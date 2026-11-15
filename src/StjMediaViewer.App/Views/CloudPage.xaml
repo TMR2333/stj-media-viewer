@@ -11,8 +11,9 @@
         数据全部来自 CloudViewModel.Shared；页面里没有任何硬编码颜色/字号/圆角。
     -->
     <Grid Background="{ThemeResource AppWindowBackgroundBrush}">
-        <ScrollViewer VerticalScrollMode="Enabled" VerticalScrollBarVisibility="Auto" Padding="24,18,24,24">
-            <StackPanel Spacing="16" MaxWidth="1240">
+        <ScrollViewer VerticalScrollMode="Enabled" VerticalScrollBarVisibility="Auto"
+                  HorizontalContentAlignment="Left" Padding="24,18,24,24">
+            <StackPanel Spacing="16" MaxWidth="1240" MinWidth="1180" HorizontalAlignment="Left">
 
                 <!-- ============ 标题 ============ -->
                 <Grid>

@@ -12,9 +12,10 @@
         设计语言：单一 Fluent；颜色 / 字号 / 圆角全部来自 ThemeResource token。
     -->
     <ScrollViewer VerticalScrollMode="Enabled" VerticalScrollBarVisibility="Auto"
+                  HorizontalContentAlignment="Left"
                   Background="{ThemeResource AppSurfaceBrush}"
                   Padding="{ThemeResource AppPagePadding}">
-        <StackPanel MaxWidth="1080" Spacing="12">
+        <StackPanel MaxWidth="1080" MinWidth="1032" HorizontalAlignment="Left" Spacing="12">
 
             <!-- 页头 -->
             <StackPanel Spacing="2" Margin="0,0,0,4">
