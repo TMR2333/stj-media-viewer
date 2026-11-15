@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="StjMediaViewer.App.Controls.Badge"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- 每种语义一个 Border 变体，全部用 ThemeResource token 上色；代码只切 Visibility。
+         这样明暗主题切换时颜色由框架自动重解析，不用在代码里碰 Brush。 -->
+    <Grid HorizontalAlignment="Left" VerticalAlignment="Center">
+        <Border x:Name="NeutralBadge" Visibility="Collapsed"
+                Background="{ThemeResource AppSurfaceAltBrush}" BorderBrush="{ThemeResource AppStrokeBrush}"
+                BorderThickness="1" CornerRadius="{ThemeResource AppRadiusPill}" Padding="8,2,10,2">
+            <TextBlock x:Name="NeutralText" Style="{ThemeResource AppMicroTextStyle}" Foreground="{ThemeResource TextSecondaryBrush}" />
+        </Border>
+
+        <Border x:Name="RawBadge" Visibility="Collapsed"
+                Background="{ThemeResource BadgeRawBrush}" CornerRadius="{ThemeResource AppRadiusPill}" Padding="8,2,10,2">
+            <TextBlock x:Name="RawText" Style="{ThemeResource AppMicroTextStyle}" Foreground="{ThemeResource BadgeRawTextBrush}" />
+        </Border>
+
+        <Border x:Name="LogBadge" Visibility="Collapsed"
+                Background="{ThemeResource BadgeLogBrush}" CornerRadius="{ThemeResource AppRadiusPill}" Padding="8,2,10,2">
+            <TextBlock x:Name="LogText" Style="{ThemeResource AppMicroTextStyle}" Foreground="{ThemeResource BadgeLogTextBrush}" />
+        </Border>
+
+        <Border x:Name="VideoBadge" Visibility="Collapsed"
+                Background="{ThemeResource BadgeVideoBrush}" CornerRadius="{ThemeResource AppRadiusPill}" Padding="8,2,10,2">
+            <TextBlock x:Name="VideoText" Style="{ThemeResource AppMicroTextStyle}" Foreground="{ThemeResource BadgeVideoTextBrush}" />
+        </Border>
+
+        <Border x:Name="ImageBadge" Visibility="Collapsed"
+                Background="{ThemeResource BadgeImageBrush}" CornerRadius="{ThemeResource AppRadiusPill}" Padding="8,2,10,2">
+            <TextBlock x:Name="ImageText" Style="{ThemeResource AppMicroTextStyle}" Foreground="{ThemeResource BadgeImageTextBrush}" />
+        </Border>
+
+        <Border x:Name="AudioBadge" Visibility="Collapsed"
+                Background="{ThemeResource BadgeAudioBrush}" CornerRadius="{ThemeResource AppRadiusPill}" Padding="8,2,10,2">
+            <TextBlock x:Name="AudioText" Style="{ThemeResource AppMicroTextStyle}" Foreground="{ThemeResource BadgeAudioTextBrush}" />
+        </Border>
+
+        <Border x:Name="AiBadge" Visibility="Collapsed"
+                Background="{ThemeResource BadgeAiBrush}" CornerRadius="{ThemeResource AppRadiusPill}" Padding="8,2,10,2">
+            <TextBlock x:Name="AiText" Style="{ThemeResource AppMicroTextStyle}" Foreground="{ThemeResource BadgeAiTextBrush}" />
+        </Border>
+    </Grid>
+</UserControl>

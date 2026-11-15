@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="StjMediaViewer.App.Views.DuplicatesPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:uic="using:StjMediaViewer.App.Controls"
+    xmlns:vm="using:StjMediaViewer.App.ViewModels"
+    Background="{ThemeResource AppTransparentBrush}">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- 页头 -->
+        <Border Grid.Row="0"
+                Background="{ThemeResource AppSurfaceBrush}"
+                BorderBrush="{ThemeResource AppDividerBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="16,10,16,10">
+            <StackPanel Spacing="10">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="1">
+                        <TextBlock Text="重复项" Style="{ThemeResource AppSubtitleTextStyle}" />
+                        <TextBlock Text="{x:Bind ViewModel.SummaryText, Mode=OneWay}"
+                                   Style="{ThemeResource AppMicroTextStyle}" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                        <ToggleSwitch Header="包含近重复" IsOn="{x:Bind ViewModel.IncludeNearDuplicates, Mode=TwoWay}"
+                                      Margin="0,0,4,0" />
+                        <Button Background="{ThemeResource AccentSubtleBrush}"
+                                BorderBrush="{ThemeResource AccentBorderBrush}"
+                                Style="{ThemeResource AppSubtleButtonStyle}"
+                                Padding="14,2,14,2" MinHeight="32"
+                                Click="Scan_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE8B7;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                                <TextBlock Text="开始查重" Style="{ThemeResource AppCaptionTextStyle}" />
+                            </StackPanel>
+                        </Button>
+                        <ProgressRing Width="20" Height="20" IsActive="{x:Bind ViewModel.IsScanning, Mode=OneWay}"
+                                      Foreground="{ThemeResource AccentBrush}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Grid>
+
+                <ProgressBar Minimum="0" Maximum="100" Value="{x:Bind ViewModel.ScanPercent, Mode=OneWay}"
+                             Foreground="{ThemeResource AccentBrush}"
+                             Visibility="{x:Bind ViewModel.ProgressVisibility, Mode=OneWay}" />
+
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <uic:StatTile Grid.Column="0" Value="{x:Bind ViewModel.GroupCountText, Mode=OneWay}" Label="重复组" />
+                    <uic:StatTile Grid.Column="1" Value="{x:Bind ViewModel.FileCountText, Mode=OneWay}" Label="涉及文件" />
+                    <uic:StatTile Grid.Column="2" Value="{x:Bind ViewModel.WastedText, Mode=OneWay}" Label="可释放空间" />
+                    <StackPanel Grid.Column="3" VerticalAlignment="Center" Spacing="6" MinWidth="220">
+                        <TextBlock Text="{x:Bind ViewModel.SelectionText, Mode=OneWay}"
+                                   Style="{ThemeResource AppCaptionTextStyle}"
+                                   Visibility="{x:Bind ViewModel.SelectionVisibility, Mode=OneWay}" />
+                        <Button Style="{ThemeResource AppSubtleButtonStyle}"
+                                Padding="12,2,12,2" MinHeight="30"
+                                Click="DeleteSelected_Click"
+                                Visibility="{x:Bind ViewModel.SelectionVisibility, Mode=OneWay}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE74D;" FontSize="{ThemeResource AppFontCaptionSize}"
+                                          Foreground="{ThemeResource DangerBrush}" />
+                                <TextBlock Text="删除勾选的副本（回收站）" Style="{ThemeResource AppCaptionTextStyle}" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- 结果列表 -->
+        <ScrollViewer Grid.Row="1" VerticalScrollMode="Enabled" VerticalScrollBarVisibility="Auto"
+                      Padding="16,10,16,16">
+            <StackPanel Spacing="10">
+
+                <Border Background="{ThemeResource AppSurfaceAltBrush}"
+                        BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                        BorderThickness="{ThemeResource AppCardStrokeThickness}"
+                        CornerRadius="{ThemeResource AppRadiusMedium}"
+                        Padding="14,12"
+                        Visibility="{x:Bind ViewModel.EmptyVisibility, Mode=OneWay}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="查重结果会显示在这里" Style="{ThemeResource AppBodyTextStyle}"
+                                   Foreground="{ThemeResource TextPrimaryBrush}" />
+                        <TextBlock Text="点「开始查重」扫描索引库：先按文件大小 + 快速哈希分组，再对候选做完整哈希；开启「包含近重复」会额外比较缩略图感知哈希。"
+                                   Style="{ThemeResource AppCaptionTextStyle}" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <ItemsControl ItemsSource="{x:Bind ViewModel.Groups, Mode=OneWay}"
+                              Visibility="{x:Bind ViewModel.ResultsVisibility, Mode=OneWay}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:DuplicateGroupViewModel">
+                            <Border Background="{ThemeResource AppSurfaceBrush}"
+                                    BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                                    BorderThickness="{ThemeResource AppCardStrokeThickness}"
+                                    CornerRadius="{ThemeResource AppRadiusMedium}"
+                                    Padding="12"
+                                    Margin="0,0,0,10">
+                                <StackPanel Spacing="10">
+
+                                    <!-- 组头 -->
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <Border Grid.Column="0" Background="{ThemeResource DangerSubtleBrush}"
+                                                BorderBrush="{ThemeResource DangerBrush}" BorderThickness="1"
+                                                CornerRadius="{ThemeResource AppRadiusSmall}" Padding="6,1"
+                                                Visibility="{x:Bind ExactVisibility, Mode=OneWay}">
+                                            <TextBlock Text="完全相同" Style="{ThemeResource AppMicroTextStyle}"
+                                                       Foreground="{ThemeResource DangerBrush}" />
+                                        </Border>
+                                        <Border Grid.Column="0" Background="{ThemeResource WarningSubtleBrush}"
+                                                BorderBrush="{ThemeResource WarningBrush}" BorderThickness="1"
+                                                CornerRadius="{ThemeResource AppRadiusSmall}" Padding="6,1"
+                                                Visibility="{x:Bind SameContentVisibility, Mode=OneWay}">
+                                            <TextBlock Text="同内容" Style="{ThemeResource AppMicroTextStyle}"
+                                                       Foreground="{ThemeResource WarningBrush}" />
+                                        </Border>
+                                        <Border Grid.Column="0" Background="{ThemeResource AccentSubtleBrush}"
+                                                BorderBrush="{ThemeResource AccentBorderBrush}" BorderThickness="1"
+                                                CornerRadius="{ThemeResource AppRadiusSmall}" Padding="6,1"
+                                                Visibility="{x:Bind NearVisibility, Mode=OneWay}">
+                                            <TextBlock Text="近重复" Style="{ThemeResource AppMicroTextStyle}"
+                                                       Foreground="{ThemeResource AccentBrush}" />
+                                        </Border>
+
+                                        <TextBlock Grid.Column="1" Text="{x:Bind CountText}"
+                                                   Style="{ThemeResource AppCaptionTextStyle}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="2" Text="{x:Bind WastedText}"
+                                                   Style="{ThemeResource AppMicroTextStyle}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="3" Text="{x:Bind ReasonText}"
+                                                   Style="{ThemeResource AppMicroTextStyle}" VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Visibility="{x:Bind ReasonVisibility, Mode=OneWay}" />
+                                        <TextBlock Grid.Column="4" Text="{x:Bind DeleteSelectionText, Mode=OneWay}"
+                                                   Style="{ThemeResource AppMicroTextStyle}" VerticalAlignment="Center" />
+                                    </Grid>
+
+                                    <!-- 组内文件（横向滚动） -->
+                                    <ScrollViewer HorizontalScrollMode="Enabled" VerticalScrollMode="Disabled"
+                                                  HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                                        <ItemsControl ItemsSource="{x:Bind Items}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <StackPanel Orientation="Horizontal" Spacing="8" />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:DuplicateItemViewModel">
+                                                    <Border Width="230"
+                                                            Background="{ThemeResource AppSurfaceAltBrush}"
+                                                            BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                                                            BorderThickness="{ThemeResource AppCardStrokeThickness}"
+                                                            CornerRadius="{ThemeResource AppRadiusMedium}"
+                                                            Padding="8">
+                                                        <StackPanel Spacing="6">
+                                                            <Border Height="120"
+                                                                    Background="{ThemeResource AppSurfaceBrush}"
+                                                                    CornerRadius="{ThemeResource AppRadiusSmall}">
+                                                                <Grid>
+                                                                    <uic:ThumbnailImage Asset="{x:Bind Asset}" DecodeSize="320" />
+                                                                    <Border HorizontalAlignment="Left" VerticalAlignment="Top"
+                                                                            Margin="6"
+                                                                            Background="{ThemeResource SuccessSubtleBrush}"
+                                                                            BorderBrush="{ThemeResource SuccessBrush}"
+                                                                            BorderThickness="1"
+                                                                            CornerRadius="{ThemeResource AppRadiusSmall}"
+                                                                            Padding="6,1"
+                                                                            Visibility="{x:Bind KeptVisibility, Mode=OneWay}">
+                                                                        <TextBlock Text="保留" Style="{ThemeResource AppMicroTextStyle}"
+                                                                                   Foreground="{ThemeResource SuccessBrush}" />
+                                                                    </Border>
+                                                                </Grid>
+                                                            </Border>
+
+                                                            <TextBlock Text="{x:Bind FileName}"
+                                                                       Style="{ThemeResource AppCaptionTextStyle}"
+                                                                       Foreground="{ThemeResource TextPrimaryBrush}"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Text="{x:Bind DetailText}"
+                                                                       Style="{ThemeResource AppMicroTextStyle}"
+                                                                       TextWrapping="Wrap" />
+                                                            <TextBlock Text="{x:Bind PathText}"
+                                                                       Style="{ThemeResource AppMicroTextStyle}"
+                                                                       TextTrimming="CharacterEllipsis" />
+
+                                                            <Grid ColumnSpacing="6">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                    <ColumnDefinition Width="*" />
+                                                                </Grid.ColumnDefinitions>
+                                                                <Button Grid.Column="0"
+                                                                        Style="{ThemeResource AppSubtleButtonStyle}"
+                                                                        Padding="8,1,8,1" MinHeight="26"
+                                                                        Click="Keep_Click"
+                                                                        Visibility="{x:Bind NotKeptVisibility, Mode=OneWay}">
+                                                                    <TextBlock Text="{x:Bind KeepButtonText, Mode=OneWay}"
+                                                                               Style="{ThemeResource AppMicroTextStyle}" />
+                                                                </Button>
+                                                                <CheckBox Grid.Column="1"
+                                                                          Content="删除"
+                                                                          HorizontalAlignment="Right"
+                                                                          VerticalAlignment="Center"
+                                                                          IsChecked="{x:Bind IsSelectedForDelete, Mode=TwoWay}"
+                                                                          Checked="DeleteCheck_Changed"
+                                                                          Unchecked="DeleteCheck_Changed"
+                                                                          Visibility="{x:Bind DeleteCheckVisibility, Mode=OneWay}" />
+                                                            </Grid>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <Border Height="8" Background="{ThemeResource AppTransparentBrush}" />
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="StjMediaViewer.App.Controls.ThumbnailImage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- 占位渐变的颜色由代码按"文件路径 hash"生成（程序化占位是唯一允许的硬编码色），
+         渐变本身在这里声明，明暗主题变化时由代码重算。 -->
+    <Grid x:Name="Root"
+          Background="{ThemeResource AppSurfaceAltBrush}"
+          CornerRadius="{ThemeResource AppRadiusMedium}"
+          SizeChanged="Root_SizeChanged">
+        <Grid x:Name="PlaceholderHost">
+            <Grid.Background>
+                <LinearGradientBrush x:Name="PlaceholderBrush" StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop x:Name="StopA" Offset="0" />
+                    <GradientStop x:Name="StopB" Offset="1" />
+                </LinearGradientBrush>
+            </Grid.Background>
+        </Grid>
+        <FontIcon x:Name="TypeGlyph" FontSize="30"
+                  Foreground="{ThemeResource TextTertiaryBrush}"
+                  HorizontalAlignment="Center" VerticalAlignment="Center"
+                  IsHitTestVisible="False" />
+        <Image x:Name="Thumb" Stretch="UniformToFill" Visibility="Collapsed" />
+    </Grid>
+</UserControl>

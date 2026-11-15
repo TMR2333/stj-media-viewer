@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="StjMediaViewer.App.Controls.StatTile"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:StjMediaViewer.App.Controls">
+
+    <!-- 用 GlassPanel 而不是裸 Border：自动获得三套皮肤的层次（Glass = 玻璃 + 渐变高光 + 柔和阴影，
+         MD3 = 16 圆角 tonal 卡片，Fluent = 8 圆角细描边卡片）。 -->
+    <controls:GlassPanel ContentPadding="{ThemeResource AppCardPadding}">
+        <StackPanel Spacing="4" VerticalAlignment="Center">
+            <FontIcon x:Name="TileGlyph" FontSize="16" Foreground="{ThemeResource AccentBrush}"
+                      HorizontalAlignment="Left" Visibility="Collapsed" />
+            <TextBlock x:Name="ValueText" Style="{ThemeResource AppTitleTextStyle}" TextTrimming="CharacterEllipsis" />
+            <TextBlock x:Name="LabelText" Style="{ThemeResource AppCaptionTextStyle}" />
+            <TextBlock x:Name="HintText" Style="{ThemeResource AppMicroTextStyle}" Visibility="Collapsed" TextWrapping="Wrap" />
+        </StackPanel>
+    </controls:GlassPanel>
+</UserControl>

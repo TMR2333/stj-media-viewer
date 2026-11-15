@@ -117,6 +117,17 @@ public static class TimeUtil
             int.TryParse(offset.Substring(1, 2), out var hh) &&
             int.TryParse(offset.Substring(3, 2), out var mm))
             off = new TimeSpan(offset[0] == '-' ? -hh : hh, mm, 0);
+
+        if (off is null) return ParseFlexible(dateTimeOriginal);
+
+        // 关键：EXIF 记的是"墙上时间 + 时区偏移"，必须用时间分量重新构造 DateTimeOffset，
+        // 不能先按本地时间解析再套 offset（那会抛 ArgumentException 或双加偏移）。
+        var s = dateTimeOriginal.Trim().TrimEnd('\0');
+        foreach (var f in new[] { "yyyy:MM:dd HH:mm:ss", "yyyy-MM-dd HH:mm:ss", "yyyy:MM:dd HH:mm:ss.fff", "yyyy-MM-dd'T'HH:mm:ss" })
+        {
+            if (DateTime.TryParseExact(s, f, CultureInfo.InvariantCulture, DateTimeStyles.None, out var wall))
+                return new DateTimeOffset(wall.Year, wall.Month, wall.Day, wall.Hour, wall.Minute, wall.Second, off.Value);
+        }
         return ParseFlexible(dateTimeOriginal, off);
     }
 }

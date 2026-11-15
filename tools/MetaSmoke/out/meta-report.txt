@@ -1,0 +1,34 @@
+﻿library = D:\UserData\Documents\dsh\stj-m-v\tools\SampleLibrary\out\library
+files = 85
+
+================ 统计 ================
+检查媒体文件: 62   总耗时: 205.7 ms   平均: 3.32 ms   最慢: 2023\上海\DSC01234.JPG 44.2 ms
+  Image: 52 个, 平均 3.10 ms
+  Audio: 4 个, 平均 5.09 ms
+  Video: 6 个, 平均 4.05 ms
+City: 有文件元数据城市并确认 19 条，等待 IGeocoder 32 条；来源分布=[xmp:19]
+失败项: 3
+  expectTransferCharacteristics: 3
+  - Video\2024_冰岛_航拍_DJI_HLG.mov: expectTransferCharacteristics 期望 'arib-std-b67' 实际 'HLG'
+  - Video\2024_巴黎_SLog3_Sony.mov: expectTransferCharacteristics 期望 'bt709' 实际 'S-Log3'
+  - Video\2025_东京_夜景_Fuji_HLG.mov: expectTransferCharacteristics 期望 'arib-std-b67' 实际 'HLG'
+
+================ 并发与取消 ================
+并发解析 62 个文件（8 线程）: 20 ms, 结果不一致/异常 0
+预取消 token: kind=Image, warnings=2, error='文件内容与扩展名不符（魔数校验失败），可能已损坏'（不应抛异常）
+不存在文件: error='文件不存在'，未抛异常
+
+================ XmpReader 独立解析 ================
+DSC01235.xmp: props=25 rating=2 label=Green city=上海 country=中国 title=上海城市 keywords=上海/中国/城市/建筑/天际线 hasSettings=True pv=15.4 engine=Lightroom
+DSC03002.xmp: props=25 rating=3 label=Red city=成都 country=中国 title=成都街拍 keywords=成都/中国/街拍/城市/人文 hasSettings=True pv=15.4 engine=Lightroom
+DSC02001.xmp: props=25 rating=2 label=Yellow city=东京 country=日本 title=东京街拍 keywords=东京/日本/街拍/城市/人文 hasSettings=True pv=15.4 engine=Lightroom
+
+================ RAW 内嵌预览 ================
+DSC01235.ARW: found=True pos=583344 len=66548 1200x800 method=scan bytes=66548 0.4ms
+DSC01239.ARW: found=True pos=843782 len=60156 1600x1067 method=scan bytes=60156 1.3ms
+DSC03005.ARW: found=True pos=1089182 len=64514 1600x1067 method=scan bytes=64514 0.5ms
+R5A0013.DNG: found=True pos=735378 len=56055 1600x1067 method=scan bytes=56055 0.4ms
+DSC02001.ARW: found=True pos=545944 len=35141 1200x800 method=scan bytes=35141 1.0ms
+DJI_0001.DNG: found=True pos=527552 len=41584 1200x900 method=scan bytes=41584 0.3ms
+R5A0002.CR2: found=True pos=612368 len=35203 1200x800 method=scan bytes=35203 0.4ms
+_DSC3000.NEF: found=True pos=399640 len=70779 1200x800 method=scan bytes=70779 0.9ms

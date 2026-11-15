@@ -13,23 +13,29 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
         Title = "STJ Media Viewer";
-        AppWindow.Title = "STJ Media Viewer";
         AppWindow.TitleBar.ExtendsContentIntoTitleBar = false;
-        TrySetSize(1480, 940);
         RootFrame.Navigate(typeof(ShellPage));
     }
 
-    private void TrySetSize(int width, int height)
+    /// <summary>在窗口 Activate 之后调用，避免 AppWindow 还没拿到显示器信息。</summary>
+    public void PositionWindow()
     {
         try
         {
+            var scale = (Content as FrameworkElement)?.XamlRoot?.RasterizationScale ?? 1.0;
             var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary);
-            var w = Math.Min(width, area.WorkArea.Width - 80);
-            var h = Math.Min(height, area.WorkArea.Height - 80);
-            AppWindow.Resize(new Windows.Graphics.SizeInt32((int)w, (int)h));
-            AppWindow.Move(new Windows.Graphics.PointInt32(
-                area.WorkArea.X + (area.WorkArea.Width - (int)w) / 2,
-                area.WorkArea.Y + (area.WorkArea.Height - (int)h) / 2));
+            var wa = area.WorkArea;
+
+            // 目标逻辑尺寸 1500x900 DIP；AppWindow 用物理像素，所以乘缩放。
+            // 再与工作区做 clamp，保证一定完整可见（含任务栏）。
+            int margin = (int)(80 * scale);
+            int w = Math.Min((int)(1500 * scale), Math.Max(800, wa.Width - margin));
+            int h = Math.Min((int)(900 * scale), Math.Max(600, wa.Height - margin));
+            int x = wa.X + (wa.Width - w) / 2;
+            int y = wa.Y + (wa.Height - h) / 2;
+
+            AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(x, y, w, h));
+            Core.Util.Log.Info($"窗口定位 scale={scale:0.##} workArea={wa.Width}x{wa.Height}@{wa.X},{wa.Y} → {w}x{h}@{x},{y}");
         }
         catch (Exception ex)
         {

@@ -1,0 +1,278 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="StjMediaViewer.App.Views.TimelinePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:uic="using:StjMediaViewer.App.Controls"
+    xmlns:vm="using:StjMediaViewer.App.ViewModels"
+    Background="{ThemeResource AppTransparentBrush}">
+
+    <Page.Resources>
+        <ItemsPanelTemplate x:Key="WallPanelSmall">
+            <ItemsWrapGrid Orientation="Horizontal" ItemWidth="132" ItemHeight="168" />
+        </ItemsPanelTemplate>
+        <ItemsPanelTemplate x:Key="WallPanelMedium">
+            <ItemsWrapGrid Orientation="Horizontal" ItemWidth="172" ItemHeight="212" />
+        </ItemsPanelTemplate>
+        <ItemsPanelTemplate x:Key="WallPanelLarge">
+            <ItemsWrapGrid Orientation="Horizontal" ItemWidth="224" ItemHeight="266" />
+        </ItemsPanelTemplate>
+
+        <Style x:Key="WallItemStyle" TargetType="GridViewItem">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Background" Value="{ThemeResource AppTransparentBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+        </Style>
+
+        <Style x:Key="DayRowStyle" TargetType="Button">
+            <Setter Property="Background" Value="{ThemeResource AppTransparentBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="6,3,6,3" />
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="CornerRadius" Value="{ThemeResource AppRadiusSmall}" />
+        </Style>
+
+        <DataTemplate x:Key="WallTemplate" x:DataType="vm:AssetCardItem">
+            <Grid Margin="4">
+                <Border Background="{ThemeResource AppSurfaceAltBrush}"
+                        BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                        BorderThickness="{ThemeResource AppCardStrokeThickness}"
+                        CornerRadius="{ThemeResource AppRadiusMedium}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Grid Grid.Row="0" Margin="1,1,1,0">
+                            <uic:ThumbnailImage Asset="{x:Bind Asset, Mode=OneWay}" DecodeSize="360" />
+                            <uic:Badge Text="RAW" Kind="Raw" Margin="4"
+                                       HorizontalAlignment="Left" VerticalAlignment="Top"
+                                       Visibility="{x:Bind RawBadgeVisibility, Mode=OneWay}" />
+                        </Grid>
+                        <StackPanel Grid.Row="1" Padding="7,5,7,6" Spacing="1">
+                            <TextBlock Text="{x:Bind FileName, Mode=OneWay}"
+                                       Style="{ThemeResource AppCaptionTextStyle}"
+                                       Foreground="{ThemeResource TextPrimaryBrush}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{x:Bind DeviceDateText, Mode=OneWay}"
+                                       Style="{ThemeResource AppMicroTextStyle}"
+                                       TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Grid>
+        </DataTemplate>
+    </Page.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- 页头 + 年份 chips -->
+        <Border Grid.Row="0"
+                Background="{ThemeResource AppSurfaceBrush}"
+                BorderBrush="{ThemeResource AppDividerBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="16,10,16,10">
+            <StackPanel Spacing="8">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="1">
+                        <TextBlock Text="时间线" Style="{ThemeResource AppSubtitleTextStyle}" />
+                        <TextBlock Text="{x:Bind ViewModel.TotalSummary, Mode=OneWay}"
+                                   Style="{ThemeResource AppMicroTextStyle}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <TextBlock Text="密度" Style="{ThemeResource AppMicroTextStyle}" VerticalAlignment="Center" />
+                        <ToggleButton x:Name="DensitySmall" Style="{ThemeResource AppChipStyle}" Content="小" Click="Density_Click" Tag="small" />
+                        <ToggleButton x:Name="DensityMedium" Style="{ThemeResource AppChipStyle}" Content="中" Click="Density_Click" Tag="medium" />
+                        <ToggleButton x:Name="DensityLarge" Style="{ThemeResource AppChipStyle}" Content="大" Click="Density_Click" Tag="large" />
+                    </StackPanel>
+                </Grid>
+
+                <ScrollViewer HorizontalScrollMode="Enabled" VerticalScrollMode="Disabled"
+                              HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.YearChips, Mode=OneWay}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="6" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:YearChipViewModel">
+                                <Button Style="{ThemeResource AppSubtleButtonStyle}" Tag="{x:Bind Year}" Click="Year_Click"
+                                        HorizontalContentAlignment="Stretch" Padding="10,4,10,4" MinHeight="28"
+                                        CornerRadius="{ThemeResource AppRadiusPill}">
+                                    <Grid>
+                                        <Border Background="{ThemeResource AppSelectedBrush}"
+                                                CornerRadius="{ThemeResource AppRadiusPill}"
+                                                Visibility="{x:Bind SelectionVisibility, Mode=OneWay}" />
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <TextBlock Text="{x:Bind Title}" Style="{ThemeResource AppCaptionTextStyle}" />
+                                            <TextBlock Text="{x:Bind CountText}" Style="{ThemeResource AppMicroTextStyle}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </StackPanel>
+        </Border>
+
+        <!-- 左侧时间轴 + 右侧缩略图墙 -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="300" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0"
+                    Background="{ThemeResource AppSurfaceBrush}"
+                    BorderBrush="{ThemeResource AppDividerBrush}"
+                    BorderThickness="0,0,1,0">
+                <ScrollViewer VerticalScrollMode="Enabled" VerticalScrollBarVisibility="Auto" Padding="10,8,10,16">
+                    <StackPanel>
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.Years, Mode=OneWay}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:TimelineYearViewModel">
+                                <Expander HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                          IsExpanded="{x:Bind IsExpanded}">
+                                    <Expander.Header>
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="{x:Bind Title}" Style="{ThemeResource AppSubtitleTextStyle}" />
+                                            <TextBlock Text="{x:Bind CountText}" Style="{ThemeResource AppMicroTextStyle}"
+                                                       VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Expander.Header>
+
+                                    <ItemsControl ItemsSource="{x:Bind Months}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="vm:TimelineMonthViewModel">
+                                                <Expander HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                                          IsExpanded="{x:Bind IsExpanded}">
+                                                    <Expander.Header>
+                                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                                            <TextBlock Text="{x:Bind Title}" Style="{ThemeResource AppSectionHeaderTextStyle}"
+                                                                       Margin="0" VerticalAlignment="Center" />
+                                                            <TextBlock Text="{x:Bind CountText}" Style="{ThemeResource AppMicroTextStyle}"
+                                                                       VerticalAlignment="Center" />
+                                                        </StackPanel>
+                                                    </Expander.Header>
+                                                    <ItemsControl ItemsSource="{x:Bind Days}">
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate x:DataType="vm:TimelineDayViewModel">
+                                                                <Button Style="{StaticResource DayRowStyle}"
+                                                                        Click="Day_Click">
+                                                                    <Grid>
+                                                                        <Border Background="{ThemeResource AppSelectedBrush}"
+                                                                                CornerRadius="{ThemeResource AppRadiusSmall}"
+                                                                                Visibility="{x:Bind SelectionVisibility, Mode=OneWay}" />
+                                                                        <Grid ColumnSpacing="8">
+                                                                            <Grid.ColumnDefinitions>
+                                                                                <ColumnDefinition Width="Auto" />
+                                                                                <ColumnDefinition Width="Auto" />
+                                                                                <ColumnDefinition Width="*" />
+                                                                                <ColumnDefinition Width="Auto" />
+                                                                            </Grid.ColumnDefinitions>
+                                                                            <TextBlock Grid.Column="0" Text="{x:Bind DayText}"
+                                                                                       Style="{ThemeResource AppCaptionTextStyle}"
+                                                                                       FontFamily="{ThemeResource AppMonoFontFamily}" />
+                                                                            <TextBlock Grid.Column="1" Text="{x:Bind WeekdayText}"
+                                                                                       Style="{ThemeResource AppMicroTextStyle}" />
+                                                                            <Border Grid.Column="2" Height="8"
+                                                                                    Width="{x:Bind BarWidth}"
+                                                                                    Background="{ThemeResource AccentSubtleBrush}"
+                                                                                    BorderBrush="{ThemeResource AccentBorderBrush}"
+                                                                                    BorderThickness="1"
+                                                                                    CornerRadius="{ThemeResource AppRadiusPill}"
+                                                                                    HorizontalAlignment="Left"
+                                                                                    VerticalAlignment="Center" />
+                                                                            <TextBlock Grid.Column="3" Text="{x:Bind CountText}"
+                                                                                       Style="{ThemeResource AppMicroTextStyle}" />
+                                                                        </Grid>
+                                                                    </Grid>
+                                                                </Button>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </Expander>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </Expander>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock Text="库里还没有可用的拍摄时间数据。扫描媒体库后会自动出现年 / 月 / 日分组。"
+                               Style="{ThemeResource AppCaptionTextStyle}"
+                               TextWrapping="Wrap"
+                               Margin="4,12,4,0"
+                               Visibility="{x:Bind ViewModel.EmptyVisibility, Mode=OneWay}" />
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <!-- 右侧缩略图墙垫一层表面色，保证日期标题等文字不在裸光场上 -->
+            <Grid Grid.Column="1" Background="{ThemeResource AppSurfaceBrush}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Grid Padding="16,10,16,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="1">
+                        <TextBlock Text="{x:Bind ViewModel.SelectedDayTitle, Mode=OneWay}"
+                                   Style="{ThemeResource AppSubtitleTextStyle}" />
+                        <TextBlock Text="{x:Bind ViewModel.SelectedDaySummary, Mode=OneWay}"
+                                   Style="{ThemeResource AppMicroTextStyle}" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="1" Text="{x:Bind ViewModel.WallSummary, Mode=OneWay}"
+                               Style="{ThemeResource AppCaptionTextStyle}" VerticalAlignment="Center" />
+                </Grid>
+
+                <GridView Grid.Row="1"
+                          x:Name="Wall"
+                          ItemsSource="{x:Bind ViewModel.Items, Mode=OneWay}"
+                          ItemTemplate="{StaticResource WallTemplate}"
+                          ItemContainerStyle="{StaticResource WallItemStyle}"
+                          ItemsPanel="{StaticResource WallPanelMedium}"
+                          SelectionMode="Single"
+                          Padding="12,0,12,12"
+                          DoubleTapped="Wall_DoubleTapped" />
+
+                <ProgressBar Grid.Row="1" Height="2" VerticalAlignment="Top"
+                             IsIndeterminate="True"
+                             Background="{ThemeResource AppTransparentBrush}"
+                             Foreground="{ThemeResource AccentBrush}"
+                             Visibility="{x:Bind ViewModel.LoadingVisibility, Mode=OneWay}" />
+
+                <StackPanel Grid.Row="1" HorizontalAlignment="Center" VerticalAlignment="Center"
+                            Spacing="8"
+                            Visibility="{x:Bind ViewModel.WallEmptyVisibility, Mode=OneWay}">
+                    <FontIcon Glyph="&#xE787;" FontSize="{ThemeResource AppFontDisplaySize}"
+                              Foreground="{ThemeResource TextTertiaryBrush}" HorizontalAlignment="Center" />
+                    <TextBlock Text="这一天没有素材" Style="{ThemeResource AppCaptionTextStyle}"
+                               HorizontalAlignment="Center" />
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </Grid>
+</Page>

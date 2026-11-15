@@ -1,0 +1,277 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="StjMediaViewer.App.Views.AiQueuePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:uic="using:StjMediaViewer.App.Controls"
+    xmlns:vm="using:StjMediaViewer.App.ViewModels"
+    Background="{ThemeResource AppTransparentBrush}">
+
+    <!-- 内容区加一层半透明表面（Glass 下 55%），保证文字不直接落在光场上（可读性优先） -->
+    <ScrollViewer VerticalScrollMode="Enabled" VerticalScrollBarVisibility="Auto"
+                  Background="{ThemeResource AppSurfaceBrush}"
+                  Padding="{ThemeResource AppPagePadding}">
+        <StackPanel MaxWidth="1060" Spacing="12">
+
+            <!-- 页头 -->
+            <StackPanel Spacing="2" Margin="0,0,0,4">
+                <TextBlock Text="AI 队列" Style="{ThemeResource AppTitleTextStyle}" />
+                <TextBlock Text="用你配置的视觉模型批量分类：范围 → 选项 → 运行，结果直接写回索引库并可导出 XMP。"
+                           Style="{ThemeResource AppCaptionTextStyle}" />
+                <TextBlock Text="{x:Bind ViewModel.ApiHintText, Mode=OneWay}"
+                           Style="{ThemeResource AppMicroTextStyle}" TextWrapping="Wrap" />
+            </StackPanel>
+
+            <!-- 未配置模型的引导 -->
+            <Border Background="{ThemeResource WarningSubtleBrush}"
+                    BorderBrush="{ThemeResource WarningBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{ThemeResource AppRadiusMedium}"
+                    Padding="16,12"
+                    Visibility="{x:Bind ViewModel.GuidanceVisibility, Mode=OneWay}">
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Grid.Column="0" Glyph="&#xE9D2;" FontSize="{ThemeResource AppFontTitleSize}"
+                              Foreground="{ThemeResource WarningBrush}" VerticalAlignment="Center" />
+                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                        <TextBlock Text="还没有接入视觉模型" Style="{ThemeResource AppBodyTextStyle}"
+                                   Foreground="{ThemeResource TextPrimaryBrush}" FontWeight="SemiBold" />
+                        <TextBlock Text="{x:Bind ViewModel.GuidanceText, Mode=OneWay}"
+                                   Style="{ThemeResource AppCaptionTextStyle}" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <Button Grid.Column="2" Style="{ThemeResource AppSubtleButtonStyle}"
+                            Padding="12,2,12,2" MinHeight="30"
+                            Click="GoSettings_Click" VerticalAlignment="Center">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE713;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                            <TextBlock Text="去设置" Style="{ThemeResource AppCaptionTextStyle}" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- 批量选项 -->
+            <uic:SectionCard Header="批量分类" Subtitle="选择处理范围与批量选项，然后开始" Glyph="&#xE9D2;">
+                <StackPanel Spacing="12">
+                    <Grid ColumnSpacing="16" RowSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4">
+                            <TextBlock Text="处理范围" Style="{ThemeResource AppMicroTextStyle}" />
+                            <ComboBox x:Name="ScopeBox" HorizontalAlignment="Stretch"
+                                      SelectionChanged="ScopeBox_SelectionChanged">
+                                <ComboBoxItem Content="只处理未分类（推荐）" Tag="unclassified" />
+                                <ComboBoxItem Content="当前筛选结果（素材库页面的筛选）" Tag="filtered" />
+                                <ComboBoxItem Content="全部素材" Tag="all" />
+                                <ComboBoxItem Content="已选中的素材" Tag="selected" />
+                            </ComboBox>
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4" MinWidth="120">
+                            <TextBlock Text="本次最多处理" Style="{ThemeResource AppMicroTextStyle}" />
+                            <NumberBox Minimum="1" Maximum="2000" SpinButtonPlacementMode="Compact"
+                                       Value="{x:Bind ViewModel.MaxItems, Mode=OneWay}"
+                                       ValueChanged="MaxItems_ValueChanged" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="0" Grid.Column="2" Spacing="4" MinWidth="110">
+                            <TextBlock Text="并发数" Style="{ThemeResource AppMicroTextStyle}" />
+                            <NumberBox Minimum="1" Maximum="16" SpinButtonPlacementMode="Compact"
+                                       Value="{x:Bind ViewModel.Concurrency, Mode=OneWay}"
+                                       ValueChanged="Concurrency_ValueChanged" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
+                                    Orientation="Horizontal" Spacing="24">
+                            <ToggleSwitch Header="覆盖人工分类结果" IsOn="{x:Bind ViewModel.OverwriteManual, Mode=TwoWay}" />
+                            <ToggleSwitch Header="写入关键词" IsOn="{x:Bind ViewModel.ApplyKeywords, Mode=TwoWay}" />
+                            <ToggleSwitch Header="写入质量分" IsOn="{x:Bind ViewModel.ApplyQuality, Mode=TwoWay}" />
+                            <TextBlock Text="{x:Bind ViewModel.ScopeSummary, Mode=OneWay}"
+                                       Style="{ThemeResource AppMicroTextStyle}" VerticalAlignment="Bottom"
+                                       Margin="0,0,0,4" />
+                        </StackPanel>
+                    </Grid>
+
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Background="{ThemeResource AccentSubtleBrush}"
+                                BorderBrush="{ThemeResource AccentBorderBrush}"
+                                Style="{ThemeResource AppSubtleButtonStyle}"
+                                Padding="14,2,14,2" MinHeight="32"
+                                Click="Start_Click"
+                                Visibility="{x:Bind ViewModel.StartVisibility, Mode=OneWay}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE768;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                                <TextBlock Text="{x:Bind ViewModel.StartButtonText, Mode=OneWay}"
+                                           Style="{ThemeResource AppCaptionTextStyle}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="14,2,14,2" MinHeight="32"
+                                Click="Pause_Click"
+                                Visibility="{x:Bind ViewModel.PauseVisibility, Mode=OneWay}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE769;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                                <TextBlock Text="暂停" Style="{ThemeResource AppCaptionTextStyle}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="14,2,14,2" MinHeight="32"
+                                Click="Cancel_Click"
+                                Visibility="{x:Bind ViewModel.CancelVisibility, Mode=OneWay}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE711;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                                <TextBlock Text="取消" Style="{ThemeResource AppCaptionTextStyle}" />
+                            </StackPanel>
+                        </Button>
+                        <ProgressRing Width="20" Height="20" IsActive="{x:Bind ViewModel.IsRunning, Mode=OneWay}"
+                                      Foreground="{ThemeResource AccentBrush}" VerticalAlignment="Center" />
+                        <TextBlock Text="{x:Bind ViewModel.RunStatusText, Mode=OneWay}"
+                                   Style="{ThemeResource AppMicroTextStyle}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+            </uic:SectionCard>
+
+            <!-- 进度 + 实时日志 -->
+            <uic:SectionCard Header="实时进度" Subtitle="最近 200 条处理记录" Glyph="&#xE9D9;"
+                             Visibility="{x:Bind ViewModel.ProgressVisibility, Mode=OneWay}">
+                <StackPanel Spacing="10">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ProgressRing Grid.Column="0" Width="56" Height="56"
+                                      IsActive="{x:Bind ViewModel.IsRunning, Mode=OneWay}"
+                                      Value="{x:Bind ViewModel.ProgressPercent, Mode=OneWay}"
+                                      Foreground="{ThemeResource AccentBrush}" />
+                        <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                            <TextBlock Text="{x:Bind ViewModel.ProgressText, Mode=OneWay}"
+                                       Style="{ThemeResource AppBodyTextStyle}"
+                                       Foreground="{ThemeResource TextPrimaryBrush}" />
+                            <ProgressBar Minimum="0" Maximum="100"
+                                         Value="{x:Bind ViewModel.ProgressPercent, Mode=OneWay}"
+                                         Foreground="{ThemeResource AccentBrush}" />
+                            <TextBlock Text="{x:Bind ViewModel.CurrentFile, Mode=OneWay}"
+                                       Style="{ThemeResource AppMicroTextStyle}"
+                                       TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </Grid>
+
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <uic:StatTile Grid.Column="0" Value="{x:Bind ViewModel.TotalText, Mode=OneWay}" Label="总数" />
+                        <uic:StatTile Grid.Column="1" Value="{x:Bind ViewModel.ProcessedText, Mode=OneWay}" Label="已处理" />
+                        <uic:StatTile Grid.Column="2" Value="{x:Bind ViewModel.SucceededText, Mode=OneWay}" Label="成功" />
+                        <uic:StatTile Grid.Column="3" Value="{x:Bind ViewModel.FailedText, Mode=OneWay}" Label="失败" />
+                        <uic:StatTile Grid.Column="4" Value="{x:Bind ViewModel.SkippedText, Mode=OneWay}" Label="跳过" />
+                    </Grid>
+
+                    <ScrollViewer MaxHeight="300" VerticalScrollMode="Enabled" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{x:Bind ViewModel.Logs, Mode=OneWay}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:AiQueueLogEntry">
+                                    <Grid ColumnSpacing="8" Padding="0,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{x:Bind TimeText}"
+                                                   Style="{ThemeResource AppMicroTextStyle}"
+                                                   FontFamily="{ThemeResource AppMonoFontFamily}" />
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                                            <FontIcon Glyph="&#xE73E;" FontSize="{ThemeResource AppFontMicroSize}"
+                                                      Foreground="{ThemeResource SuccessBrush}"
+                                                      Visibility="{x:Bind OkVisibility}" />
+                                            <FontIcon Glyph="&#xEA39;" FontSize="{ThemeResource AppFontMicroSize}"
+                                                      Foreground="{ThemeResource DangerBrush}"
+                                                      Visibility="{x:Bind ErrorVisibility}" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2" Text="{x:Bind LineText}"
+                                                   Style="{ThemeResource AppMicroTextStyle}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    <TextBlock Text="日志为空时说明还没有开始处理。"
+                               Style="{ThemeResource AppMicroTextStyle}"
+                               Visibility="Collapsed" />
+                </StackPanel>
+            </uic:SectionCard>
+
+            <!-- 结果汇总 -->
+            <uic:SectionCard Header="结果汇总" Subtitle="本批次的成功率与主题分布" Glyph="&#xE9D5;"
+                             Visibility="{x:Bind ViewModel.SummaryVisibility, Mode=OneWay}">
+                <StackPanel Spacing="12">
+                    <Grid ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <uic:StatTile Grid.Column="0" Value="{x:Bind ViewModel.SuccessRateText, Mode=OneWay}" Label="成功率" />
+                        <uic:StatTile Grid.Column="1" Value="{x:Bind ViewModel.AverageText, Mode=OneWay}" Label="平均耗时" />
+                        <uic:StatTile Grid.Column="2" Value="{x:Bind ViewModel.Succeeded, Mode=OneWay}" Label="成功张数" />
+                    </Grid>
+
+                    <TextBlock Text="{x:Bind ViewModel.UpdatedText, Mode=OneWay}"
+                               Style="{ThemeResource AppCaptionTextStyle}" TextWrapping="Wrap" />
+
+                    <TextBlock Text="主题分布" Style="{ThemeResource AppSectionHeaderTextStyle}" />
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.ThemeBars, Mode=OneWay}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ThemeBar">
+                                <Grid ColumnSpacing="10" Margin="0,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="110" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{x:Bind Label}"
+                                               Style="{ThemeResource AppCaptionTextStyle}" />
+                                    <Border Grid.Column="1" Height="10" Width="{x:Bind Width}"
+                                            Background="{ThemeResource AccentSubtleBrush}"
+                                            BorderBrush="{ThemeResource AccentBorderBrush}"
+                                            BorderThickness="1"
+                                            CornerRadius="{ThemeResource AppRadiusPill}" />
+                                    <TextBlock Grid.Column="2" Text="{x:Bind CountText}"
+                                               Style="{ThemeResource AppMicroTextStyle}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="12,2,12,2" MinHeight="30"
+                            Click="WriteXmp_Click"
+                            Visibility="{x:Bind ViewModel.HasUpdated, Mode=OneWay}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE8A5;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                            <TextBlock Text="把结果写入 XMP 边车" Style="{ThemeResource AppCaptionTextStyle}" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </uic:SectionCard>
+
+            <Border Height="12" Background="{ThemeResource AppTransparentBrush}" />
+        </StackPanel>
+    </ScrollViewer>
+</Page>

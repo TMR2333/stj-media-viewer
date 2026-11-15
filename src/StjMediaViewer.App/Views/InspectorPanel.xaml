@@ -1,0 +1,339 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="StjMediaViewer.App.Views.InspectorPanel"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:uic="using:StjMediaViewer.App.Controls"
+    xmlns:vm="using:StjMediaViewer.App.ViewModels">
+
+    <!--
+        右侧检视面板：大缩略图 / 元数据分组（带来源徽标）/ 手动分类 / 操作。
+        视觉层级靠 token 的表面色与分隔线，不写任何硬编码颜色。
+    -->
+    <Grid Background="{ThemeResource AppSurfaceBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- ============ 头部：预览图 + 标题 ============ -->
+        <Border Grid.Row="0"
+                Background="{ThemeResource AppSurfaceAltBrush}"
+                BorderBrush="{ThemeResource AppDividerBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="12">
+            <StackPanel Spacing="10">
+                <Border x:Name="PreviewHost"
+                        Height="168"
+                        CornerRadius="{ThemeResource AppRadiusMedium}"
+                        Background="{ThemeResource AppSurfaceBrush}"
+                        BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                        BorderThickness="{ThemeResource AppCardStrokeThickness}"
+                        Tapped="PreviewHost_Tapped"
+                        ToolTipService.ToolTip="点击在全屏预览中打开">
+                    <Grid>
+                        <Image Source="{x:Bind ViewModel.PreviewImage, Mode=OneWay}"
+                               Visibility="{x:Bind ViewModel.ImageVisibility, Mode=OneWay}"
+                               Stretch="UniformToFill" />
+
+                        <StackPanel Visibility="{x:Bind ViewModel.PlaceholderVisibility, Mode=OneWay}"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="8">
+                            <FontIcon Glyph="{x:Bind ViewModel.PlaceholderGlyph, Mode=OneWay}"
+                                      FontSize="{ThemeResource AppFontTitleSize}"
+                                      Foreground="{ThemeResource TextTertiaryBrush}"
+                                      HorizontalAlignment="Center" />
+                            <TextBlock Text="{x:Bind ViewModel.PlaceholderText, Mode=OneWay}"
+                                       Style="{ThemeResource AppMicroTextStyle}"
+                                       HorizontalAlignment="Center" />
+                        </StackPanel>
+
+                        <ProgressRing IsActive="{x:Bind ViewModel.IsImageLoading, Mode=OneWay}" Width="28" Height="28"
+                                      Foreground="{ThemeResource AccentBrush}"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+                        <Border VerticalAlignment="Bottom" HorizontalAlignment="Right"
+                                Margin="8"
+                                Background="{ThemeResource AppSurfaceOverlayBrush}"
+                                CornerRadius="{ThemeResource AppRadiusSmall}"
+                                Padding="6,2">
+                            <TextBlock Text="点击放大" Style="{ThemeResource AppMicroTextStyle}" />
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <StackPanel Spacing="2">
+                    <TextBlock Text="{x:Bind ViewModel.HeaderTitle, Mode=OneWay}"
+                               Style="{ThemeResource AppSubtitleTextStyle}"
+                               TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{x:Bind ViewModel.HeaderMeta, Mode=OneWay}"
+                               Style="{ThemeResource AppCaptionTextStyle}"
+                               TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{x:Bind ViewModel.HeaderPath, Mode=OneWay}"
+                               Style="{ThemeResource AppMicroTextStyle}"
+                               TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- ============ 中部：元数据 + 手动分类 ============ -->
+        <ScrollViewer Grid.Row="1" VerticalScrollMode="Enabled" VerticalScrollBarVisibility="Auto" Padding="12,4,12,12">
+            <StackPanel Spacing="2">
+                <TextBlock Text="元数据" Style="{ThemeResource AppSectionHeaderTextStyle}" />
+
+                <ItemsControl ItemsSource="{x:Bind ViewModel.Groups, Mode=OneWay}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:MetaGroup">
+                            <Expander IsExpanded="{x:Bind IsExpanded}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                                <Expander.Header>
+                                    <TextBlock Text="{x:Bind Title}"
+                                               Style="{ThemeResource AppSectionHeaderTextStyle}"
+                                               Margin="0,2,0,2" />
+                                </Expander.Header>
+                                <ItemsControl ItemsSource="{x:Bind Rows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:MetaRow">
+                                            <Grid Margin="0,4,0,4" ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="Auto" MinWidth="64" />
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+
+                                                <TextBlock Grid.Column="0"
+                                                           Text="{x:Bind Label}"
+                                                           Style="{ThemeResource AppMicroTextStyle}"
+                                                           VerticalAlignment="Top"
+                                                           Margin="0,2,0,0" />
+
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{x:Bind Value}"
+                                                           Style="{ThemeResource AppCaptionTextStyle}"
+                                                           Foreground="{ThemeResource TextPrimaryBrush}"
+                                                           TextWrapping="Wrap"
+                                                           MaxLines="3"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           IsTextSelectionEnabled="True" />
+
+                                                <!-- 分类维度的来源徽标：人工 / AI / 元数据 / 边车 -->
+                                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4"
+                                                            VerticalAlignment="Top" Margin="0,1,0,0">
+                                                    <Border Visibility="{x:Bind ManualVisibility}"
+                                                            Background="{ThemeResource SuccessSubtleBrush}"
+                                                            BorderBrush="{ThemeResource SuccessBrush}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="{ThemeResource AppRadiusSmall}"
+                                                            Padding="5,0">
+                                                        <TextBlock Text="人工" Style="{ThemeResource AppMicroTextStyle}"
+                                                                   Foreground="{ThemeResource SuccessBrush}" />
+                                                    </Border>
+                                                    <Border Visibility="{x:Bind AiVisibility}"
+                                                            Background="{ThemeResource BadgeAiBrush}"
+                                                            CornerRadius="{ThemeResource AppRadiusSmall}"
+                                                            Padding="5,0">
+                                                        <TextBlock Text="AI" Style="{ThemeResource AppMicroTextStyle}"
+                                                                   Foreground="{ThemeResource BadgeAiTextBrush}" />
+                                                    </Border>
+                                                    <Border Visibility="{x:Bind DerivedVisibility}"
+                                                            Background="{ThemeResource AppSurfaceAltBrush}"
+                                                            BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                                                            BorderThickness="{ThemeResource AppCardStrokeThickness}"
+                                                            CornerRadius="{ThemeResource AppRadiusSmall}"
+                                                            Padding="5,0">
+                                                        <TextBlock Text="元数据" Style="{ThemeResource AppMicroTextStyle}" />
+                                                    </Border>
+                                                    <Border Visibility="{x:Bind SidecarVisibility}"
+                                                            Background="{ThemeResource BadgeLogBrush}"
+                                                            CornerRadius="{ThemeResource AppRadiusSmall}"
+                                                            Padding="5,0">
+                                                        <TextBlock Text="边车" Style="{ThemeResource AppMicroTextStyle}"
+                                                                   Foreground="{ThemeResource BadgeLogTextBrush}" />
+                                                    </Border>
+                                                </StackPanel>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </Expander>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- ============ 手动分类 ============ -->
+                <TextBlock Text="手动分类" Style="{ThemeResource AppSectionHeaderTextStyle}" />
+
+                <TextBlock Text="主题" Style="{ThemeResource AppMicroTextStyle}" />
+                <ComboBox x:Name="ThemeBox"
+                          HorizontalAlignment="Stretch"
+                          Margin="0,2,0,0"
+                          ItemsSource="{x:Bind ViewModel.ThemeOptions}"
+                          SelectedItem="{x:Bind ViewModel.SelectedTheme, Mode=TwoWay}"
+                          DisplayMemberPath="Display" />
+                <TextBlock Text="{x:Bind ViewModel.ThemeSourceHint, Mode=OneWay}"
+                           Style="{ThemeResource AppMicroTextStyle}"
+                           Visibility="{x:Bind ViewModel.ThemeSourceVisibility, Mode=OneWay}"
+                           TextWrapping="Wrap"
+                           Margin="0,2,0,0" />
+
+                <TextBlock Text="影调" Style="{ThemeResource AppMicroTextStyle}" Margin="0,8,0,0" />
+                <ComboBox x:Name="ToneBox"
+                          HorizontalAlignment="Stretch"
+                          Margin="0,2,0,0"
+                          ItemsSource="{x:Bind ViewModel.ToneOptions}"
+                          SelectedItem="{x:Bind ViewModel.SelectedTone, Mode=TwoWay}"
+                          DisplayMemberPath="Display" />
+                <TextBlock Text="{x:Bind ViewModel.ToneSourceHint, Mode=OneWay}"
+                           Style="{ThemeResource AppMicroTextStyle}"
+                           Visibility="{x:Bind ViewModel.ToneSourceVisibility, Mode=OneWay}"
+                           TextWrapping="Wrap"
+                           Margin="0,2,0,0" />
+
+                <CheckBox x:Name="ProcessedBox"
+                          Margin="0,10,0,0"
+                          Content="已后期调色"
+                          IsThreeState="True"
+                          IsChecked="{x:Bind ViewModel.ProcessedValue, Mode=TwoWay}" />
+                <TextBlock Text="三态：勾选=已调色，不勾=未调色，中间态=未标记"
+                           Style="{ThemeResource AppMicroTextStyle}"
+                           TextWrapping="Wrap" />
+
+                <TextBlock Text="城市" Style="{ThemeResource AppMicroTextStyle}" Margin="0,8,0,0" />
+                <TextBox x:Name="CityBox"
+                         PlaceholderText="拍摄城市"
+                         Text="{x:Bind ViewModel.CityText, Mode=TwoWay}"
+                         LostFocus="CityBox_LostFocus"
+                         KeyDown="CityBox_KeyDown" />
+
+                <TextBlock Text="评分" Style="{ThemeResource AppMicroTextStyle}" Margin="0,10,0,0" />
+                <uic:RatingStars x:Name="RatingStars"
+                                     Rating="{x:Bind ViewModel.Rating, Mode=OneWay}"
+                                     RatingChanged="RatingStars_RatingChanged"
+                                     HorizontalAlignment="Left" />
+
+                <TextBlock Text="颜色标签" Style="{ThemeResource AppMicroTextStyle}" Margin="0,10,0,0" />
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                    <Button Style="{ThemeResource AppIconButtonStyle}" Click="LabelRed_Click" ToolTipService.ToolTip="红">
+                        <Border x:Name="DotRed" Width="16" Height="16" CornerRadius="{ThemeResource AppRadiusPill}"
+                                Background="{ThemeResource DangerBrush}" BorderBrush="{ThemeResource AppFocusRingBrush}" BorderThickness="0" />
+                    </Button>
+                    <Button Style="{ThemeResource AppIconButtonStyle}" Click="LabelYellow_Click" ToolTipService.ToolTip="黄">
+                        <Border x:Name="DotYellow" Width="16" Height="16" CornerRadius="{ThemeResource AppRadiusPill}"
+                                Background="{ThemeResource WarningBrush}" BorderBrush="{ThemeResource AppFocusRingBrush}" BorderThickness="0" />
+                    </Button>
+                    <Button Style="{ThemeResource AppIconButtonStyle}" Click="LabelGreen_Click" ToolTipService.ToolTip="绿">
+                        <Border x:Name="DotGreen" Width="16" Height="16" CornerRadius="{ThemeResource AppRadiusPill}"
+                                Background="{ThemeResource SuccessBrush}" BorderBrush="{ThemeResource AppFocusRingBrush}" BorderThickness="0" />
+                    </Button>
+                    <Button Style="{ThemeResource AppIconButtonStyle}" Click="LabelBlue_Click" ToolTipService.ToolTip="蓝">
+                        <Border x:Name="DotBlue" Width="16" Height="16" CornerRadius="{ThemeResource AppRadiusPill}"
+                                Background="{ThemeResource InfoBrush}" BorderBrush="{ThemeResource AppFocusRingBrush}" BorderThickness="0" />
+                    </Button>
+                    <Button Style="{ThemeResource AppIconButtonStyle}" Click="LabelPurple_Click" ToolTipService.ToolTip="紫">
+                        <Border x:Name="DotPurple" Width="16" Height="16" CornerRadius="{ThemeResource AppRadiusPill}"
+                                Background="{ThemeResource BadgeLogBrush}" BorderBrush="{ThemeResource AppFocusRingBrush}" BorderThickness="0" />
+                    </Button>
+                    <Button Style="{ThemeResource AppIconButtonStyle}" Click="LabelNone_Click" ToolTipService.ToolTip="无">
+                        <FontIcon Glyph="&#xE894;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                    </Button>
+                </StackPanel>
+
+                <TextBlock Text="选用 / 废片" Style="{ThemeResource AppMicroTextStyle}" Margin="0,10,0,0" />
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                    <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="10,2,10,2" MinHeight="28" Click="Pick_Click">
+                        <TextBlock Text="选用" Style="{ThemeResource AppCaptionTextStyle}" />
+                    </Button>
+                    <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="10,2,10,2" MinHeight="28" Click="Reject_Click">
+                        <TextBlock Text="废片" Style="{ThemeResource AppCaptionTextStyle}" />
+                    </Button>
+                    <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="10,2,10,2" MinHeight="28" Click="PickClear_Click">
+                        <TextBlock Text="清除" Style="{ThemeResource AppCaptionTextStyle}" />
+                    </Button>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+
+        <!-- ============ 底部：操作 ============ -->
+        <Border Grid.Row="2"
+                Background="{ThemeResource AppSurfaceAltBrush}"
+                BorderBrush="{ThemeResource AppDividerBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="12,10,12,10">
+            <StackPanel Spacing="8">
+                <TextBlock Text="{x:Bind ViewModel.StatusText, Mode=OneWay}"
+                           Style="{ThemeResource AppMicroTextStyle}"
+                           Visibility="{x:Bind ViewModel.StatusOkVisibility, Mode=OneWay}"
+                           TextWrapping="Wrap" />
+                <TextBlock Text="{x:Bind ViewModel.StatusText, Mode=OneWay}"
+                           Style="{ThemeResource AppMicroTextStyle}"
+                           Foreground="{ThemeResource DangerBrush}"
+                           Visibility="{x:Bind ViewModel.StatusErrorVisibility, Mode=OneWay}"
+                           TextWrapping="Wrap" />
+
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Button x:Name="SaveButton" Grid.Column="0"
+                            Background="{ThemeResource AccentSubtleBrush}"
+                            BorderBrush="{ThemeResource AccentBorderBrush}"
+                            Style="{ThemeResource AppSubtleButtonStyle}"
+                            Click="Save_Click"
+                            ToolTipService.ToolTip="保存到索引库">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE74E;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                            <TextBlock Text="保存" Style="{ThemeResource AppCaptionTextStyle}" />
+                        </StackPanel>
+                    </Button>
+
+                    <Button Grid.Column="1"
+                            Style="{ThemeResource AppSubtleButtonStyle}"
+                            Click="Ai_Click"
+                            ToolTipService.ToolTip="用 AI 分析这张素材">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE9D2;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                            <TextBlock Text="AI 分类" Style="{ThemeResource AppCaptionTextStyle}" />
+                        </StackPanel>
+                    </Button>
+
+                    <ProgressRing Grid.Column="2" IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}" Width="18" Height="18"
+                                  Foreground="{ThemeResource AccentBrush}"
+                                  HorizontalAlignment="Left"
+                                  Visibility="{x:Bind ViewModel.BusyVisibility, Mode=OneWay}" />
+
+                    <Button Grid.Column="3"
+                            Style="{ThemeResource AppSubtleButtonStyle}"
+                            Click="Xmp_Click"
+                            ToolTipService.ToolTip="把评分 / 标签 / 分类写回 XMP 边车">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE8A5;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                            <TextBlock Text="写入 XMP" Style="{ThemeResource AppCaptionTextStyle}" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </StackPanel>
+        </Border>
+
+        <!-- ============ 未选中素材的空状态 ============ -->
+        <Grid Grid.RowSpan="3"
+              Background="{ThemeResource AppSurfaceBrush}"
+              Visibility="{x:Bind ViewModel.EmptyVisibility, Mode=OneWay}">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10" Width="230">
+                <FontIcon Glyph="&#xE8A5;"
+                          FontSize="{ThemeResource AppFontDisplaySize}"
+                          Foreground="{ThemeResource TextTertiaryBrush}"
+                          HorizontalAlignment="Center" />
+                <TextBlock Text="未选择素材"
+                           Style="{ThemeResource AppSubtitleTextStyle}"
+                           HorizontalAlignment="Center" />
+                <TextBlock Text="在网格中单击任意素材，这里会显示完整元数据、编辑分类并写回边车。"
+                           Style="{ThemeResource AppCaptionTextStyle}"
+                           TextWrapping="Wrap"
+                           TextAlignment="Center" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

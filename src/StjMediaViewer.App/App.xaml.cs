@@ -31,7 +31,10 @@ public partial class App : Application
             await AppServices.InitializeAsync();
             MainWindow = new MainWindow();
             MainWindow.Activate();
+            if (MainWindow is global::StjMediaViewer.App.MainWindow mw) mw.PositionWindow();
             AppServices.WindowChrome.Configure(MainWindow);
+            await AppServices.Design.ApplySavedAsync();
+            ScreenCapture.ScheduleIfRequested(MainWindow);
         }
         catch (Exception ex)
         {

@@ -6,3 +6,5 @@ tools/ffmpeg/
 *.zip
 *.log
 __pycache__/
+tools/SampleLibrary/out/
+.spike/

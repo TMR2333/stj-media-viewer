@@ -58,6 +58,19 @@ public sealed class MediaMetadata
     public string? Copyright { get; set; }
     public List<string> Keywords { get; set; } = new();
 
+    /// <summary>XMP xmp:Rating / EXIF Rating(0x4746) / 边车评分，0..5；null = 未标注。</summary>
+    public int? Rating { get; set; }
+    /// <summary>XMP xmp:Label（Red/Yellow/Green/Blue/Purple）。</summary>
+    public string? ColorLabel { get; set; }
+    /// <summary>XMP photoshop:City / IPTC City（GPS 反查之前就能拿到的地点）。</summary>
+    public string? City { get; set; }
+    public string? Province { get; set; }
+    public string? Country { get; set; }
+    /// <summary>City 的来源：xmp / iptc / offline / online / manual；null = 未知。</summary>
+    public string? CitySource { get; set; }
+    /// <summary>XMP 里的选用标记（可选，没有就是 null）。</summary>
+    public bool? IsPick { get; set; }
+
     /// <summary>检测到的边车文件绝对路径（.xmp/.dop/.cos/...）。</summary>
     public List<string> Sidecars { get; set; } = new();
     public string? XmpPath { get; set; }
@@ -126,6 +139,13 @@ public sealed class MediaMetadata
         a.Caption ??= Caption;
         a.Creator ??= Creator;
         a.Copyright ??= Copyright;
+        if (Rating is int rating) a.Rating = Math.Clamp(rating, 0, 5);
+        a.ColorLabel ??= ColorLabel;
+        a.City ??= City;
+        a.Province ??= Province;
+        a.Country ??= Country;
+        a.CitySource ??= CitySource;
+        a.IsPick ??= IsPick;
         if (Keywords.Count > 0)
         {
             foreach (var k in Keywords)

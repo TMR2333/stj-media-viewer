@@ -9,7 +9,8 @@
 -->
 <ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:StjMediaViewer.App.Controls">
 
     <ResourceDictionary.ThemeDictionaries>
 
@@ -64,7 +65,20 @@
             <SolidColorBrush x:Key="AppGlassTintBrush" Color="#00FFFFFF" />
             <SolidColorBrush x:Key="AppGlassStrokeBrush" Color="#00FFFFFF" />
             <SolidColorBrush x:Key="AppGlassHighlightBrush" Color="#00FFFFFF" />
+            <!-- 玻璃镜面 sheen / 内阴影（Fluent/MD3 全透明 → 自动退化） -->
+            <SolidColorBrush x:Key="AppGlassSheenBrush" Color="#00FFFFFF" />
+            <SolidColorBrush x:Key="AppGlassInnerShadowBrush" Color="#00FFFFFF" />
+            <!-- 环境光场：AmbientBackdrop 用；只有 Glass 皮肤明显，其余皮肤透明 -->
+            <SolidColorBrush x:Key="AppAmbientBrush" Color="#00FFFFFF" />
+            <SolidColorBrush x:Key="AppAmbientGlowBlueBrush" Color="#00FFFFFF" />
+            <SolidColorBrush x:Key="AppAmbientGlowVioletBrush" Color="#00FFFFFF" />
+            <SolidColorBrush x:Key="AppAmbientGlowTealBrush" Color="#00FFFFFF" />
+            <SolidColorBrush x:Key="AppAmbientGlowWarmBrush" Color="#00FFFFFF" />
+            <SolidColorBrush x:Key="AppAmbientVignetteBrush" Color="#00FFFFFF" />
+            <SolidColorBrush x:Key="AppCardStrokeBrush" Color="#0FFFFFFF" />
             <SolidColorBrush x:Key="AppScrimBrush" Color="#B3000000" />
+            <!-- 结构色：透明占位。不允许在页面里直接写 Colors.Transparent，统一走它 -->
+            <SolidColorBrush x:Key="AppTransparentBrush" Color="#00000000" />
         </ResourceDictionary>
 
         <!-- ===================== 浅色 ===================== -->
@@ -118,7 +132,20 @@
             <SolidColorBrush x:Key="AppGlassTintBrush" Color="#00FFFFFF" />
             <SolidColorBrush x:Key="AppGlassStrokeBrush" Color="#00FFFFFF" />
             <SolidColorBrush x:Key="AppGlassHighlightBrush" Color="#00FFFFFF" />
+            <!-- 玻璃镜面 sheen / 内阴影（Fluent/MD3 全透明 → 自动退化） -->
+            <SolidColorBrush x:Key="AppGlassSheenBrush" Color="#00FFFFFF" />
+            <SolidColorBrush x:Key="AppGlassInnerShadowBrush" Color="#00FFFFFF" />
+            <!-- 环境光场：AmbientBackdrop 用；只有 Glass 皮肤明显，其余皮肤透明 -->
+            <SolidColorBrush x:Key="AppAmbientBrush" Color="#00FFFFFF" />
+            <SolidColorBrush x:Key="AppAmbientGlowBlueBrush" Color="#00FFFFFF" />
+            <SolidColorBrush x:Key="AppAmbientGlowVioletBrush" Color="#00FFFFFF" />
+            <SolidColorBrush x:Key="AppAmbientGlowTealBrush" Color="#00FFFFFF" />
+            <SolidColorBrush x:Key="AppAmbientGlowWarmBrush" Color="#00FFFFFF" />
+            <SolidColorBrush x:Key="AppAmbientVignetteBrush" Color="#00FFFFFF" />
+            <SolidColorBrush x:Key="AppCardStrokeBrush" Color="#0F000000" />
             <SolidColorBrush x:Key="AppScrimBrush" Color="#8C000000" />
+            <!-- 结构色：透明占位。不允许在页面里直接写 Colors.Transparent，统一走它 -->
+            <SolidColorBrush x:Key="AppTransparentBrush" Color="#00000000" />
         </ResourceDictionary>
     </ResourceDictionary.ThemeDictionaries>
 
@@ -134,10 +161,15 @@
     <x:Double x:Key="AppControlHeightSmall">28</x:Double>
     <x:Double x:Key="AppControlHeightLarge">44</x:Double>
     <x:Double x:Key="AppCardStrokeThickness">1</x:Double>
+    <!-- 玻璃镜面描边：Glass 皮肤升到 1.5px，其余皮肤保持 1px（描边色透明，自动退化） -->
+    <x:Double x:Key="AppGlassStrokeThickness">1</x:Double>
     <x:Double x:Key="AppGap">8</x:Double>
     <x:Double x:Key="AppGapLarge">16</x:Double>
     <x:Double x:Key="AppCardElevation">8</x:Double>
     <x:Double x:Key="AppDividerThickness">1</x:Double>
+    <!-- 玻璃外阴影：>0 时 GlassPanel/SectionCard 才会挂 ThemeShadow（Fluent/MD3 = 0，不挂阴影） -->
+    <x:Double x:Key="AppGlassShadowOpacity">0</x:Double>
+    <x:Double x:Key="AppGlassShadowDepth">0</x:Double>
 
     <Thickness x:Key="AppPagePadding">24,18,24,18</Thickness>
     <Thickness x:Key="AppCardPadding">12</Thickness>
@@ -215,7 +247,7 @@
     <!-- ===================== 容器样式 ===================== -->
     <Style x:Key="AppCardStyle" TargetType="Border">
         <Setter Property="Background" Value="{ThemeResource AppSurfaceRaisedBrush}" />
-        <Setter Property="BorderBrush" Value="{ThemeResource AppStrokeBrush}" />
+        <Setter Property="BorderBrush" Value="{ThemeResource AppCardStrokeBrush}" />
         <Setter Property="BorderThickness" Value="{ThemeResource AppCardStrokeThickness}" />
         <Setter Property="CornerRadius" Value="{ThemeResource AppCardRadius}" />
         <Setter Property="Padding" Value="{ThemeResource AppCardPadding}" />
@@ -268,6 +300,106 @@
         <Setter Property="Fill" Value="{ThemeResource AppDividerBrush}" />
         <Setter Property="Height" Value="1" />
         <Setter Property="HorizontalAlignment" Value="Stretch" />
+    </Style>
+
+    <!-- =================================================================================
+         自定义容器控件默认样式（ui-shell 维护）
+         =================================================================================
+         放在 Tokens.Base.xaml 而不是 Themes/Generic.xaml：App.xaml 只合并 Tokens.Base.xaml，
+         而 ui-views 的页面可能在 ApplySavedAsync 之前创建，控件必须始终有兜底模板。
+         模板全部只引用 token，因此三套皮肤自动变形：
+         · Fluent / MD3：AppGlass* 全透明 → GlassPanel 退化成普通卡片（用 AppCardStrokeBrush 的细描边）；
+         · Glass：底座 → 玻璃 tint → 45° sheen → 顶部渐变高光 → 底部内阴影 → 柔和外阴影（ThemeShadow）。
+         光源永远左上：高光在顶部、内阴影在底部、sheen 从左上斜向右下。
+    ================================================================================= -->
+    <Style TargetType="controls:GlassPanel">
+        <Setter Property="IsTabStop" Value="False" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Stretch" />
+        <Setter Property="ContentPadding" Value="{ThemeResource AppCardPadding}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="controls:GlassPanel">
+                    <Grid x:Name="ShadowHost">
+                        <!-- 层 1：底座（Glass 下是更深的一层，制造"背景层/卡片层"的深度差） -->
+                        <Border Background="{ThemeResource AppSurfaceRaisedBrush}"
+                                BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                                BorderThickness="{ThemeResource AppCardStrokeThickness}"
+                                CornerRadius="{ThemeResource AppCardRadius}" />
+                        <!-- 层 2：玻璃 tint（玻璃厚度的一半来自这一层） -->
+                        <Border Background="{ThemeResource AppGlassTintBrush}"
+                                CornerRadius="{ThemeResource AppCardRadius}" />
+                        <!-- 层 3：45° 镜面 sheen（左上→右下，统一光源；不是实心白边） -->
+                        <Border Background="{ThemeResource AppGlassSheenBrush}"
+                                CornerRadius="{ThemeResource AppCardRadius}" />
+                        <!-- 层 4：顶部渐变高光（峰值 50% 白，两端透明） -->
+                        <Border Height="1" VerticalAlignment="Top" Margin="20,1,20,0"
+                                Background="{ThemeResource AppGlassHighlightBrush}" />
+                        <!-- 层 5：底部内阴影（inset shadow 的替代，给"厚度"） -->
+                        <Border Height="1" VerticalAlignment="Bottom" Margin="20,0,20,1"
+                                Background="{ThemeResource AppGlassInnerShadowBrush}" />
+                        <Border Padding="{TemplateBinding ContentPadding}">
+                            <ContentPresenter Content="{TemplateBinding Content}"
+                                              ContentTemplate="{TemplateBinding ContentTemplate}"
+                                              HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                        </Border>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style TargetType="controls:SectionCard">
+        <Setter Property="IsTabStop" Value="False" />
+        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+        <Setter Property="VerticalContentAlignment" Value="Stretch" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="controls:SectionCard">
+                    <Grid x:Name="ShadowHost">
+                        <Border Background="{ThemeResource AppSurfaceRaisedBrush}"
+                                BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                                BorderThickness="{ThemeResource AppCardStrokeThickness}"
+                                CornerRadius="{ThemeResource AppCardRadius}" />
+                        <Border Background="{ThemeResource AppGlassTintBrush}"
+                                CornerRadius="{ThemeResource AppCardRadius}" />
+                        <Border Background="{ThemeResource AppGlassSheenBrush}"
+                                CornerRadius="{ThemeResource AppCardRadius}" />
+                        <Border Height="1" VerticalAlignment="Top" Margin="22,1,22,0"
+                                Background="{ThemeResource AppGlassHighlightBrush}" />
+                        <Border Height="1" VerticalAlignment="Bottom" Margin="22,0,22,1"
+                                Background="{ThemeResource AppGlassInnerShadowBrush}" />
+                        <Border Padding="{ThemeResource AppCardPadding}">
+                            <Grid RowSpacing="{ThemeResource AppGap}">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <StackPanel x:Name="HeaderPanel" Grid.Row="0" Orientation="Horizontal"
+                                            Spacing="{ThemeResource AppGap}" VerticalAlignment="Center">
+                                    <FontIcon x:Name="HeaderIcon" Glyph="{TemplateBinding Glyph}" FontSize="16"
+                                              Foreground="{ThemeResource AccentBrush}" VerticalAlignment="Center" />
+                                    <StackPanel Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock x:Name="HeaderText" Text="{TemplateBinding Header}"
+                                                   Style="{ThemeResource AppSubtitleTextStyle}" />
+                                        <TextBlock x:Name="SubtitleText" Text="{TemplateBinding Subtitle}"
+                                                   Style="{ThemeResource AppCaptionTextStyle}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </StackPanel>
+                                <Border x:Name="HeaderDivider" Grid.Row="1" Height="1"
+                                        Background="{ThemeResource AppDividerBrush}" />
+                                <ContentPresenter Grid.Row="2" Content="{TemplateBinding Content}"
+                                                  ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                  HorizontalContentAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                  VerticalContentAlignment="{TemplateBinding VerticalContentAlignment}" />
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
     </Style>
 
 </ResourceDictionary>

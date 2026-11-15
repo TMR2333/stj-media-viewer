@@ -1,0 +1,678 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="StjMediaViewer.App.Views.LibraryPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:uic="using:StjMediaViewer.App.Controls"
+    xmlns:vm="using:StjMediaViewer.App.ViewModels"
+    xmlns:views="using:StjMediaViewer.App.Views"
+    Background="{ThemeResource AppTransparentBrush}"
+    NavigationCacheMode="Required">
+
+    <Page.Resources>
+        <!-- ================= 列表容器：去掉默认内边距，卡片自己控制留白 ================= -->
+        <Style x:Key="AssetItemStyle" TargetType="ListViewItem">
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="MinHeight" Value="0" />
+            <Setter Property="Background" Value="{ThemeResource AppTransparentBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+            <Setter Property="CornerRadius" Value="{ThemeResource AppRadiusMedium}" />
+        </Style>
+
+        <!-- ================= 筛选行：整行可点，选中态用强调色底 + 勾 ================= -->
+        <Style x:Key="FilterRowButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{ThemeResource AppTransparentBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="6,0,6,0" />
+            <Setter Property="MinHeight" Value="26" />
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="CornerRadius" Value="{ThemeResource AppRadiusSmall}" />
+            <Setter Property="FontSize" Value="{ThemeResource AppFontCaptionSize}" />
+            <Setter Property="Foreground" Value="{ThemeResource TextSecondaryBrush}" />
+        </Style>
+
+        <!-- ================= 工具条紧凑控件（不用大胶囊） ================= -->
+        <!--
+            紧凑切换标签：高 24、圆角 AppRadiusSmall、无粗边框。
+            选中态 = AppSelectedBrush（MD3 secondary container 语义）+ 主色文字；
+            交互反馈用 state layer（AppHoverBrush / AppPressedBrush 叠层），
+            这样"选中 + hover"不会糊成第三种底色 —— MD3 的规矩：底色只分容器层级。
+        -->
+        <Style x:Key="CompactToggleStyle" TargetType="ToggleButton">
+            <Setter Property="Background" Value="{ThemeResource AppTransparentBrush}" />
+            <Setter Property="BorderBrush" Value="{ThemeResource AppTransparentBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="{ThemeResource AppRadiusSmall}" />
+            <Setter Property="MinHeight" Value="24" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="Padding" Value="9,2,9,2" />
+            <Setter Property="FontSize" Value="{ThemeResource AppFontCaptionSize}" />
+            <Setter Property="Foreground" Value="{ThemeResource TextSecondaryBrush}" />
+            <Setter Property="UseSystemFocusVisuals" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ToggleButton">
+                        <Border x:Name="Root"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="{TemplateBinding CornerRadius}">
+                            <Grid>
+                                <VisualStateManager.VisualStateGroups>
+                                    <VisualStateGroup x:Name="CommonStates">
+                                        <VisualState x:Name="Normal">
+                                            <VisualState.Setters>
+                                                <Setter Target="HoverLayer.Opacity" Value="0" />
+                                                <Setter Target="PressLayer.Opacity" Value="0" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState x:Name="PointerOver">
+                                            <VisualState.Setters>
+                                                <Setter Target="HoverLayer.Opacity" Value="1" />
+                                                <Setter Target="PressLayer.Opacity" Value="0" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState x:Name="Pressed">
+                                            <VisualState.Setters>
+                                                <Setter Target="HoverLayer.Opacity" Value="0" />
+                                                <Setter Target="PressLayer.Opacity" Value="1" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                        <VisualState x:Name="Disabled">
+                                            <VisualState.Setters>
+                                                <Setter Target="Root.Opacity" Value="0.4" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                    </VisualStateGroup>
+                                    <VisualStateGroup x:Name="CheckStates">
+                                        <VisualState x:Name="Unchecked" />
+                                        <VisualState x:Name="Indeterminate" />
+                                        <VisualState x:Name="Checked">
+                                            <VisualState.Setters>
+                                                <Setter Target="Root.Background" Value="{ThemeResource AppSelectedBrush}" />
+                                                <Setter Target="Root.BorderBrush" Value="{ThemeResource AppSelectedBorderBrush}" />
+                                                <Setter Target="Root.BorderThickness" Value="1" />
+                                                <Setter Target="Label.Foreground" Value="{ThemeResource AccentBrush}" />
+                                            </VisualState.Setters>
+                                        </VisualState>
+                                    </VisualStateGroup>
+                                </VisualStateManager.VisualStateGroups>
+
+                                <!-- state layer：只做交互反馈，不参与选中底色 -->
+                                <Border x:Name="HoverLayer"
+                                        Background="{ThemeResource AppHoverBrush}"
+                                        CornerRadius="{TemplateBinding CornerRadius}"
+                                        Opacity="0" />
+                                <Border x:Name="PressLayer"
+                                        Background="{ThemeResource AppPressedBrush}"
+                                        CornerRadius="{TemplateBinding CornerRadius}"
+                                        Opacity="0" />
+
+                                <ContentPresenter x:Name="Label"
+                                                  Content="{TemplateBinding Content}"
+                                                  ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                  Foreground="{TemplateBinding Foreground}"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center"
+                                                  Margin="{TemplateBinding Padding}" />
+                            </Grid>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 紧凑普通按钮（排序方向、清空筛选等）：同尺寸、同圆角，无胶囊 -->
+        <Style x:Key="CompactButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{ThemeResource AppTransparentBrush}" />
+            <Setter Property="BorderBrush" Value="{ThemeResource AppTransparentBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="{ThemeResource AppRadiusSmall}" />
+            <Setter Property="MinHeight" Value="26" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="Padding" Value="9,2,9,2" />
+            <Setter Property="FontSize" Value="{ThemeResource AppFontCaptionSize}" />
+            <Setter Property="Foreground" Value="{ThemeResource TextSecondaryBrush}" />
+        </Style>
+
+        <!-- ================= 虚拟化面板：固定单元格尺寸才能稳定回收 ================= -->
+        <ItemsPanelTemplate x:Key="PanelSmall">
+            <ItemsWrapGrid Orientation="Horizontal" ItemWidth="152" ItemHeight="188" />
+        </ItemsPanelTemplate>
+        <ItemsPanelTemplate x:Key="PanelMedium">
+            <ItemsWrapGrid Orientation="Horizontal" ItemWidth="196" ItemHeight="244" />
+        </ItemsPanelTemplate>
+        <ItemsPanelTemplate x:Key="PanelLarge">
+            <ItemsWrapGrid Orientation="Horizontal" ItemWidth="248" ItemHeight="308" />
+        </ItemsPanelTemplate>
+        <ItemsPanelTemplate x:Key="PanelList">
+            <ItemsStackPanel Orientation="Vertical" />
+        </ItemsPanelTemplate>
+
+        <!-- ================= 网格卡片 ================= -->
+        <DataTemplate x:Key="CardTemplate" x:DataType="vm:AssetCardItem">
+            <Grid Margin="4" ToolTipService.ToolTip="{x:Bind TooltipText, Mode=OneWay}">
+                <Border Background="{ThemeResource AppSurfaceAltBrush}"
+                        BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                        BorderThickness="{ThemeResource AppCardStrokeThickness}"
+                        CornerRadius="{ThemeResource AppRadiusMedium}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <!-- 缩略图区 -->
+                        <Grid Grid.Row="0" Margin="1,1,1,0">
+                            <uic:ThumbnailImage Asset="{x:Bind Asset, Mode=OneWay}" DecodeSize="360" />
+
+                            <!-- 左上：RAW（琥珀色）/ LOG -->
+                            <StackPanel Orientation="Horizontal" Spacing="4" Margin="6"
+                                        HorizontalAlignment="Left" VerticalAlignment="Top">
+                                <uic:Badge Text="RAW" Kind="Raw" Visibility="{x:Bind RawBadgeVisibility, Mode=OneWay}" />
+                                <uic:Badge Text="LOG" Kind="Log" Visibility="{x:Bind LogBadgeVisibility, Mode=OneWay}" />
+                            </StackPanel>
+
+                            <!-- 右上：AI 标记 -->
+                            <uic:Badge Text="AI" Kind="Ai"
+                                       Margin="6"
+                                       HorizontalAlignment="Right" VerticalAlignment="Top"
+                                       Visibility="{x:Bind AiBadgeVisibility, Mode=OneWay}"
+                                       ToolTipService.ToolTip="AI 已分类" />
+
+                            <!-- 右下：视频时长 -->
+                            <uic:Badge Text="{x:Bind DurationText, Mode=OneWay}" Kind="Video"
+                                       Margin="6"
+                                       HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                       Visibility="{x:Bind VideoBadgeVisibility, Mode=OneWay}" />
+
+                            <!-- 左下：音频波形标记 -->
+                            <Border Background="{ThemeResource BadgeAudioBrush}"
+                                    CornerRadius="{ThemeResource AppRadiusPill}"
+                                    Width="20" Height="20"
+                                    Margin="6"
+                                    HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                                    Visibility="{x:Bind AudioBadgeVisibility, Mode=OneWay}"
+                                    ToolTipService.ToolTip="音频素材">
+                                <FontIcon Glyph="&#xE8D6;"
+                                          FontSize="{ThemeResource AppFontMicroSize}"
+                                          Foreground="{ThemeResource BadgeAudioTextBrush}" />
+                            </Border>
+
+                            <!-- 底部颜色标签条 -->
+                            <Border Height="3" VerticalAlignment="Bottom" Margin="6,0,6,0"
+                                    CornerRadius="{ThemeResource AppRadiusPill}"
+                                    Background="{ThemeResource DangerBrush}"
+                                    Visibility="{x:Bind LabelRedVisibility, Mode=OneWay}" />
+                            <Border Height="3" VerticalAlignment="Bottom" Margin="6,0,6,0"
+                                    CornerRadius="{ThemeResource AppRadiusPill}"
+                                    Background="{ThemeResource WarningBrush}"
+                                    Visibility="{x:Bind LabelYellowVisibility, Mode=OneWay}" />
+                            <Border Height="3" VerticalAlignment="Bottom" Margin="6,0,6,0"
+                                    CornerRadius="{ThemeResource AppRadiusPill}"
+                                    Background="{ThemeResource SuccessBrush}"
+                                    Visibility="{x:Bind LabelGreenVisibility, Mode=OneWay}" />
+                            <Border Height="3" VerticalAlignment="Bottom" Margin="6,0,6,0"
+                                    CornerRadius="{ThemeResource AppRadiusPill}"
+                                    Background="{ThemeResource InfoBrush}"
+                                    Visibility="{x:Bind LabelBlueVisibility, Mode=OneWay}" />
+                            <Border Height="3" VerticalAlignment="Bottom" Margin="6,0,6,0"
+                                    CornerRadius="{ThemeResource AppRadiusPill}"
+                                    Background="{ThemeResource BadgeLogBrush}"
+                                    Visibility="{x:Bind LabelPurpleVisibility, Mode=OneWay}" />
+
+                            <!-- 悬停快速操作（Opacity 不参与命中测试，所以整块透明层始终可交互） -->
+                            <Border x:Name="HoverActions"
+                                    Background="{ThemeResource AppTransparentBrush}"
+                                    Opacity="0"
+                                    PointerEntered="CardHover_Entered"
+                                    PointerMoved="CardHover_Moved"
+                                    PointerExited="CardHover_Exited">
+                                <StackPanel Orientation="Horizontal" Spacing="4"
+                                            HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                            Margin="6,0,6,8">
+                                    <Button Style="{ThemeResource AppIconButtonStyle}"
+                                            Background="{ThemeResource AppSurfaceOverlayBrush}"
+                                            Click="CardPreview_Click"
+                                            ToolTipService.ToolTip="预览">
+                                        <FontIcon Glyph="&#xE8A7;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                                    </Button>
+                                    <Button Style="{ThemeResource AppIconButtonStyle}"
+                                            Background="{ThemeResource AppSurfaceOverlayBrush}"
+                                            Click="CardAi_Click"
+                                            ToolTipService.ToolTip="AI 分类此条">
+                                        <FontIcon Glyph="&#xE9D2;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                                    </Button>
+                                    <Button Style="{ThemeResource AppIconButtonStyle}"
+                                            Background="{ThemeResource AppSurfaceOverlayBrush}"
+                                            Click="CardMore_Click"
+                                            ToolTipService.ToolTip="更多操作">
+                                        <FontIcon Glyph="&#xE712;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- 选中态：描边 + 勾选角标 -->
+                            <Border BorderBrush="{ThemeResource AppSelectedBorderBrush}"
+                                    BorderThickness="2"
+                                    CornerRadius="{ThemeResource AppRadiusMedium}"
+                                    Visibility="{x:Bind SelectionVisibility, Mode=OneWay}"
+                                    IsHitTestVisible="False" />
+                            <Border Width="20" Height="20"
+                                    CornerRadius="{ThemeResource AppRadiusPill}"
+                                    Background="{ThemeResource AccentBrush}"
+                                    Margin="6"
+                                    HorizontalAlignment="Right" VerticalAlignment="Top"
+                                    Visibility="{x:Bind SelectionVisibility, Mode=OneWay}"
+                                    IsHitTestVisible="False">
+                                <FontIcon Glyph="&#xE73E;"
+                                          FontSize="{ThemeResource AppFontMicroSize}"
+                                          Foreground="{ThemeResource TextOnAccentBrush}" />
+                            </Border>
+                        </Grid>
+
+                        <!-- 信息区 -->
+                        <StackPanel Grid.Row="1" Padding="8,6,8,8" Spacing="1">
+                            <TextBlock Text="{x:Bind FileName, Mode=OneWay}"
+                                       Style="{ThemeResource AppCaptionTextStyle}"
+                                       Foreground="{ThemeResource TextPrimaryBrush}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <Grid ColumnSpacing="4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Text="{x:Bind DeviceDateText, Mode=OneWay}"
+                                           Style="{ThemeResource AppMicroTextStyle}"
+                                           TextTrimming="CharacterEllipsis" />
+                                <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                            Visibility="{x:Bind StarsVisibility, Mode=OneWay}">
+                                    <TextBlock Text="{x:Bind StarsFilled, Mode=OneWay}"
+                                               Style="{ThemeResource AppMicroTextStyle}"
+                                               Foreground="{ThemeResource WarningBrush}" />
+                                    <TextBlock Text="{x:Bind StarsEmpty, Mode=OneWay}"
+                                               Style="{ThemeResource AppMicroTextStyle}"
+                                               Foreground="{ThemeResource TextDisabledBrush}" />
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Grid>
+        </DataTemplate>
+
+        <!-- ================= 列表行 ================= -->
+        <DataTemplate x:Key="RowTemplate" x:DataType="vm:AssetCardItem">
+            <Grid Margin="4,2,4,2" Height="60" ToolTipService.ToolTip="{x:Bind TooltipText, Mode=OneWay}">
+                <Border Background="{ThemeResource AppSurfaceAltBrush}"
+                        BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                        BorderThickness="{ThemeResource AppCardStrokeThickness}"
+                        CornerRadius="{ThemeResource AppRadiusMedium}"
+                        Padding="8,6">
+                    <Grid ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="150" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <uic:ThumbnailImage Grid.Column="0" Width="58" Height="44" DecodeSize="160" Asset="{x:Bind Asset, Mode=OneWay}" />
+
+                        <StackPanel Grid.Column="1" Spacing="1" VerticalAlignment="Center">
+                            <TextBlock Text="{x:Bind FileName, Mode=OneWay}"
+                                       Style="{ThemeResource AppCaptionTextStyle}"
+                                       Foreground="{ThemeResource TextPrimaryBrush}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{x:Bind DeviceDateText, Mode=OneWay}"
+                                       Style="{ThemeResource AppMicroTextStyle}"
+                                       TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+
+                        <TextBlock Grid.Column="2"
+                                   Text="{x:Bind ThemeText, Mode=OneWay}"
+                                   Style="{ThemeResource AppMicroTextStyle}"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" />
+
+                        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                            <uic:Badge Text="RAW" Kind="Raw" Visibility="{x:Bind RawBadgeVisibility, Mode=OneWay}" />
+                            <uic:Badge Text="LOG" Kind="Log" Visibility="{x:Bind LogBadgeVisibility, Mode=OneWay}" />
+                        </StackPanel>
+
+                        <TextBlock Grid.Column="4"
+                                   Text="{x:Bind FormatText, Mode=OneWay}"
+                                   Style="{ThemeResource AppMicroTextStyle}"
+                                   VerticalAlignment="Center"
+                                   FontFamily="{ThemeResource AppMonoFontFamily}" />
+
+                        <TextBlock Grid.Column="5"
+                                   Text="{x:Bind SizeText, Mode=OneWay}"
+                                   Style="{ThemeResource AppMicroTextStyle}"
+                                   VerticalAlignment="Center" />
+                    </Grid>
+                </Border>
+
+                <Border BorderBrush="{ThemeResource AppSelectedBorderBrush}"
+                        BorderThickness="2"
+                        CornerRadius="{ThemeResource AppRadiusMedium}"
+                        Visibility="{x:Bind SelectionVisibility, Mode=OneWay}"
+                        IsHitTestVisible="False" />
+            </Grid>
+        </DataTemplate>
+    </Page.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- ==================================================================
+             工具条：结果计数 / 快捷筛选 / 排序 / 密度 / 检视面板开关
+             ================================================================== -->
+        <Border Grid.Row="0"
+                Background="{ThemeResource AppSurfaceBrush}"
+                BorderBrush="{ThemeResource AppDividerBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="16,10,16,10">
+            <StackPanel Spacing="8">
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                        <TextBlock Text="{x:Bind ViewModel.ResultText, Mode=OneWay}"
+                                   Style="{ThemeResource AppSubtitleTextStyle}"
+                                   VerticalAlignment="Center" />
+                        <Border Background="{ThemeResource AccentSubtleBrush}"
+                                BorderBrush="{ThemeResource AccentBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="{ThemeResource AppRadiusPill}"
+                                Padding="8,1"
+                                VerticalAlignment="Center"
+                                Visibility="{x:Bind ViewModel.DemoVisibility, Mode=OneWay}"
+                                ToolTipService.ToolTip="当前使用内置演示素材">
+                            <TextBlock Text="演示数据" Style="{ThemeResource AppMicroTextStyle}"
+                                       Foreground="{ThemeResource AccentBrush}" />
+                        </Border>
+                        <TextBlock Text="{x:Bind ViewModel.SelectionText, Mode=OneWay}"
+                                   Style="{ThemeResource AppCaptionTextStyle}"
+                                   VerticalAlignment="Center"
+                                   Visibility="{x:Bind ViewModel.SelectionVisibility, Mode=OneWay}" />
+                    </StackPanel>
+
+                    <Button Grid.Column="1"
+                            Style="{StaticResource CompactButtonStyle}"
+                            Click="ClearFilters_Click"
+                            ToolTipService.ToolTip="清空全部筛选条件">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE894;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                            <TextBlock Text="清空筛选" Style="{ThemeResource AppCaptionTextStyle}" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                        <ToggleButton x:Name="ChipUnclassified"
+                                      Style="{StaticResource CompactToggleStyle}"
+                                      Content="只看未分类"
+                                      IsChecked="{x:Bind ViewModel.OnlyUnclassified, Mode=OneWay}"
+                                      Click="OnlyUnclassified_Click"
+                                      ToolTipService.ToolTip="只显示还没有主题或影调的素材" />
+                        <ToggleButton x:Name="ChipRaw"
+                                      Style="{StaticResource CompactToggleStyle}"
+                                      Content="只看 RAW"
+                                      IsChecked="{x:Bind ViewModel.OnlyRaw, Mode=OneWay}"
+                                      Click="OnlyRaw_Click"
+                                      ToolTipService.ToolTip="只显示 RAW 原片" />
+                        <ToggleButton x:Name="ChipLog"
+                                      Style="{StaticResource CompactToggleStyle}"
+                                      Content="只看 Log"
+                                      IsChecked="{x:Bind ViewModel.OnlyLog, Mode=OneWay}"
+                                      Click="OnlyLog_Click"
+                                      ToolTipService.ToolTip="只显示 Log 视频素材" />
+
+                        <Border Width="1" Height="16" Background="{ThemeResource AppDividerBrush}" Margin="6,0" />
+
+                        <TextBlock Text="排序" Style="{ThemeResource AppMicroTextStyle}" VerticalAlignment="Center" />
+                        <ComboBox x:Name="SortBox" MinWidth="124" Height="30"
+                                  CornerRadius="{ThemeResource AppRadiusSmall}"
+                                  SelectionChanged="SortBox_SelectionChanged">
+                            <ComboBoxItem Content="拍摄时间" Tag="capturedAt" />
+                            <ComboBoxItem Content="文件名" Tag="fileName" />
+                            <ComboBoxItem Content="文件大小" Tag="size" />
+                            <ComboBoxItem Content="评分" Tag="rating" />
+                            <ComboBoxItem Content="质量分" Tag="quality" />
+                        </ComboBox>
+                        <Button x:Name="SortOrderButton"
+                                Style="{StaticResource CompactButtonStyle}"
+                                Click="SortOrder_Click"
+                                ToolTipService.ToolTip="切换升序 / 降序">
+                            <TextBlock x:Name="SortOrderText" Text="降序" Style="{ThemeResource AppCaptionTextStyle}" />
+                        </Button>
+
+                        <Border Width="1" Height="16" Background="{ThemeResource AppDividerBrush}" Margin="6,0" />
+
+                        <TextBlock Text="密度" Style="{ThemeResource AppMicroTextStyle}" VerticalAlignment="Center" />
+                        <ToggleButton x:Name="DensitySmall" Style="{StaticResource CompactToggleStyle}" Content="小" MinWidth="28" Click="Density_Click" Tag="small" />
+                        <ToggleButton x:Name="DensityMedium" Style="{StaticResource CompactToggleStyle}" Content="中" MinWidth="28" Click="Density_Click" Tag="medium" />
+                        <ToggleButton x:Name="DensityLarge" Style="{StaticResource CompactToggleStyle}" Content="大" MinWidth="28" Click="Density_Click" Tag="large" />
+                        <ToggleButton x:Name="DensityList" Style="{StaticResource CompactToggleStyle}" Content="列表" Click="Density_Click" Tag="list" />
+                    </StackPanel>
+
+                    <ToggleButton Grid.Column="1" x:Name="InspectorToggle"
+                                  Style="{StaticResource CompactToggleStyle}"
+                                  Content="检视面板"
+                                  IsChecked="True"
+                                  Click="InspectorToggle_Click"
+                                  VerticalAlignment="Center" />
+                </Grid>
+
+                <TextBlock Text="{x:Bind ViewModel.ActiveFilterSummary, Mode=OneWay}"
+                           Style="{ThemeResource AppMicroTextStyle}"
+                           Visibility="{x:Bind ViewModel.ActiveFilterSummaryVisibility, Mode=OneWay}"
+                           TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+        </Border>
+
+        <!-- ==================================================================
+             三栏：筛选栏 / 网格 / 检视面板
+             ================================================================== -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="248" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition x:Name="InspectorColumn" Width="348" />
+            </Grid.ColumnDefinitions>
+
+            <!-- 左侧筛选栏 -->
+            <Border Grid.Column="0"
+                    Background="{ThemeResource AppSurfaceBrush}"
+                    BorderBrush="{ThemeResource AppDividerBrush}"
+                    BorderThickness="0,0,1,0">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Padding="12,10,10,6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="筛选" Style="{ThemeResource AppSubtitleTextStyle}" VerticalAlignment="Center" />
+                        <Button Grid.Column="1"
+                                Style="{ThemeResource AppIconButtonStyle}"
+                                Click="ClearFilters_Click"
+                                ToolTipService.ToolTip="清空筛选">
+                            <FontIcon Glyph="&#xE894;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                        </Button>
+                    </Grid>
+
+                    <ScrollViewer Grid.Row="1"
+                                  VerticalScrollMode="Enabled"
+                                  VerticalScrollBarVisibility="Auto"
+                                  Padding="8,0,8,16">
+                        <ItemsControl ItemsSource="{x:Bind ViewModel.Groups, Mode=OneWay}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:FilterGroupViewModel">
+                                    <Expander HorizontalAlignment="Stretch"
+                                              HorizontalContentAlignment="Stretch"
+                                              IsExpanded="{x:Bind IsExpanded}">
+                                        <Expander.Header>
+                                            <Grid ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Text="{x:Bind Title, Mode=OneWay}"
+                                                           Style="{ThemeResource AppSectionHeaderTextStyle}"
+                                                           Margin="0,2,0,2"
+                                                           VerticalAlignment="Center" />
+                                                <Border Grid.Column="1"
+                                                        Background="{ThemeResource AccentSubtleBrush}"
+                                                        CornerRadius="{ThemeResource AppRadiusPill}"
+                                                        Padding="6,0"
+                                                        VerticalAlignment="Center"
+                                                        Visibility="{x:Bind SummaryVisibility, Mode=OneWay}">
+                                                    <TextBlock Text="{x:Bind Summary, Mode=OneWay}"
+                                                               Style="{ThemeResource AppMicroTextStyle}"
+                                                               Foreground="{ThemeResource AccentBrush}" />
+                                                </Border>
+                                            </Grid>
+                                        </Expander.Header>
+
+                                        <ItemsControl ItemsSource="{x:Bind Options}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:FilterOptionViewModel">
+                                                    <Button Style="{StaticResource FilterRowButtonStyle}"
+                                                            Click="FilterOption_Click"
+                                                            Opacity="{x:Bind RowOpacity, Mode=OneWay}">
+                                                        <Grid ColumnSpacing="6">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="14" />
+                                                                <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="Auto" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <Border Grid.ColumnSpan="3"
+                                                                    Background="{ThemeResource AppSelectedBrush}"
+                                                                    CornerRadius="{ThemeResource AppRadiusSmall}"
+                                                                    Visibility="{x:Bind SelectionVisibility, Mode=OneWay}" />
+                                                            <FontIcon Grid.Column="0"
+                                                                      Glyph="&#xE73E;"
+                                                                      FontSize="{ThemeResource AppFontMicroSize}"
+                                                                      Foreground="{ThemeResource AccentBrush}"
+                                                                      VerticalAlignment="Center"
+                                                                      Visibility="{x:Bind SelectionVisibility, Mode=OneWay}" />
+                                                            <TextBlock Grid.Column="1"
+                                                                       Text="{x:Bind Display, Mode=OneWay}"
+                                                                       Style="{ThemeResource AppCaptionTextStyle}"
+                                                                       VerticalAlignment="Center"
+                                                                       TextTrimming="CharacterEllipsis" />
+                                                            <TextBlock Grid.Column="2"
+                                                                       Text="{x:Bind CountText, Mode=OneWay}"
+                                                                       Style="{ThemeResource AppMicroTextStyle}"
+                                                                       VerticalAlignment="Center"
+                                                                       Visibility="{x:Bind CountVisibility, Mode=OneWay}" />
+                                                        </Grid>
+                                                    </Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Expander>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+
+            <!-- 中间网格 -->
+            <!-- 网格区垫一层 AppSurfaceBrush：Glass 下约 55% 半透明，既透出光场又保证卡片文字对比度 -->
+            <Grid Grid.Column="1" x:Name="GridHost" Background="{ThemeResource AppSurfaceBrush}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <ListView x:Name="AssetList"
+                          Grid.Row="0"
+                          SelectionMode="Extended"
+                          IsItemClickEnabled="False"
+                          ItemsSource="{x:Bind ViewModel.Items}"
+                          ItemContainerStyle="{StaticResource AssetItemStyle}"
+                          ItemTemplate="{StaticResource CardTemplate}"
+                          ItemsPanel="{StaticResource PanelMedium}"
+                          Padding="8,8,8,0"
+                          SelectionChanged="AssetList_SelectionChanged"
+                          DoubleTapped="AssetList_DoubleTapped"
+                          RightTapped="AssetList_RightTapped"
+                          KeyDown="AssetList_KeyDown"
+                          ScrollViewer.HorizontalScrollMode="Disabled"
+                          ScrollViewer.VerticalScrollBarVisibility="Auto" />
+
+                <!-- 加载中：顶部细进度条 -->
+                <ProgressBar Grid.Row="0"
+                             Height="2"
+                             VerticalAlignment="Top"
+                             IsIndeterminate="True"
+                             Background="{ThemeResource AppTransparentBrush}"
+                             Foreground="{ThemeResource AccentBrush}"
+                             Visibility="{x:Bind ViewModel.LoadingVisibility, Mode=OneWay}" />
+
+                <!-- 分页加载更多 -->
+                <Border Grid.Row="1" Padding="16,8,16,10" Background="{ThemeResource AppTransparentBrush}">
+                    <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center"
+                                Visibility="{x:Bind ViewModel.LoadMoreVisibility, Mode=OneWay}">
+                        <TextBlock Text="滚动到底自动加载更多"
+                                   Style="{ThemeResource AppMicroTextStyle}"
+                                   VerticalAlignment="Center" />
+                        <Button Style="{StaticResource CompactButtonStyle}"
+                                Click="LoadMore_Click">
+                            <TextBlock Text="加载更多" Style="{ThemeResource AppCaptionTextStyle}" />
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <!-- 空状态 -->
+                <Grid Grid.RowSpan="2"
+                      Visibility="{x:Bind ViewModel.EmptyVisibility, Mode=OneWay}"
+                      Background="{ThemeResource AppTransparentBrush}">
+                    <uic:EmptyState Glyph="&#xE8B7;"
+                                    Title="{x:Bind ViewModel.EmptyTitle, Mode=OneWay}"
+                                    Description="{x:Bind ViewModel.EmptyCaption, Mode=OneWay}"
+                                    ActionText="{x:Bind ViewModel.EmptyActionText, Mode=OneWay}"
+                                    ActionInvoked="EmptyState_ActionInvoked"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center" />
+                </Grid>
+            </Grid>
+
+            <!-- 右侧检视面板 -->
+            <Border Grid.Column="2"
+                    x:Name="InspectorHost"
+                    BorderBrush="{ThemeResource AppDividerBrush}"
+                    BorderThickness="1,0,0,0">
+                <views:InspectorPanel x:Name="Inspector" />
+            </Border>
+        </Grid>
+    </Grid>
+</Page>

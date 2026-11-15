@@ -1,0 +1,322 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="StjMediaViewer.App.Views.ShellPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:views="using:StjMediaViewer.App.Views"
+    xmlns:controls="using:StjMediaViewer.App.Controls">
+
+    <!--
+        应用外壳：顶栏（品牌 / 全局搜索 / 扫描进度 / AI / 主题 / 设计语言）
+        + 左侧导航 + 内容 Frame + 状态栏 + 全屏预览覆盖层。
+        约定名字（Lead 验收脚本依赖）：ContentFrame / NavView / LanguagePicker / StatusText。
+    -->
+    <Page.Resources>
+        <!-- 顶栏紧凑按钮：小圆角、无粗边框，避免一排大胶囊把顶栏撑得笨重 -->
+        <Style x:Key="TopBarCompactButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="{ThemeResource AppTransparentBrush}" />
+            <Setter Property="BorderBrush" Value="{ThemeResource AppTransparentBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="CornerRadius" Value="{ThemeResource AppRadiusSmall}" />
+            <Setter Property="Padding" Value="10,2,10,2" />
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="FontSize" Value="{ThemeResource AppFontCaptionSize}" />
+            <Setter Property="Foreground" Value="{ThemeResource TextSecondaryBrush}" />
+        </Style>
+    </Page.Resources>
+
+    <Grid x:Name="RootGrid"
+          Background="{ThemeResource AppWindowBackgroundBrush}"
+          KeyDown="RootGrid_KeyDown">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!--
+            背景光场：液态玻璃必须有东西可折射（LiquidGlassUI 设计原则第一条）。
+            用 ui-shell 的 AmbientBackdrop：底色渐变 + 四色径向光斑 + 四周 vignette。
+            Fluent / MD3 下对应 token 全透明 → 什么都不画，不影响原有观感；
+            Glass 下就是可供折射的真实彩色光场。铺满窗口且必须在所有内容之下。
+        -->
+        <controls:AmbientBackdrop Grid.RowSpan="4" IsHitTestVisible="False" />
+
+        <!-- ================= 顶栏 ================= -->
+        <Grid Grid.Row="0"
+              Height="60"
+              Padding="16,0,16,0"
+              Background="{ThemeResource AppSurfaceBrush}"
+              BorderBrush="{ThemeResource AppDividerBrush}"
+              BorderThickness="0,0,0,1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <!-- 品牌 -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                <Border Width="28" Height="28"
+                        CornerRadius="{ThemeResource AppRadiusMedium}"
+                        Background="{ThemeResource AccentSubtleBrush}"
+                        BorderBrush="{ThemeResource AccentBorderBrush}"
+                        BorderThickness="1">
+                    <FontIcon Glyph="&#xE8B9;" FontSize="{ThemeResource AppFontBodySize}"
+                              Foreground="{ThemeResource AccentBrush}" />
+                </Border>
+                <TextBlock Text="STJ Media Viewer"
+                           Style="{ThemeResource AppSubtitleTextStyle}"
+                           VerticalAlignment="Center" />
+                <Border Background="{ThemeResource AppSurfaceAltBrush}"
+                        BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                        BorderThickness="{ThemeResource AppCardStrokeThickness}"
+                        CornerRadius="{ThemeResource AppRadiusPill}"
+                        Padding="8,1"
+                        VerticalAlignment="Center"
+                        Visibility="{x:Bind ViewModel.DemoVisibility, Mode=OneWay}">
+                    <TextBlock Text="演示库" Style="{ThemeResource AppMicroTextStyle}" />
+                </Border>
+            </StackPanel>
+
+            <!--
+                全局搜索（250ms 防抖，回车立即查询）：
+                放大镜内嵌在胶囊容器里，TextBox 自身无边框透明底。
+                之前用 TextBox.Header 塞图标，等于在顶栏里多出一行 → 搜索框被裁切。
+            -->
+            <Grid Grid.Column="1" MaxWidth="520" Margin="24,0" HorizontalAlignment="Stretch" VerticalAlignment="Center">
+                <!-- 搜索是"输入类"控件：这里保持 AppStrokeBrush（清晰的功能边界），不用卡片柔描边 -->
+                <Border Height="36"
+                        CornerRadius="{ThemeResource AppRadiusMedium}"
+                        Background="{ThemeResource AppSurfaceAltBrush}"
+                        BorderBrush="{ThemeResource AppStrokeBrush}"
+                        BorderThickness="1">
+                    <Grid>
+                        <FontIcon Glyph="&#xE721;"
+                                  FontSize="{ThemeResource AppFontCaptionSize}"
+                                  Foreground="{ThemeResource TextTertiaryBrush}"
+                                  HorizontalAlignment="Left" VerticalAlignment="Center"
+                                  Margin="12,0,0,0"
+                                  IsHitTestVisible="False" />
+                        <TextBox x:Name="SearchBox"
+                                 Height="34"
+                                 VerticalAlignment="Center"
+                                 Margin="34,0,8,0"
+                                 Padding="0"
+                                 Background="{ThemeResource AppTransparentBrush}"
+                                 BorderThickness="0"
+                                 PlaceholderText="搜索文件名 / 城市 / 设备 / 关键词…"
+                                 TextChanged="SearchBox_TextChanged"
+                                 KeyDown="SearchBox_KeyDown">
+                            <TextBox.Resources>
+                                <!-- 去掉 WinUI TextBox 自带的 2px 焦点下划线，否则会出现一条突兀的蓝线 -->
+                                <Thickness x:Key="TextControlBorderThemeThickness">0</Thickness>
+                                <Thickness x:Key="TextControlBorderThemeThicknessFocused">0</Thickness>
+                                <SolidColorBrush x:Key="TextControlBackground" Color="Transparent" />
+                                <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="Transparent" />
+                                <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="Transparent" />
+                                <SolidColorBrush x:Key="TextControlBorderBrush" Color="Transparent" />
+                                <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="Transparent" />
+                                <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="Transparent" />
+                                <SolidColorBrush x:Key="TextControlElevationBorderBrush" Color="Transparent" />
+                                <SolidColorBrush x:Key="TextControlElevationBorderFocusedBrush" Color="Transparent" />
+                            </TextBox.Resources>
+                        </TextBox>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- 右侧命令区 -->
+            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                <ProgressRing Width="18" Height="18"
+                              Foreground="{ThemeResource AccentBrush}"
+                              IsActive="{x:Bind ViewModel.IsScanning, Mode=OneWay}"
+                              Visibility="{x:Bind ViewModel.ScanRingVisibility, Mode=OneWay}" />
+
+                <Button x:Name="ScanButton"
+                        Style="{StaticResource TopBarCompactButtonStyle}"
+                        Click="ScanButton_Click"
+                        ToolTipService.ToolTip="选择媒体库文件夹并扫描">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE8B5;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                        <TextBlock Text="扫描" Style="{ThemeResource AppCaptionTextStyle}" />
+                    </StackPanel>
+                </Button>
+
+                <Button x:Name="AiButton"
+                        Style="{StaticResource TopBarCompactButtonStyle}"
+                        Click="AiButton_Click"
+                        ToolTipService.ToolTip="打开 AI 队列">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE9D2;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                        <TextBlock Text="AI 队列" Style="{ThemeResource AppCaptionTextStyle}" />
+                    </StackPanel>
+                </Button>
+
+                <Button x:Name="ThemeButton"
+                        Style="{ThemeResource AppIconButtonStyle}"
+                        Click="ThemeButton_Click"
+                        ToolTipService.ToolTip="{x:Bind ViewModel.ThemeTooltip, Mode=OneWay}">
+                    <FontIcon Glyph="{x:Bind ViewModel.ThemeGlyph, Mode=OneWay}"
+                              FontSize="{ThemeResource AppFontBodySize}" />
+                </Button>
+
+                <ComboBox x:Name="LanguagePicker"
+                          MinWidth="150" Height="30"
+                          VerticalAlignment="Center"
+                          ToolTipService.ToolTip="设计语言（Fluent / MD3 / Liquid Glass）"
+                          SelectionChanged="LanguagePicker_SelectionChanged">
+                    <ComboBoxItem Content="Fluent（微软）" Tag="fluent" />
+                    <ComboBoxItem Content="Material Design 3" Tag="md3" />
+                    <ComboBoxItem Content="Liquid Glass（苹果）" Tag="glass" />
+                </ComboBox>
+            </StackPanel>
+        </Grid>
+
+        <!-- ================= 扫描细进度条 ================= -->
+        <ProgressBar Grid.Row="1"
+                     Height="2"
+                     VerticalAlignment="Top"
+                     Background="{ThemeResource AppTransparentBrush}"
+                     Foreground="{ThemeResource AccentBrush}"
+                     IsIndeterminate="{x:Bind ViewModel.IsScanIndeterminate, Mode=OneWay}"
+                     Value="{x:Bind ViewModel.ScanPercent, Mode=OneWay}"
+                     Visibility="{x:Bind ViewModel.ScanBarVisibility, Mode=OneWay}" />
+
+        <!-- ================= 导航 + 内容 ================= -->
+        <!-- LeftCompact + 收合：把宽度让给素材库三栏网格（悬停/点汉堡展开）。 -->
+        <NavigationView Grid.Row="2"
+                        x:Name="NavView"
+                        PaneDisplayMode="LeftCompact"
+                        IsPaneOpen="False"
+                        OpenPaneLength="196"
+                        CompactPaneLength="48"
+                        IsSettingsVisible="False"
+                        IsBackButtonVisible="Collapsed"
+                        SelectionChanged="NavView_SelectionChanged"
+                        Background="{ThemeResource AppSurfaceBrush}">
+            <NavigationView.MenuItems>
+                <NavigationViewItem Content="素材库" Tag="library" Icon="Pictures" />
+                <NavigationViewItem Content="时间线" Tag="timeline" Icon="Calendar" />
+                <NavigationViewItem Content="地图" Tag="map" Icon="Map" />
+                <NavigationViewItem Content="重复项" Tag="duplicates" Icon="Copy" />
+                <NavigationViewItem Content="AI 队列" Tag="aiqueue" Icon="Bullets" />
+            </NavigationView.MenuItems>
+            <NavigationView.FooterMenuItems>
+                <NavigationViewItem Content="设置" Tag="settings" Icon="Setting" />
+            </NavigationView.FooterMenuItems>
+
+            <Grid>
+                <Frame x:Name="ContentFrame" />
+
+                <!-- 尚未接入的页面：优雅占位，绝不崩溃 -->
+                <Grid x:Name="PlaceholderHost"
+                      Background="{ThemeResource AppWindowBackgroundBrush}"
+                      Visibility="Collapsed">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12" Width="330">
+                        <FontIcon Glyph="&#xE9D9;"
+                                  FontSize="{ThemeResource AppFontDisplaySize}"
+                                  Foreground="{ThemeResource TextTertiaryBrush}"
+                                  HorizontalAlignment="Center" />
+                        <TextBlock x:Name="Placeholder"
+                                   Text="该视图尚未接入"
+                                   Style="{ThemeResource AppSubtitleTextStyle}"
+                                   HorizontalAlignment="Center"
+                                   TextAlignment="Center" />
+                        <TextBlock Text="第一阶段聚焦「素材库 / 检视 / 预览」；时间线、地图、重复项与 AI 队列会在后续阶段接入。"
+                                   Style="{ThemeResource AppCaptionTextStyle}"
+                                   TextWrapping="Wrap"
+                                   TextAlignment="Center" />
+                        <Button Style="{ThemeResource AppSubtleButtonStyle}"
+                                Click="BackToLibrary_Click"
+                                HorizontalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE72B;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                                <TextBlock Text="返回素材库" Style="{ThemeResource AppCaptionTextStyle}" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </NavigationView>
+
+        <!-- ================= 状态栏 ================= -->
+        <Grid Grid.Row="3"
+              Height="30"
+              Padding="16,0,16,0"
+              Background="{ThemeResource AppSurfaceAltBrush}"
+              BorderBrush="{ThemeResource AppDividerBrush}"
+              BorderThickness="0,1,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0"
+                    Width="6" Height="6"
+                    CornerRadius="{ThemeResource AppRadiusPill}"
+                    Background="{ThemeResource DangerBrush}"
+                    VerticalAlignment="Center"
+                    Margin="0,0,8,0"
+                    Visibility="{x:Bind ViewModel.StatusErrorVisibility, Mode=OneWay}" />
+
+            <TextBlock x:Name="StatusText"
+                       Grid.Column="1"
+                       Text="{x:Bind ViewModel.StatusText, Mode=OneWay}"
+                       Style="{ThemeResource AppMicroTextStyle}"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis" />
+
+            <TextBlock x:Name="CountText"
+                       Grid.Column="2"
+                       Text="{x:Bind ViewModel.TotalText, Mode=OneWay}"
+                       Style="{ThemeResource AppMicroTextStyle}"
+                       VerticalAlignment="Center"
+                       Margin="16,0,12,0" />
+
+            <TextBlock x:Name="FilteredText"
+                       Grid.Column="3"
+                       Text="{x:Bind ViewModel.FilteredText, Mode=OneWay}"
+                       Style="{ThemeResource AppMicroTextStyle}"
+                       Foreground="{ThemeResource AccentBrush}"
+                       VerticalAlignment="Center"
+                       Margin="0,0,12,0" />
+
+            <TextBlock x:Name="SelectionText"
+                       Grid.Column="4"
+                       Text="{x:Bind ViewModel.SelectionText, Mode=OneWay}"
+                       Style="{ThemeResource AppMicroTextStyle}"
+                       VerticalAlignment="Center"
+                       Margin="0,0,12,0" />
+
+            <TextBlock x:Name="CacheText"
+                       Grid.Column="5"
+                       Text="{x:Bind ViewModel.CacheText, Mode=OneWay}"
+                       Style="{ThemeResource AppMicroTextStyle}"
+                       VerticalAlignment="Center"
+                       Margin="0,0,16,0" />
+
+            <Border Grid.Column="6"
+                    Background="{ThemeResource AppSurfaceBrush}"
+                    BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                    BorderThickness="{ThemeResource AppCardStrokeThickness}"
+                    CornerRadius="{ThemeResource AppRadiusPill}"
+                    Padding="8,1"
+                    VerticalAlignment="Center">
+                <TextBlock x:Name="SkinText"
+                           Text="{x:Bind ViewModel.SkinText, Mode=OneWay}"
+                           Style="{ThemeResource AppMicroTextStyle}"
+                           Foreground="{ThemeResource TextSecondaryBrush}" />
+            </Border>
+        </Grid>
+
+        <!-- ================= 全屏预览层（覆盖整个窗口内容） ================= -->
+        <views:PreviewOverlay x:Name="Preview" Grid.RowSpan="4" />
+    </Grid>
+</Page>

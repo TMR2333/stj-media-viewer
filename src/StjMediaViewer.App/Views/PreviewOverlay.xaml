@@ -1,0 +1,248 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserControl
+    x:Class="StjMediaViewer.App.Views.PreviewOverlay"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:uic="using:StjMediaViewer.App.Controls"
+    xmlns:vm="using:StjMediaViewer.App.ViewModels">
+
+    <!--
+        全屏预览层：页面级 Popup 太慢，直接用 Shell 根 Grid 的最上层覆盖层。
+        结构：遮罩 / 顶部信息条 / 中间画布（图片可缩放平移 + 视频 + 音频）/ 底部操作条。
+        所有颜色与圆角都是 token。
+    -->
+    <Grid x:Name="OverlayRoot"
+          Background="{ThemeResource AppTransparentBrush}"
+          Visibility="{x:Bind ViewModel.OverlayVisibility, Mode=OneWay}"
+          IsTabStop="True"
+          KeyDown="Overlay_KeyDown">
+
+        <!-- 遮罩：点空白处关闭（按钮/图片区域会自己吞掉事件） -->
+        <Border x:Name="Scrim" Background="{ThemeResource AppScrimBrush}" Tapped="Scrim_Tapped" />
+
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- ============ 顶部信息条 ============ -->
+            <Border Grid.Row="0"
+                    Background="{ThemeResource AppSurfaceOverlayBrush}"
+                    BorderBrush="{ThemeResource AppDividerBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="20,12,20,12">
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                        <TextBlock Text="{x:Bind ViewModel.TitleText, Mode=OneWay}"
+                                   Style="{ThemeResource AppSubtitleTextStyle}"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{x:Bind ViewModel.MetaText, Mode=OneWay}"
+                                   Style="{ThemeResource AppCaptionTextStyle}"
+                                   TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+
+                    <TextBlock Grid.Column="1"
+                               Text="{x:Bind ViewModel.IndexText, Mode=OneWay}"
+                               Style="{ThemeResource AppCaptionTextStyle}"
+                               VerticalAlignment="Center"
+                               FontFamily="{ThemeResource AppMonoFontFamily}" />
+
+                    <Button Grid.Column="2" x:Name="CloseButton" Style="{ThemeResource AppIconButtonStyle}"
+                            Click="Close_Click" ToolTipService.ToolTip="关闭（Esc）">
+                        <FontIcon Glyph="&#xE711;" FontSize="{ThemeResource AppFontBodySize}" />
+                    </Button>
+                </Grid>
+            </Border>
+
+            <!-- ============ 中间画布 ============ -->
+            <Grid Grid.Row="1">
+                <!-- 图片：滚轮缩放 / 拖拽平移 / 双击 1:1 -->
+                <ScrollViewer x:Name="ZoomScroll"
+                              HorizontalScrollMode="Enabled"
+                              VerticalScrollMode="Enabled"
+                              HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Auto"
+                              ZoomMode="Enabled"
+                              MinZoomFactor="0.1"
+                              MaxZoomFactor="8"
+                              Background="{ThemeResource AppTransparentBrush}"
+                              Padding="0,8,0,8"
+                              Tapped="ZoomScroll_Tapped"
+                              PointerPressed="ZoomScroll_PointerPressed"
+                              PointerMoved="ZoomScroll_PointerMoved"
+                              PointerReleased="ZoomScroll_PointerReleased"
+                              DoubleTapped="ZoomScroll_DoubleTapped"
+                              ViewChanged="ZoomScroll_ViewChanged">
+                    <Image x:Name="ZoomImage"
+                           Source="{x:Bind ViewModel.Image, Mode=OneWay}"
+                           Visibility="{x:Bind ViewModel.ImageVisibility, Mode=OneWay}"
+                           Stretch="Uniform"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center" />
+                </ScrollViewer>
+
+                <!-- 视频 -->
+                <MediaPlayerElement x:Name="VideoPlayer"
+                                    Source="{x:Bind ViewModel.VideoSource, Mode=OneWay}"
+                                    Visibility="{x:Bind ViewModel.VideoVisibility, Mode=OneWay}"
+                                    AreTransportControlsEnabled="True"
+                                    AutoPlay="True"
+                                    Stretch="Uniform" />
+
+                <!-- 音频：封面占位 + 信息 -->
+                <Grid Visibility="{x:Bind ViewModel.AudioVisibility, Mode=OneWay}"
+                      HorizontalAlignment="Center" VerticalAlignment="Center"
+                      Width="360">
+                    <uic:GlassPanel ContentPadding="24">
+                        <StackPanel Spacing="14" HorizontalAlignment="Center">
+                            <Border Width="200" Height="200"
+                                    CornerRadius="{ThemeResource AppRadiusLarge}"
+                                    Background="{ThemeResource AppSurfaceAltBrush}"
+                                    BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                                    BorderThickness="{ThemeResource AppCardStrokeThickness}">
+                                <Grid>
+                                    <Image Source="{x:Bind ViewModel.Image, Mode=OneWay}" Stretch="UniformToFill" />
+                                    <FontIcon x:Name="AudioGlyph" Glyph="&#xE8D6;"
+                                              FontSize="{ThemeResource AppFontDisplaySize}"
+                                              Foreground="{ThemeResource TextTertiaryBrush}"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Grid>
+                            </Border>
+                            <TextBlock Text="{x:Bind ViewModel.AudioTitle, Mode=OneWay}"
+                                       Style="{ThemeResource AppSubtitleTextStyle}"
+                                       HorizontalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{x:Bind ViewModel.AudioSubtitle, Mode=OneWay}"
+                                       Style="{ThemeResource AppCaptionTextStyle}"
+                                       HorizontalAlignment="Center" />
+                            <TextBlock Text="音频素材：内置播放器将在接入解码链路后启用"
+                                       Style="{ThemeResource AppMicroTextStyle}"
+                                       HorizontalAlignment="Center"
+                                       TextAlignment="Center" />
+                        </StackPanel>
+                    </uic:GlassPanel>
+                </Grid>
+
+                <!-- 占位（无预览） -->
+                <StackPanel Visibility="{x:Bind ViewModel.PlaceholderVisibility, Mode=OneWay}"
+                            HorizontalAlignment="Center" VerticalAlignment="Center"
+                            Spacing="12">
+                    <FontIcon Glyph="{x:Bind ViewModel.PlaceholderGlyph, Mode=OneWay}"
+                              FontSize="{ThemeResource AppFontDisplaySize}"
+                              Foreground="{ThemeResource TextTertiaryBrush}"
+                              HorizontalAlignment="Center" />
+                    <TextBlock Text="{x:Bind ViewModel.PlaceholderText, Mode=OneWay}"
+                               Style="{ThemeResource AppCaptionTextStyle}"
+                               HorizontalAlignment="Center" />
+                </StackPanel>
+
+                <ProgressRing IsActive="True"
+                              Width="36" Height="36"
+                              Visibility="{x:Bind ViewModel.LoadingVisibility, Mode=OneWay}"
+                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+                <!-- 左右切换 -->
+                <Button Style="{ThemeResource AppIconButtonStyle}"
+                        Click="Previous_Click"
+                        HorizontalAlignment="Left" VerticalAlignment="Center"
+                        Margin="16,0,0,0"
+                        Background="{ThemeResource AppSurfaceOverlayBrush}"
+                        ToolTipService.ToolTip="上一张（←）">
+                    <FontIcon Glyph="&#xE76B;" FontSize="{ThemeResource AppFontSubtitleSize}" />
+                </Button>
+                <Button Style="{ThemeResource AppIconButtonStyle}"
+                        Click="Next_Click"
+                        HorizontalAlignment="Right" VerticalAlignment="Center"
+                        Margin="0,0,16,0"
+                        Background="{ThemeResource AppSurfaceOverlayBrush}"
+                        ToolTipService.ToolTip="下一张（→）">
+                    <FontIcon Glyph="&#xE76C;" FontSize="{ThemeResource AppFontSubtitleSize}" />
+                </Button>
+            </Grid>
+
+            <!-- ============ 底部操作条 ============ -->
+            <Border Grid.Row="2"
+                    Background="{ThemeResource AppSurfaceOverlayBrush}"
+                    BorderBrush="{ThemeResource AppDividerBrush}"
+                    BorderThickness="0,1,0,0"
+                    Padding="20,10,20,10">
+                <Grid ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- 评分 -->
+                    <uic:RatingStars Grid.Column="0" x:Name="PreviewStars"
+                                         Rating="{x:Bind ViewModel.Rating, Mode=OneWay}"
+                                         RatingChanged="PreviewStars_RatingChanged"
+                                         VerticalAlignment="Center" />
+
+                    <!-- 颜色标签 -->
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <Button Style="{ThemeResource AppIconButtonStyle}" Click="LabelRed_Click" ToolTipService.ToolTip="红标">
+                            <Border Width="14" Height="14" CornerRadius="{ThemeResource AppRadiusPill}" Background="{ThemeResource DangerBrush}" />
+                        </Button>
+                        <Button Style="{ThemeResource AppIconButtonStyle}" Click="LabelYellow_Click" ToolTipService.ToolTip="黄标">
+                            <Border Width="14" Height="14" CornerRadius="{ThemeResource AppRadiusPill}" Background="{ThemeResource WarningBrush}" />
+                        </Button>
+                        <Button Style="{ThemeResource AppIconButtonStyle}" Click="LabelGreen_Click" ToolTipService.ToolTip="绿标">
+                            <Border Width="14" Height="14" CornerRadius="{ThemeResource AppRadiusPill}" Background="{ThemeResource SuccessBrush}" />
+                        </Button>
+                        <Button Style="{ThemeResource AppIconButtonStyle}" Click="LabelBlue_Click" ToolTipService.ToolTip="蓝标">
+                            <Border Width="14" Height="14" CornerRadius="{ThemeResource AppRadiusPill}" Background="{ThemeResource InfoBrush}" />
+                        </Button>
+                        <Button Style="{ThemeResource AppIconButtonStyle}" Click="LabelNone_Click" ToolTipService.ToolTip="清除色标">
+                            <FontIcon Glyph="&#xE894;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                        </Button>
+                        <TextBlock Text="{x:Bind ViewModel.ColorLabelName, Mode=OneWay}"
+                                   Style="{ThemeResource AppMicroTextStyle}"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- 选用 / 废片 -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="10,2,10,2" MinHeight="28" Click="Pick_Click">
+                            <TextBlock Text="选用" Style="{ThemeResource AppMicroTextStyle}" />
+                        </Button>
+                        <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="10,2,10,2" MinHeight="28" Click="Reject_Click">
+                            <TextBlock Text="废片" Style="{ThemeResource AppMicroTextStyle}" />
+                        </Button>
+                        <TextBlock Text="{x:Bind ViewModel.PickText, Mode=OneWay}"
+                                   Style="{ThemeResource AppMicroTextStyle}"
+                                   VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <!-- 分类信息 -->
+                    <TextBlock Grid.Column="3"
+                               Text="{x:Bind ViewModel.ThemeText, Mode=OneWay}"
+                               Style="{ThemeResource AppMicroTextStyle}"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis" />
+
+                    <!-- 缩放信息 -->
+                    <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                        <TextBlock Text="{x:Bind ViewModel.ZoomText, Mode=OneWay}"
+                                   Style="{ThemeResource AppMicroTextStyle}"
+                                   VerticalAlignment="Center"
+                                   FontFamily="{ThemeResource AppMonoFontFamily}" />
+                        <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="10,2,10,2" MinHeight="28" Click="ZoomReset_Click">
+                            <TextBlock Text="适应窗口" Style="{ThemeResource AppMicroTextStyle}" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>
