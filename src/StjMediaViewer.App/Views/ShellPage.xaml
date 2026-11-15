@@ -193,6 +193,11 @@
                         Background="{ThemeResource AppSurfaceBrush}">
             <NavigationView.MenuItems>
                 <NavigationViewItem Content="素材库" Tag="library" Icon="Pictures" />
+                <NavigationViewItem Content="画廊" Tag="gallery">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE8A9;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
                 <NavigationViewItem Content="导入" Tag="import">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE8B5;" />

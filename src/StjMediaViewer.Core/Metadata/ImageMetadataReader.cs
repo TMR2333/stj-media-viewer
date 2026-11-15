@@ -70,6 +70,7 @@ public static class ImageMetadataReader
             }
 
             int? pixelW = null, pixelH = null, frameW = null, frameH = null, ifd0W = null, ifd0H = null;
+            int exifOrientation = 1;   // EXIF 0x0112：5–8 表示需要旋转 90/270，宽高要交换
             var sawIcc = false;
 
             foreach (var dir in dirs)
@@ -80,9 +81,15 @@ public static class ImageMetadataReader
                     switch (dir.GetType().Name)
                     {
                         case "ExifIfd0Directory":
+                        {
+                            // EXIF 0x0112 Orientation：5–8 表示需要旋转 90/270，宽高要交换
+                            var exifOrientationTag = TryInt(dir, ExifDirectoryBase.TagOrientation);
+                            if (exifOrientationTag is >= 1 and <= 8) exifOrientation = exifOrientationTag.Value;
+
                             ReadIfd0(dir, m, ref ifd0W, ref ifd0H, out var xmpBytes);
                             if (xmpBytes is not null) XmpApplier.ApplyEmbedded(XmpReader.Parse(xmpBytes), m, preferOverOtherText: true);
                             break;
+                        }
                         case "ExifSubIfdDirectory":
                             ReadSubIfd(dir, m, ref pixelW, ref pixelH);
                             break;
@@ -164,6 +171,13 @@ public static class ImageMetadataReader
                     m.Width = frameW;
                     m.Height = frameH;
                 }
+            }
+
+            // EXIF 方向 5–8 = 需要旋转 90/270：宽高交换成正立后的尺寸（Photos/资源管理器也是这么显示）
+            if (exifOrientation is 5 or 6 or 7 or 8 && m.Width is { } ow && m.Height is { } oh && ow != oh)
+            {
+                m.Width = oh;
+                m.Height = ow;
             }
 
             if (!sawIcc && m.ColorProfileName is null && m.Kind == MediaKind.Image &&

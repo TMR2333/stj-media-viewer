@@ -243,6 +243,7 @@ public sealed partial class ShellPage : Page
     private static Type? ResolvePageType(string viewId) => viewId switch
     {
         "library" => typeof(LibraryPage),
+        "gallery" => typeof(GalleryPage),
         "import" => typeof(ImportPage),
         "timeline" => typeof(TimelinePage),
         "duplicates" => typeof(DuplicatesPage),

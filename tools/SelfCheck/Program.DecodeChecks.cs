@@ -47,6 +47,15 @@ public static partial class Program
             Check($"{name} 方向已摆正为 240×160", image.Width == 240 && image.Height == 160,
                   $"{image.Width}×{image.Height}");
 
+            // 2b) 元数据层：宽高必须是正立后的尺寸（存储 160×240 + Orientation=6 → 正立 240×160）
+            var meta = s.Metadata.Read(path);
+            if (orientation is 6 or 8)
+            {
+                Check($"{name} 元数据宽高已按方向交换",
+                      meta.Width == 240 && meta.Height == 160,
+                      $"{meta.Width}×{meta.Height}");
+            }
+
             // 3) 四角颜色（宽容差：JPEG 压缩 + 缩放）
             if (image.Width > 0 && image.Height > 0)
             {
