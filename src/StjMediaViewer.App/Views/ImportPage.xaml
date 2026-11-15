@@ -30,15 +30,21 @@
                              Glyph="&#xE88E;">
                 <StackPanel Spacing="12">
 
-                    <Grid>
+                    <Grid ColumnSpacing="12">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBlock Grid.Column="0"
-                                   Text="{x:Bind ViewModel.DeviceSummaryText, Mode=OneWay}"
-                                   Style="{ThemeResource AppMicroTextStyle}"
-                                   VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                        <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="{x:Bind ViewModel.DeviceSummaryText, Mode=OneWay}"
+                                       Style="{ThemeResource AppMicroTextStyle}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{x:Bind ViewModel.HiddenInternalText, Mode=OneWay}"
+                                       Style="{ThemeResource AppMicroTextStyle}"
+                                       Foreground="{ThemeResource TextTertiaryBrush}"
+                                       TextWrapping="Wrap"
+                                       Visibility="{x:Bind ViewModel.HiddenInternalVisibility, Mode=OneWay}" />
+                        </StackPanel>
                         <Button Grid.Column="1"
                                 Style="{ThemeResource AppSubtleButtonStyle}"
                                 Padding="12,2,12,2" MinHeight="30"

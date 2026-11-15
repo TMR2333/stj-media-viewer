@@ -345,8 +345,8 @@ internal sealed class FallbackAssetOperations : IAssetOperations
 internal sealed class FallbackStorageDeviceService : IStorageDeviceService
 {
     private static readonly IReadOnlyList<StorageDevice> None = Array.Empty<StorageDevice>();
-    public IReadOnlyList<StorageDevice> GetDevices() => None;
-    public Task<IReadOnlyList<StorageDevice>> ProbeDevicesAsync(CancellationToken ct = default) => Task.FromResult(None);
+    public IReadOnlyList<StorageDevice> GetDevices(bool includeInternal = false) => None;
+    public Task<IReadOnlyList<StorageDevice>> ProbeDevicesAsync(bool includeInternal = false, CancellationToken ct = default) => Task.FromResult(None);
     public StorageDevice? GetDeviceForPath(string path) => null;
 }
 

@@ -52,14 +52,24 @@ public static partial class Program
     // ==================================================================================
     private static async Task CheckDevices(Services s)
     {
-        var quick = s.Devices.GetDevices();
-        Check("枚举到本地卷", quick.Count > 0, $"{quick.Count} 个");
+        var quick = s.Devices.GetDevices(includeInternal: true);
+        Check("枚举到本地卷（含内置盘）", quick.Count > 0, $"{quick.Count} 个");
         Check("卷路径 / 类型 / 容量字段齐全",
               quick.Any(d => !string.IsNullOrEmpty(d.RootPath) && !string.IsNullOrEmpty(d.DriveType) && d.TotalBytes > 0),
               quick.FirstOrDefault(d => d.TotalBytes > 0)?.DisplayName);
 
-        var probed = await s.Devices.ProbeDevicesAsync();
+        var probed = await s.Devices.ProbeDevicesAsync(includeInternal: true);
         Check("探测总线类型不抛异常", probed.Count > 0, $"{probed.Count} 个");
+
+        // 默认（外部存储）列表：不能出现内置固定盘，也不能出现系统盘
+        var external = await s.Devices.ProbeDevicesAsync();
+        var systemRoot = Path.GetPathRoot(Environment.SystemDirectory)?.TrimEnd('\\') ?? "";
+        Check("外部设备列表不含系统盘",
+              external.All(d => !string.Equals(d.RootPath.TrimEnd('\\'), systemRoot, StringComparison.OrdinalIgnoreCase)),
+              $"{external.Count} 个外部设备");
+        Check("外部设备列表不含内置固定盘",
+              external.All(d => d.DriveType != "固定" || d.IsExternal),
+              string.Join(" | ", external.Select(d => $"{d.RootPath}{d.DriveType}/{d.BusType}")));
         var system = probed.FirstOrDefault(d => d.RootPath.StartsWith(
             Path.GetPathRoot(Environment.SystemDirectory) ?? "C:", StringComparison.OrdinalIgnoreCase));
         Check("系统盘被识别", system is not null, system?.BusType);

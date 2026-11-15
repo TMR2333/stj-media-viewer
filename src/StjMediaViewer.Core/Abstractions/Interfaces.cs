@@ -221,11 +221,18 @@ public interface IAssetOperations
 /// <summary>外部存储设备（U 盘 / SD 卡 / 相机 / 移动硬盘）枚举。</summary>
 public interface IStorageDeviceService
 {
-    /// <summary>快速枚举：盘符、卷标、类型、容量（不探测总线，毫秒级）。</summary>
-    IReadOnlyList<StorageDevice> GetDevices();
+    /// <summary>
+    /// 快速枚举：盘符、卷标、类型、容量（不探测总线，毫秒级）。
+    /// <paramref name="includeInternal"/>=false（默认）时**只返回外部存储**：U 盘 / SD 卡 / 移动硬盘 / 网络盘，
+    /// 本机内置磁盘（NVMe/SATA 固定盘）不列出；true 时返回全部（诊断 / 自检用）。
+    /// </summary>
+    IReadOnlyList<StorageDevice> GetDevices(bool includeInternal = false);
 
-    /// <summary>完整枚举：额外探测总线类型（USB/SD）、DCIM 相机目录线索。可能耗时几十毫秒到几百毫秒。</summary>
-    Task<IReadOnlyList<StorageDevice>> ProbeDevicesAsync(CancellationToken ct = default);
+    /// <summary>
+    /// 完整枚举：额外探测总线类型（USB/SD）与 DCIM 相机目录线索。
+    /// 默认同样只返回外部存储：固定盘只有在总线是 USB / SD / MMC 时才算外部（很多读卡器/移动硬盘会报成固定盘）。
+    /// </summary>
+    Task<IReadOnlyList<StorageDevice>> ProbeDevicesAsync(bool includeInternal = false, CancellationToken ct = default);
 
     /// <summary>取某个路径所属的设备信息（用于"浏览文件夹导入"时也能显示容量）。</summary>
     StorageDevice? GetDeviceForPath(string path);

@@ -22,11 +22,11 @@ public sealed class StorageDeviceService : IStorageDeviceService
         "Program Files (x86)", "ProgramData", "Users", "PerfLogs", "Recovery", "$WinREAgent",
     };
 
-    public IReadOnlyList<StorageDevice> GetDevices() => Enumerate(false);
+    public IReadOnlyList<StorageDevice> GetDevices(bool includeInternal = false) => Enumerate(includeInternal, includeNetwork: true);
 
-    public async Task<IReadOnlyList<StorageDevice>> ProbeDevicesAsync(CancellationToken ct = default)
+    public async Task<IReadOnlyList<StorageDevice>> ProbeDevicesAsync(bool includeInternal = false, CancellationToken ct = default)
     {
-        var quick = Enumerate(false);
+        var quick = Enumerate(includeInternal, includeNetwork: true);
         // 总线探测会打开卷句柄，放到线程池里批量做，避免阻塞 UI
         var probed = await Task.Run(() =>
         {
@@ -48,7 +48,22 @@ public sealed class StorageDeviceService : IStorageDeviceService
                 if (!dev.IsReady || dev.DriveType == "光驱") continue;
                 DetectCamera(dev);
             }
-            return (IReadOnlyList<StorageDevice>)probed
+            var systemRoot = Path.GetPathRoot(Environment.SystemDirectory)?.TrimEnd('\\') ?? "";
+            var filtered = probed.Where(d =>
+            {
+                // 诊断模式（includeInternal）原样返回，方便自检 / 排查
+                if (includeInternal) return true;
+
+                // 系统盘永远不作为导入源
+                if (!string.IsNullOrEmpty(systemRoot) &&
+                    string.Equals(d.RootPath.TrimEnd('\\'), systemRoot, StringComparison.OrdinalIgnoreCase))
+                    return false;
+
+                // 只留"外部存储"：可移动盘 / 外接总线的固定盘 / 网络盘（映射的 NAS）
+                return d.DriveType == "可移动" || d.IsExternal || d.DriveType == "网络";
+            });
+
+            return (IReadOnlyList<StorageDevice>)filtered
                 .OrderByDescending(d => d.IsExternal)
                 .ThenBy(d => d.RootPath, StringComparer.OrdinalIgnoreCase)
                 .ToList();
@@ -63,7 +78,7 @@ public sealed class StorageDeviceService : IStorageDeviceService
             var full = Path.GetFullPath(path);
             var root = Path.GetPathRoot(full);
             if (string.IsNullOrEmpty(root)) return null;
-            return GetDevices().FirstOrDefault(d =>
+            return GetDevices(includeInternal: true).FirstOrDefault(d =>
                 string.Equals(Path.GetFullPath(d.RootPath).TrimEnd('\\'), root.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase));
         }
         catch (Exception ex)
@@ -75,7 +90,7 @@ public sealed class StorageDeviceService : IStorageDeviceService
 
     // ------------------------------------------------------------------ 快速枚举
 
-    private static List<StorageDevice> Enumerate(bool includeNetwork)
+    private static List<StorageDevice> Enumerate(bool includeInternal, bool includeNetwork)
     {
         var list = new List<StorageDevice>();
         DriveInfo[] drives;
@@ -93,6 +108,9 @@ public sealed class StorageDeviceService : IStorageDeviceService
                 var type = di.DriveType;
                 if (type is DriveType.NoRootDirectory or DriveType.Unknown) continue;
                 if (!includeNetwork && type is DriveType.Network) continue;
+                // 内置固定盘：快枚举阶段拿不到总线，先跳过；ProbeDevicesAsync 会补回 USB/SD 外接盘
+                if (!includeInternal && type is DriveType.Fixed) continue;
+                if (!includeInternal && type is DriveType.CDRom) continue;
 
                 var isReady = di.IsReady;
                 var device = new StorageDevice

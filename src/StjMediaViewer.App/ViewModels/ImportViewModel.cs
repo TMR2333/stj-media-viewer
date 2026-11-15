@@ -45,7 +45,7 @@ public sealed class ImportDeviceCard
 
         CameraText = string.IsNullOrWhiteSpace(device.CameraHint) ? "" : $"相机卡：{device.CameraHint}";
         CameraVisibility = string.IsNullOrWhiteSpace(CameraText) ? Visibility.Collapsed : Visibility.Visible;
-        SourceText = device.IsExternal ? "外部设备" : "本机磁盘";
+        SourceText = device.DriveType == "网络" ? "网络盘" : device.IsExternal ? "外部设备" : "本机磁盘";
     }
 
     public StorageDevice Device { get; }
@@ -241,6 +241,12 @@ public sealed partial class ImportViewModel : ObservableObject
     private string _deviceSummaryText = "正在读取存储设备…";
 
     [ObservableProperty]
+    private string _hiddenInternalText = "";
+
+    [ObservableProperty]
+    private Visibility _hiddenInternalVisibility = Visibility.Collapsed;
+
+    [ObservableProperty]
     private string _deviceEmptyDescription = "插入 U 盘 / SD 卡 / 相机后点「刷新」；也可以直接用下面的「浏览任意文件夹…」从任意目录导入。";
 
     /// <summary>首次进入页面：默认目标目录取第一个媒体库根，然后枚举设备。</summary>
@@ -292,7 +298,7 @@ public sealed partial class ImportViewModel : ObservableObject
             var full = await AppServices.Devices.ProbeDevicesAsync();
             ApplyDevices(full);
             UpdateDeviceSummary(probed: true);
-            AppEvents.SetStatus($"存储设备：发现 {Devices.Count} 个（其中外部设备 {Devices.Count(d => d.Device.IsExternal)} 个）");
+            AppEvents.SetStatus($"存储设备：发现 {Devices.Count} 个外部存储设备");
         }
         catch (Exception ex)
         {
@@ -328,10 +334,24 @@ public sealed partial class ImportViewModel : ObservableObject
 
     private void UpdateDeviceSummary(bool probed)
     {
-        var external = Devices.Count(d => d.Device.IsExternal);
         DeviceSummaryText = Devices.Count == 0
-            ? "没有发现可用的存储设备"
-            : $"发现 {Devices.Count} 个存储设备（外部设备 {external} 个）{(probed ? " · 已探测总线与相机目录" : " · 正在探测总线…")}";
+            ? "没有检测到外部存储设备"
+            : $"发现 {Devices.Count} 个外部存储设备{(probed ? " · 已探测总线与相机目录" : " · 正在探测总线…")}";
+
+        // 内置磁盘已被过滤掉：告诉用户它们还在、只是不在这里列（避免以为"设备丢了"）
+        try
+        {
+            var all = AppServices.Devices.GetDevices(includeInternal: true).Count;
+            var hidden = Math.Max(0, all - Devices.Count);
+            HiddenInternalText = hidden > 0
+                ? $"本机内置磁盘（{hidden} 个）不在导入列表里；需要从本机目录导入请用下面的「浏览任意文件夹…」。"
+                : "";
+        }
+        catch
+        {
+            HiddenInternalText = "";
+        }
+        HiddenInternalVisibility = string.IsNullOrEmpty(HiddenInternalText) ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void SetDeviceVisibility()
