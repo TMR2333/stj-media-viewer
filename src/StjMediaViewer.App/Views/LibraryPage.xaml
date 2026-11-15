@@ -154,10 +154,10 @@
             <ItemsStackPanel Orientation="Vertical" />
         </ItemsPanelTemplate>
 
-        <!-- ================= 网格卡片 ================= -->
+        <!-- ================= 网格卡片（主内容单元 → container-high，浮起） ================= -->
         <DataTemplate x:Key="CardTemplate" x:DataType="vm:AssetCardItem">
             <Grid Margin="4" ToolTipService.ToolTip="{x:Bind TooltipText, Mode=OneWay}">
-                <Border Background="{ThemeResource AppSurfaceAltBrush}"
+                <Border Background="{ThemeResource AppSurfaceRaisedBrush}"
                         BorderBrush="{ThemeResource AppCardStrokeBrush}"
                         BorderThickness="{ThemeResource AppCardStrokeThickness}"
                         CornerRadius="{ThemeResource AppRadiusMedium}">

@@ -111,9 +111,9 @@ Fluent / MD3 下第 2~5 层全部透明，第 0 层不挂 → 自动退化成普
 
 | 键 | 语义 | Fluent 深 / 浅 | MD3 深 / 浅 | Glass 深 / 浅 |
 |---|---|---|---|---|
-| `AppWindowBackgroundBrush` | 窗口底层（可铺在系统背板上） | `#CC1A1A1C` / `#CCF3F3F3` | `#FF0F0D13` / `#FFF2ECF4` | `渐变(线性)` / `渐变(线性)` |
-| `AppSurfaceBrush` | 主表面（导航区/顶栏/面板） | `#FF202024` / `#FFFFFFFF` | `#FF1D1B20` / `#FFFEF7FF` | `#8C10141E` / `#B3FFFFFF` |
-| `AppSurfaceAltBrush` | 次级表面（输入框/状态栏） | `#FF27272C` / `#FFF7F7F9` | `#FF211F26` / `#FFF3EDF7` | `#66121825` / `#8CFFFFFF` |
+| `AppWindowBackgroundBrush` | 窗口底层（可铺在系统背板上） | `#CC1A1A1C` / `#CCF3F3F3` | `#FF0F0D13` / `#FFEDE8F0` | `渐变(线性)` / `渐变(线性)` |
+| `AppSurfaceBrush` | 主表面（导航区/顶栏/面板） | `#FF202024` / `#FFFFFFFF` | `#FF1D1B20` / `#FFF7F2FA` | `#8C10141E` / `#B3FFFFFF` |
+| `AppSurfaceAltBrush` | 次级表面（输入框/状态栏/列表行） | `#FF27272C` / `#FFF7F7F9` | `#FF26232B` / `#FFECE6F0` | `#66121825` / `#8CFFFFFF` |
 | `AppSurfaceRaisedBrush` | 卡片/浮起层 | `#FF2D2D33` / `#FFFFFFFF` | `#FF2B2930` / `#FFFFFFFF` | `#A61E2230` / `#CCFFFFFF` |
 | `AppSurfaceOverlayBrush` | 弹出层（菜单/Flyout/Dialog） | `#F22A2A30` / `#F7FFFFFF` | `#FF36343B` / `#FFE6E0E9` | `#E61C202D` / `#F2FFFFFF` |
 | `AppDividerBrush` | 分隔线 | `#14FFFFFF` / `#14000000` | `#3349454F` / `#2679747E` | `#14FFFFFF` / `#1F000000` |
