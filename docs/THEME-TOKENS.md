@@ -70,10 +70,10 @@ App.xaml
 
 | MD3 语义 | 我们的 token | 深色 | 浅色 | 用在哪 |
 |---|---|---|---|---|
-| surface-container-lowest | `AppWindowBackgroundBrush` | `#0F0D13` | `#F2ECF4` | 窗口最底、内容区背景 |
-| surface | `AppSurfaceBrush` | `#1D1B20` | `#FEF7FF` | 顶栏 / 侧栏 |
-| surface-container-low | `AppSurfaceAltBrush` | `#211F26` | `#F3EDF7` | 状态栏 / 输入框 / 次级条 |
-| surface-container-high | `AppSurfaceRaisedBrush` | `#2B2930` | `#FFFFFF` | **卡片**（比背景亮，浮起来） |
+| surface-container-lowest | `AppWindowBackgroundBrush` | `#0F0D13` | `#EDE8F0` | 窗口最底、内容区最外层 |
+| surface | `AppSurfaceBrush` | `#1D1B20` | `#F7F2FA` | 内容区底板 / 顶栏 / 侧栏 |
+| surface-container-low | `AppSurfaceAltBrush` | `#26232B` | `#ECE6F0` | 状态栏 / 输入框 / 列表行卡（比 surface 深一级，形成内凹层次） |
+| surface-container-high | `AppSurfaceRaisedBrush` | `#2B2930` | `#FFFFFF` | **卡片**（比内容底亮 2 级，浮起来；`GlassPanel/SectionCard` 默认） |
 | surface-container-highest | `AppSurfaceOverlayBrush` | `#36343B` | `#E6E0E9` | 菜单 / Flyout / Dialog |
 
 选中态用 **secondary container**：深 `#4A4458` / 浅 `#E8DEF8`（`AppSelectedBrush`），

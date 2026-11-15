@@ -17,7 +17,7 @@
         <ResourceDictionary x:Key="Default">
             <SolidColorBrush x:Key="AppWindowBackgroundBrush" Color="#FF0F0D13" />
             <SolidColorBrush x:Key="AppSurfaceBrush" Color="#FF1D1B20" />
-            <SolidColorBrush x:Key="AppSurfaceAltBrush" Color="#FF211F26" />
+            <SolidColorBrush x:Key="AppSurfaceAltBrush" Color="#FF26232B" />
             <SolidColorBrush x:Key="AppSurfaceRaisedBrush" Color="#FF2B2930" />
             <SolidColorBrush x:Key="AppSurfaceOverlayBrush" Color="#FF36343B" />
             <SolidColorBrush x:Key="AppDividerBrush" Color="#3349454F" />
@@ -308,9 +308,9 @@
 
         <!-- ===================== 浅色（Light） ===================== -->
         <ResourceDictionary x:Key="Light">
-            <SolidColorBrush x:Key="AppWindowBackgroundBrush" Color="#FFF2ECF4" />
-            <SolidColorBrush x:Key="AppSurfaceBrush" Color="#FFFEF7FF" />
-            <SolidColorBrush x:Key="AppSurfaceAltBrush" Color="#FFF3EDF7" />
+            <SolidColorBrush x:Key="AppWindowBackgroundBrush" Color="#FFEDE8F0" />
+            <SolidColorBrush x:Key="AppSurfaceBrush" Color="#FFF7F2FA" />
+            <SolidColorBrush x:Key="AppSurfaceAltBrush" Color="#FFECE6F0" />
             <SolidColorBrush x:Key="AppSurfaceRaisedBrush" Color="#FFFFFFFF" />
             <SolidColorBrush x:Key="AppSurfaceOverlayBrush" Color="#FFE6E0E9" />
             <SolidColorBrush x:Key="AppDividerBrush" Color="#2679747E" />
