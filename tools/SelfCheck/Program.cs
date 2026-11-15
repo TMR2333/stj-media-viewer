@@ -372,10 +372,14 @@ public static class Program
         var settings = s.Settings;
         await settings.LoadAsync();
         var original = settings.Current.DesignLanguage;
-        settings.Current.DesignLanguage = DesignLanguageIds.Md3;
+        // 设计语言已收敛为单一 Fluent；这里验证"设置往返持久化"本身（用主题模式当往返值，
+        // 因为它不是枚举收口字段，能真实反映 JSON 写入/读回）。
+        var originalTheme = settings.Current.ThemeMode;
+        settings.Current.ThemeMode = "dark";
         await settings.SaveAsync();
         await settings.LoadAsync();
-        Check("设置往返保存", settings.Current.DesignLanguage == DesignLanguageIds.Md3, settings.Current.DesignLanguage);
+        Check("设置往返保存", settings.Current.ThemeMode == "dark", settings.Current.ThemeMode);
+        settings.Current.ThemeMode = originalTheme;
         settings.Current.DesignLanguage = original;
         await settings.SaveAsync();
 
