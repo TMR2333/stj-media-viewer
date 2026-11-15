@@ -55,6 +55,7 @@ def write_csharp(out_path: str, countries: dict) -> None:
         "// 国家中文名：i18n-iso-countries zh 语言包（MIT）；省级中文名：GeoNames admin1CodesASCII（CC BY 4.0）。",
         f"// 国家 {len(countries)} 个；中国省级行政区 {len(CHINA_PROVINCES)} 个。",
         "// </auto-generated>",
+        "#nullable enable",
         "",
         "namespace StjMediaViewer.Core.Geo;",
         "",
