@@ -22,6 +22,9 @@ public sealed class ThumbnailService : IThumbnailService
     private readonly IMediaDecoder _decoder;
     private readonly IImageEncoder _encoder;
     private readonly string _cacheDir;
+
+    /// <summary>解码/编码管线的版本号：改了图像解码逻辑就 +1，让旧缓存自然失效。</summary>
+    private const string CacheRevision = "d2";
     private readonly ConcurrentDictionary<string, SemaphoreSlim> _gates = new(StringComparer.Ordinal);
     /// <summary>失败负缓存：坏文件/无缩略图文件在 TTL 内不再重复解码（网格滚动时会反复请求同一张）。</summary>
     private readonly ConcurrentDictionary<string, long> _failed = new(StringComparer.Ordinal);
@@ -206,12 +209,12 @@ public sealed class ThumbnailService : IThumbnailService
     private string CachePath(MediaAsset asset, int size)
     {
         TryPrepareDirectory();
-        return Path.Combine(_cacheDir, $"{KeyBase(asset)}_{size}.jpg");
+        return Path.Combine(_cacheDir, $"{KeyBase(asset)}_{CacheRevision}_{size}.jpg");
     }
 
     private string? SafeCachePath(MediaAsset asset, int size)
     {
-        try { return Path.Combine(_cacheDir, $"{KeyBase(asset)}_{size}.jpg"); }
+        try { return Path.Combine(_cacheDir, $"{KeyBase(asset)}_{CacheRevision}_{size}.jpg"); }
         catch { return null; }
     }
 

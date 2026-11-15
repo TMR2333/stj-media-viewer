@@ -258,48 +258,117 @@ public sealed class MediaDecoder : IMediaDecoder
     {
         var decoder = await BitmapDecoder.CreateAsync(stream).AsTask(ct).ConfigureAwait(false);
 
-        // OrientedPixelWidth/Height 已经把 EXIF 方向算进去，缩略图按它等比缩放
-        uint orientedW = decoder.OrientedPixelWidth;
-        uint orientedH = decoder.OrientedPixelHeight;
-        if (orientedW == 0 || orientedH == 0) return null;
+        // ── 关键：不要在 WIC 里做 EXIF 方向 ────────────────────────────────────────────
+        // 用 RespectExifOrientation 时，ScaledWidth/Height 是"旋转前"的坐标系，90°/270° 旋转的图
+        // 返回缓冲的行宽和「推断出的宽高」会对不上 → 重编码后整行错位（斜向重影）。
+        // 所以这里：按存储方向解码（尺寸确定、行宽严格 = 宽×4），方向在托管侧自己转。
+        uint storedW = decoder.PixelWidth;
+        uint storedH = decoder.PixelHeight;
+        if (storedW == 0 || storedH == 0) return null;
+
+        var orientation = await TryReadOrientationAsync(decoder).ConfigureAwait(false);
+        bool swapDims = orientation is 5 or 6 or 7 or 8;
+
+        // 正立后尺寸（用于按 maxDimension 等比缩放）
+        uint uprightW = swapDims ? storedH : storedW;
+        uint uprightH = swapDims ? storedW : storedH;
 
         double scale = 1.0;
         if (maxDimension > 0)
-            scale = Math.Min(1.0, Math.Min((double)maxDimension / orientedW, (double)maxDimension / orientedH));
+            scale = Math.Min(1.0, Math.Min((double)maxDimension / uprightW, (double)maxDimension / uprightH));
 
-        double pixels = (double)orientedW * orientedH * scale * scale;
+        double pixels = (double)uprightW * uprightH * scale * scale;
         if (pixels > MaxDecodePixels)
             scale *= Math.Sqrt(MaxDecodePixels / pixels);
 
-        uint tw = (uint)Math.Max(1, Math.Round(orientedW * scale));
-        uint th = (uint)Math.Max(1, Math.Round(orientedH * scale));
+        // 缩放要作用在「存储方向」的尺寸上
+        uint scaledStoredW = (uint)Math.Max(1, Math.Round(storedW * scale));
+        uint scaledStoredH = (uint)Math.Max(1, Math.Round(storedH * scale));
 
         var transform = new BitmapTransform
         {
-            ScaledWidth = tw,
-            ScaledHeight = th,
+            ScaledWidth = scaledStoredW,
+            ScaledHeight = scaledStoredH,
             InterpolationMode = BitmapInterpolationMode.Fant,
         };
 
-        // RespectExifOrientation：方向校正由 WIC 完成；ColorManageToSRgb：统一到 sRGB 后再分析
         var provider = await decoder.GetPixelDataAsync(
             BitmapPixelFormat.Bgra8,
             BitmapAlphaMode.Ignore,
             transform,
-            ExifOrientationMode.RespectExifOrientation,
+            ExifOrientationMode.IgnoreExifOrientation,
             ColorManagementMode.ColorManageToSRgb).AsTask(ct).ConfigureAwait(false);
 
         var bgra = provider.DetachPixelData();
-        if (bgra.Length < 4) return null;
+        int expected = checked((int)scaledStoredW * (int)scaledStoredH * 4);
+        if (bgra.Length < expected)
+        {
+            Log.Warn($"[media] 解码缓冲偏小：{bgra.Length} < {expected}（{decoder.DecoderInformation?.CodecId}）");
+            return null;
+        }
 
-        int px = bgra.Length / 4;
-        int w, h;
-        if (px == (int)(tw * th)) { w = (int)tw; h = (int)th; }
-        else if (px == (int)(th * tw)) { w = (int)th; h = (int)tw; }        // 旋转 90° 时宽高互换
-        else if (tw > 0 && px % (int)tw == 0) { w = (int)tw; h = px / w; }  // 兜底：按行数反推
-        else return null;
+        var src = new DecodedImage(bgra, (int)scaledStoredW, (int)scaledStoredH, (int)scaledStoredW * 4);
+        if (orientation is 1 or 0) return src;
 
-        return new DecodedImage(bgra, w, h, w * 4);
+        return ApplyOrientation(src, (int)orientation);
+    }
+
+    /// <summary>读 EXIF Orientation（1–8）。读不到就当 1（不旋转）。</summary>
+    private static async Task<ushort> TryReadOrientationAsync(BitmapDecoder decoder)
+    {
+        try
+        {
+            var props = await decoder.BitmapProperties.GetPropertiesAsync(new[] { "System.Photo.Orientation" });
+            if (props.TryGetValue("System.Photo.Orientation", out var value) &&
+                value.Value is ushort orientation && orientation is >= 1 and <= 8)
+                return orientation;
+        }
+        catch (Exception ex)
+        {
+            Log.Info($"[media] 读取 EXIF 方向失败（按 1 处理）：{ex.Message}");
+        }
+        return 1;
+    }
+
+    /// <summary>把"存储方向"的 BGRA 转成"正立"方向（EXIF 1–8 全支持）。</summary>
+    private static DecodedImage ApplyOrientation(DecodedImage src, int orientation)
+    {
+        int sw = src.Width, sh = src.Height;
+        int dw = orientation is 5 or 6 or 7 or 8 ? sh : sw;
+        int dh = orientation is 5 or 6 or 7 or 8 ? sw : sh;
+
+        var dst = new byte[dw * dh * 4];
+        int srcStride = src.Stride;
+        int dstStride = dw * 4;
+
+        for (int dy = 0; dy < dh; dy++)
+        {
+            int dstRow = dy * dstStride;
+            for (int dx = 0; dx < dw; dx++)
+            {
+                int sx, sy;
+                switch (orientation)
+                {
+                    case 2: sx = sw - 1 - dx; sy = dy; break;                   // 水平镜像
+                    case 3: sx = sw - 1 - dx; sy = sh - 1 - dy; break;          // 旋转 180
+                    case 4: sx = dx; sy = sh - 1 - dy; break;                   // 垂直镜像
+                    case 5: sx = dy; sy = dx; break;                            // 转置
+                    case 6: sx = dy; sy = sh - 1 - dx; break;                   // 顺时针 90
+                    case 7: sx = sw - 1 - dy; sy = sh - 1 - dx; break;          // 反转置
+                    case 8: sx = sw - 1 - dy; sy = dx; break;                   // 逆时针 90
+                    default: sx = dx; sy = dy; break;
+                }
+
+                int srcOffset = sy * srcStride + sx * 4;
+                int dstOffset = dstRow + dx * 4;
+                dst[dstOffset] = src.Bgra[srcOffset];
+                dst[dstOffset + 1] = src.Bgra[srcOffset + 1];
+                dst[dstOffset + 2] = src.Bgra[srcOffset + 2];
+                dst[dstOffset + 3] = src.Bgra[srcOffset + 3];
+            }
+        }
+
+        return new DecodedImage(dst, dw, dh, dstStride);
     }
 
     // ==================================================================== 系统缩略图回落

@@ -61,6 +61,7 @@ public static partial class Program
             await Section("离线地理编码", async () => await CheckGeocoder(s));
             await Section("索引库查询", async () => await CheckStore(s));
             await Section("缩略图与图像分析", async () => await CheckThumbnails(s));
+            await Section("图像解码完整性", async () => await CheckImageDecode(s));
             await Section("重复检测", async () => await CheckDuplicates(s));
             await Section("设置持久化", async () => await CheckSettings(s, tempData));
             await Section("AI 客户端(dry-run)", async () => await CheckAi(s));
