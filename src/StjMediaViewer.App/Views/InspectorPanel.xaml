@@ -77,7 +77,8 @@
         </Border>
 
         <!-- ============ 中部：元数据 + 手动分类 ============ -->
-        <ScrollViewer Grid.Row="1" VerticalScrollMode="Enabled" VerticalScrollBarVisibility="Auto" Padding="12,4,12,12">
+        <ScrollViewer Grid.Row="1" VerticalScrollMode="Enabled" VerticalScrollBarVisibility="Auto" Padding="12,4,12,12"
+                      Visibility="{x:Bind ViewModel.ContentVisibility, Mode=OneWay}">
             <StackPanel Spacing="2">
                 <TextBlock Text="元数据" Style="{ThemeResource AppSectionHeaderTextStyle}" />
 
@@ -256,6 +257,7 @@
         <Border Grid.Row="2"
                 Background="{ThemeResource AppSurfaceAltBrush}"
                 BorderBrush="{ThemeResource AppDividerBrush}"
+                Visibility="{x:Bind ViewModel.ContentVisibility, Mode=OneWay}"
                 BorderThickness="0,1,0,0"
                 Padding="12,10,12,10">
             <StackPanel Spacing="8">
