@@ -18,9 +18,11 @@
             <Setter Property="BorderBrush" Value="{ThemeResource AppTransparentBrush}" />
             <Setter Property="BorderThickness" Value="0" />
             <Setter Property="CornerRadius" Value="{ThemeResource AppRadiusSmall}" />
-            <Setter Property="Padding" Value="10,2,10,2" />
-            <Setter Property="MinHeight" Value="30" />
-            <Setter Property="FontSize" Value="{ThemeResource AppFontCaptionSize}" />
+            <Setter Property="Padding" Value="10,3,10,3" />
+            <Setter Property="MinHeight" Value="32" />
+            <!-- 顶栏统一字阶：与搜索框一致，避免"一排控件三种字号" -->
+            <Setter Property="FontFamily" Value="{ThemeResource AppFontFamily}" />
+            <Setter Property="FontSize" Value="{ThemeResource AppFontBodySize}" />
             <Setter Property="Foreground" Value="{ThemeResource TextSecondaryBrush}" />
         </Style>
     </Page.Resources>
@@ -82,8 +84,9 @@
 
             <!--
                 全局搜索（250ms 防抖，回车立即查询）：
-                放大镜内嵌在胶囊容器里，TextBox 自身无边框透明底。
-                之前用 TextBox.Header 塞图标，等于在顶栏里多出一行 → 搜索框被裁切。
+                放大镜内嵌在容器里，TextBox 自身无边框透明底。
+                排版约束：TextBox 铺满容器高度 + 垂直内容居中 + 只由左侧留白让位给图标，
+                这样文字与图标共用同一条视觉中线（之前高度 34/垂直居中会往下偏 1-2px）。
             -->
             <Grid Grid.Column="1" MaxWidth="520" Margin="24,0" HorizontalAlignment="Stretch" VerticalAlignment="Center">
                 <!-- 搜索是"输入类"控件：这里保持 AppStrokeBrush（清晰的功能边界），不用卡片柔描边 -->
@@ -94,16 +97,22 @@
                         BorderThickness="1">
                     <Grid>
                         <FontIcon Glyph="&#xE721;"
-                                  FontSize="{ThemeResource AppFontCaptionSize}"
+                                  FontSize="{ThemeResource AppFontBodySize}"
                                   Foreground="{ThemeResource TextTertiaryBrush}"
                                   HorizontalAlignment="Left" VerticalAlignment="Center"
                                   Margin="12,0,0,0"
                                   IsHitTestVisible="False" />
                         <TextBox x:Name="SearchBox"
-                                 Height="34"
-                                 VerticalAlignment="Center"
-                                 Margin="34,0,8,0"
-                                 Padding="0"
+                                 Height="36"
+                                 VerticalAlignment="Stretch"
+                                 VerticalContentAlignment="Center"
+                                 Margin="34,0,10,0"
+                                 Padding="0,8,0,8"
+                                 FontFamily="{ThemeResource AppFontFamily}"
+                                 FontSize="{ThemeResource AppFontBodySize}"
+                                 FontWeight="Normal"
+                                 Foreground="{ThemeResource TextPrimaryBrush}"
+                                 SelectionHighlightColor="{ThemeResource AccentBrush}"
                                  Background="{ThemeResource AppTransparentBrush}"
                                  BorderThickness="0"
                                  PlaceholderText="搜索文件名 / 城市 / 设备 / 关键词…"
@@ -113,6 +122,7 @@
                                 <!-- 去掉 WinUI TextBox 自带的 2px 焦点下划线，否则会出现一条突兀的蓝线 -->
                                 <Thickness x:Key="TextControlBorderThemeThickness">0</Thickness>
                                 <Thickness x:Key="TextControlBorderThemeThicknessFocused">0</Thickness>
+                                <Thickness x:Key="TextControlThemePadding">0,8,0,8</Thickness>
                                 <SolidColorBrush x:Key="TextControlBackground" Color="Transparent" />
                                 <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="Transparent" />
                                 <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="Transparent" />
@@ -163,8 +173,10 @@
                 </Button>
 
                 <ComboBox x:Name="LanguagePicker"
-                          MinWidth="150" Height="30"
+                          MinWidth="150" Height="32"
                           VerticalAlignment="Center"
+                          FontFamily="{ThemeResource AppFontFamily}"
+                          FontSize="{ThemeResource AppFontBodySize}"
                           ToolTipService.ToolTip="设计语言（Fluent / MD3 / Liquid Glass）"
                           SelectionChanged="LanguagePicker_SelectionChanged">
                     <ComboBoxItem Content="Fluent（微软）" Tag="fluent" />
