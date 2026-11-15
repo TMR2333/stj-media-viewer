@@ -193,6 +193,11 @@
                         Background="{ThemeResource AppSurfaceBrush}">
             <NavigationView.MenuItems>
                 <NavigationViewItem Content="素材库" Tag="library" Icon="Pictures" />
+                <NavigationViewItem Content="导入" Tag="import">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE8B5;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
                 <NavigationViewItem Content="时间线" Tag="timeline" Icon="Calendar" />
                 <NavigationViewItem Content="地图" Tag="map" Icon="Map" />
                 <NavigationViewItem Content="重复项" Tag="duplicates" Icon="Copy" />

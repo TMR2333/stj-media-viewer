@@ -1,4 +1,7 @@
 using StjMediaViewer.Core.Abstractions;
+using StjMediaViewer.Core.Devices;
+using StjMediaViewer.Core.Import;
+using StjMediaViewer.Core.Supply;
 using StjMediaViewer.Core.Ai;
 using StjMediaViewer.Core.Catalog;
 using StjMediaViewer.Core.Classification;
@@ -39,6 +42,11 @@ public static class AppServices
     public static IGeocoder Geocoder { get; private set; } = null!;
     public static IXmpWriter Xmp { get; private set; } = null!;
     public static IAssetOperations Operations { get; private set; } = null!;
+
+    // ---- 外部设备 / 导入 / 核验 ----
+    public static IStorageDeviceService Devices { get; private set; } = null!;
+    public static IImportService Import { get; private set; } = null!;
+    public static IVerificationService Verify { get; private set; } = null!;
 
     // ---- UI 侧服务 ----
     public static IDesignLanguageService Design { get; private set; } = null!;
@@ -108,6 +116,10 @@ public static class AppServices
         Xmp = new XmpWriter();
         Operations = new AssetOperations(Store);
 
+        Devices = new StorageDeviceService();
+        Import = new ImportService(Metadata, Geocoder, Library);
+        Verify = new FileVerificationService();
+
         AiClient = new OpenAiCompatibleClient(Settings);
         Ai = new AiClassificationService(AiClient, Decoder, Encoder, Settings);
 
@@ -138,6 +150,9 @@ public static class AppServices
         AiClient = new NullAiClient();
         Ai = new NullAiClassificationService();
         Geocoder = new FallbackGeocoder();
+        Devices = new FallbackStorageDeviceService();
+        Import = new FallbackImportService();
+        Verify = new FallbackVerificationService();
         return Task.CompletedTask;
     }
 

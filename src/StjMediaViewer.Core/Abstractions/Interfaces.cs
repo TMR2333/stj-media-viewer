@@ -215,3 +215,62 @@ public interface IAssetOperations
     Task<ExportResult> RenameAsync(IReadOnlyList<MediaAsset> assets, string pattern, IProgress<int>? progress = null, CancellationToken ct = default);
     Task<int> DeleteToRecycleBinAsync(IReadOnlyList<MediaAsset> assets, CancellationToken ct = default);
 }
+
+// ---------------------------- 外部存储设备 / 导入 / 核验 ----------------------------
+
+/// <summary>外部存储设备（U 盘 / SD 卡 / 相机 / 移动硬盘）枚举。</summary>
+public interface IStorageDeviceService
+{
+    /// <summary>快速枚举：盘符、卷标、类型、容量（不探测总线，毫秒级）。</summary>
+    IReadOnlyList<StorageDevice> GetDevices();
+
+    /// <summary>完整枚举：额外探测总线类型（USB/SD）、DCIM 相机目录线索。可能耗时几十毫秒到几百毫秒。</summary>
+    Task<IReadOnlyList<StorageDevice>> ProbeDevicesAsync(CancellationToken ct = default);
+
+    /// <summary>取某个路径所属的设备信息（用于"浏览文件夹导入"时也能显示容量）。</summary>
+    StorageDevice? GetDeviceForPath(string path);
+}
+
+/// <summary>
+/// 从外部设备/目录导入：先出计划（按 JPG+RAW 分组、带预览），确认后执行拷贝/移动，
+/// 并逐文件核验（哈希 + 数量对账）。
+/// </summary>
+public interface IImportService
+{
+    /// <summary>扫描源目录，产出可预览、可勾选的导入计划（JPG 作为预览，RAW 自动配对）。</summary>
+    Task<ImportPlan> BuildPlanAsync(
+        string sourceRoot,
+        ImportOptions options,
+        IProgress<ScanProgress>? progress = null,
+        CancellationToken ct = default);
+
+    /// <summary>执行导入：逐组拷贝/移动 + 可选核验 + 可选登记进媒体库。</summary>
+    Task<ImportReport> ExecuteAsync(
+        ImportPlan plan,
+        IProgress<ImportProgress>? progress = null,
+        CancellationToken ct = default);
+}
+
+/// <summary>完整性核验：保证"导出的文件没损坏、也没漏导"。</summary>
+public interface IVerificationService
+{
+    /// <summary>单文件核验（strict=true 用 SHA-256，false 用大小 + 首尾指纹）。</summary>
+    Task<VerifyItemResult> VerifyFileAsync(string sourcePath, string destinationPath, bool strict, CancellationToken ct = default);
+
+    /// <summary>按"源 → 目标"对照表批量核验（导入/导出后用）。</summary>
+    Task<VerifyReport> VerifyPairsAsync(
+        IReadOnlyList<VerifyPair> pairs,
+        bool strict,
+        IProgress<int>? progress = null,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// 目录级对账：递归比较两棵目录树，找出"目标缺失（漏导）"与"内容不一致（损坏）"。
+    /// </summary>
+    Task<VerifyReport> VerifyFolderAsync(
+        string sourceRoot,
+        string destinationRoot,
+        bool strict,
+        IProgress<int>? progress = null,
+        CancellationToken ct = default);
+}

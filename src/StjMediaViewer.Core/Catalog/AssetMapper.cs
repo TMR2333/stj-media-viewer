@@ -30,6 +30,7 @@ internal static class AssetMapper
         "keywords_json", "keywords_flat",
         "post_process", "has_develop_edits", "develop_engine", "xmp_path",
         "sidecars_json", "has_embedded_xmp",
+        "group_id", "is_group_cover", "group_has_raw", "group_has_jpeg", "companions_json",
         "theme", "tone", "rating", "color_label", "is_pick",
         "ai_subject", "ai_mood", "quality_score", "provenance_json",
         "quick_hash", "full_hash", "thumb_key",
@@ -141,6 +142,11 @@ internal static class AssetMapper
         "xmp_path" => N(a.XmpPath),
         "sidecars_json" => JsonList(a.Sidecars),
         "has_embedded_xmp" => a.HasEmbeddedXmp ? 1 : 0,
+        "group_id" => N(a.GroupId),
+        "is_group_cover" => a.IsGroupCover ? 1 : 0,
+        "group_has_raw" => a.GroupHasRaw ? 1 : 0,
+        "group_has_jpeg" => a.GroupHasJpeg ? 1 : 0,
+        "companions_json" => JsonList(a.CompanionPaths),
         "theme" => N(a.Theme),
         "tone" => N(a.Tone),
         "rating" => a.Rating,
@@ -224,6 +230,10 @@ internal static class AssetMapper
             DevelopEngine = GetN(r, "develop_engine"),
             XmpPath = GetN(r, "xmp_path"),
             HasEmbeddedXmp = GetB(r, "has_embedded_xmp"),
+            GroupId = GetS(r, "group_id"),
+            IsGroupCover = GetB(r, "is_group_cover"),
+            GroupHasRaw = GetB(r, "group_has_raw"),
+            GroupHasJpeg = GetB(r, "group_has_jpeg"),
             Theme = GetN(r, "theme"),
             Tone = GetN(r, "tone"),
             Rating = GetI(r, "rating"),
@@ -242,6 +252,7 @@ internal static class AssetMapper
 
         a.Keywords = JsonToKeywords(GetS(r, "keywords_json"));
         a.Sidecars = JsonToList(GetS(r, "sidecars_json"));
+        a.CompanionPaths = JsonToList(GetS(r, "companions_json"));
         a.Provenance = JsonToProvenance(GetS(r, "provenance_json"));
         return a;
     }

@@ -175,6 +175,10 @@
                             <StackPanel Orientation="Horizontal" Spacing="4" Margin="6"
                                         HorizontalAlignment="Left" VerticalAlignment="Top">
                                 <uic:Badge Text="RAW" Kind="Raw" Visibility="{x:Bind RawBadgeVisibility, Mode=OneWay}" />
+                                <!-- JPG+RAW 配对组：一张照片一个卡片，角标说明组内原件齐备 -->
+                                <uic:Badge Text="RAW&amp;JPEG" Kind="Raw"
+                                           Visibility="{x:Bind RawJpegBadgeVisibility, Mode=OneWay}"
+                                           ToolTipService.ToolTip="该照片同时拥有 JPEG 预览与 RAW 原件" />
                                 <uic:Badge Text="LOG" Kind="Log" Visibility="{x:Bind LogBadgeVisibility, Mode=OneWay}" />
                             </StackPanel>
 
@@ -345,6 +349,7 @@
 
                         <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                             <uic:Badge Text="RAW" Kind="Raw" Visibility="{x:Bind RawBadgeVisibility, Mode=OneWay}" />
+                            <uic:Badge Text="RAW&amp;JPEG" Kind="Raw" Visibility="{x:Bind RawJpegBadgeVisibility, Mode=OneWay}" />
                             <uic:Badge Text="LOG" Kind="Log" Visibility="{x:Bind LogBadgeVisibility, Mode=OneWay}" />
                         </StackPanel>
 
@@ -475,6 +480,14 @@
                         <ToggleButton x:Name="DensityMedium" Style="{StaticResource CompactToggleStyle}" Content="中" MinWidth="28" Click="Density_Click" Tag="medium" />
                         <ToggleButton x:Name="DensityLarge" Style="{StaticResource CompactToggleStyle}" Content="大" MinWidth="28" Click="Density_Click" Tag="large" />
                         <ToggleButton x:Name="DensityList" Style="{StaticResource CompactToggleStyle}" Content="列表" Click="Density_Click" Tag="list" />
+
+                        <Border Width="1" Height="16" Background="{ThemeResource AppDividerBrush}" Margin="6,0" />
+
+                        <ToggleButton x:Name="GroupCopiesToggle"
+                                      Style="{StaticResource CompactToggleStyle}"
+                                      Content="RAW 副本"
+                                      Click="GroupCopiesToggle_Click"
+                                      ToolTipService.ToolTip="默认把同一张照片的 JPEG 与 RAW 合成一项；开启后两个文件各自成项" />
                     </StackPanel>
 
                     <ToggleButton Grid.Column="1" x:Name="InspectorToggle"

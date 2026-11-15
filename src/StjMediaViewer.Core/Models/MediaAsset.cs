@@ -76,13 +76,27 @@ public sealed class MediaAsset
     public string? Copyright { get; set; }
     public List<string> Keywords { get; set; } = new();
 
-    // ---- 后期状态 / 边车 ----
+    // ---- 后期状态 / 边车 / 分组（同一张照片的 JPG 与 RAW 归为一组）----
     public PostProcessState PostProcess { get; set; } = PostProcessState.Unknown;
     public bool HasDevelopEdits { get; set; }
     public string? DevelopEngine { get; set; }              // Lightroom / CaptureOne / ON1 / Darktable
     public string? XmpPath { get; set; }
     public List<string> Sidecars { get; set; } = new();
     public bool HasEmbeddedXmp { get; set; }
+
+    /// <summary>同组共享的分组键（同一张照片的 JPG / RAW / 边车同属一组）。</summary>
+    public string? GroupId { get; set; }
+    /// <summary>是否是这一组在网格里的代表（优先 JPG，没有 JPG 时用 RAW）。</summary>
+    public bool IsGroupCover { get; set; }
+    /// <summary>组内是否含 RAW。</summary>
+    public bool GroupHasRaw { get; set; }
+    /// <summary>组内是否含 JPEG。</summary>
+    public bool GroupHasJpeg { get; set; }
+    /// <summary>组内其它文件（RAW ↔ JPG）。</summary>
+    public List<string> CompanionPaths { get; set; } = new();
+
+    /// <summary>是否是一组 RAW+JPEG 配对（界面上显示 RAW&amp;JPEG 标签）。</summary>
+    public bool IsRawJpegPair => GroupHasRaw && GroupHasJpeg;
 
     // ---- 分类结果 ----
     public string? Theme { get; set; }
@@ -180,6 +194,11 @@ public sealed class MediaAsset
         XmpPath = XmpPath,
         Sidecars = new List<string>(Sidecars),
         HasEmbeddedXmp = HasEmbeddedXmp,
+        GroupId = GroupId,
+        IsGroupCover = IsGroupCover,
+        GroupHasRaw = GroupHasRaw,
+        GroupHasJpeg = GroupHasJpeg,
+        CompanionPaths = new List<string>(CompanionPaths),
         Theme = Theme,
         Tone = Tone,
         Rating = Rating,

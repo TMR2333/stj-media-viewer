@@ -33,6 +33,11 @@ public sealed class AssetQuery
     /// <summary>只要解析失败或尚未解析元数据的。</summary>
     public bool OnlyProblems { get; set; }
 
+    /// <summary>
+    /// 折叠 JPG+RAW 分组：开启时只返回每组代表（JPG 优先），网格里一张照片只出现一次。
+    /// </summary>
+    public bool CollapseGroups { get; set; }
+
     public string SortBy { get; set; } = AssetSortKeys.CapturedAt;
     public bool Descending { get; set; } = true;
     public int Offset { get; set; }

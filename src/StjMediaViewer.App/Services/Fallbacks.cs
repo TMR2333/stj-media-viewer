@@ -338,3 +338,56 @@ internal sealed class FallbackAssetOperations : IAssetOperations
 
     public Task<int> DeleteToRecycleBinAsync(IReadOnlyList<MediaAsset> assets, CancellationToken ct = default) => Task.FromResult(0);
 }
+// =====================================================================================
+//  外部设备 / 导入 / 核验（演示模式兜底：不碰真实磁盘）
+// =====================================================================================
+
+internal sealed class FallbackStorageDeviceService : IStorageDeviceService
+{
+    private static readonly IReadOnlyList<StorageDevice> None = Array.Empty<StorageDevice>();
+    public IReadOnlyList<StorageDevice> GetDevices() => None;
+    public Task<IReadOnlyList<StorageDevice>> ProbeDevicesAsync(CancellationToken ct = default) => Task.FromResult(None);
+    public StorageDevice? GetDeviceForPath(string path) => null;
+}
+
+internal sealed class FallbackImportService : IImportService
+{
+    public Task<ImportPlan> BuildPlanAsync(string sourceRoot, ImportOptions options,
+        IProgress<ScanProgress>? progress = null, CancellationToken ct = default)
+    {
+        progress?.Report(new ScanProgress { Phase = ScanPhase.Completed, Message = "演示模式不读取真实磁盘" });
+        return Task.FromResult(new ImportPlan
+        {
+            SourceRoot = sourceRoot,
+            Options = options,
+            Warnings = { "当前处于演示模式（真实服务装配失败），导入不可用。" },
+        });
+    }
+
+    public Task<ImportReport> ExecuteAsync(ImportPlan plan,
+        IProgress<ImportProgress>? progress = null, CancellationToken ct = default)
+    {
+        progress?.Report(new ImportProgress { Message = "演示模式不执行导入", Done = true });
+        return Task.FromResult(new ImportReport { Warnings = { "演示模式不执行导入。" } });
+    }
+}
+
+internal sealed class FallbackVerificationService : IVerificationService
+{
+    public Task<VerifyItemResult> VerifyFileAsync(string sourcePath, string destinationPath, bool strict, CancellationToken ct = default)
+        => Task.FromResult(new VerifyItemResult
+        {
+            SourcePath = sourcePath,
+            DestinationPath = destinationPath,
+            Status = "Error",
+            Error = "演示模式不读取真实磁盘",
+        });
+
+    public Task<VerifyReport> VerifyPairsAsync(IReadOnlyList<VerifyPair> pairs, bool strict,
+        IProgress<int>? progress = null, CancellationToken ct = default)
+        => Task.FromResult(new VerifyReport { Total = pairs.Count, Errors = pairs.Count });
+
+    public Task<VerifyReport> VerifyFolderAsync(string sourceRoot, string destinationRoot, bool strict,
+        IProgress<int>? progress = null, CancellationToken ct = default)
+        => Task.FromResult(new VerifyReport { Errors = 1 });
+}

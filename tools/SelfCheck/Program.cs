@@ -10,7 +10,7 @@ namespace StjMediaViewer.SelfCheck;
 /// 端到端自检：拿 tools/SampleLibrary 生成的样本库，跑完整的"扫描 → 元数据 → 分类 → 入库 → 查询 → 缩略图 → 去重 → AI(dry-run) → 导出"链路。
 /// 用法： dotnet run --project tools/SelfCheck [-- --library 路径] [--quick]
 /// </summary>
-public static class Program
+public static partial class Program
 {
     private static int _passed;
     private static int _failed;
@@ -69,6 +69,10 @@ public static class Program
                 await Section($"AI 真实 HTTP 链路 ({aiUrl})", async () => await CheckAiLive(s, aiUrl));
             await Section("XMP 写出", async () => await CheckXmp(s));
             await Section("批量导出", async () => await CheckExport(s, tempData));
+            await Section("JPG/RAW 分组", async () => await CheckGrouping(s));
+            await Section("外部存储设备", async () => await CheckDevices(s));
+            await Section("JPG+RAW 配对导入", async () => await CheckImport(s, tempData));
+            await Section("导入/导出核验", async () => await CheckVerifyPairs(s, tempData));
             if (!quick) await Section("性能: 1000 条 upsert", async () => await CheckPerf(s));
         }
         catch (Exception ex)
@@ -591,4 +595,7 @@ public sealed record Services(
     IAiClassificationService Ai,
     IGeocoder Geocoder,
     IXmpWriter Xmp,
-    IAssetOperations Operations);
+    IAssetOperations Operations,
+    IStorageDeviceService Devices,
+    IImportService Import,
+    IVerificationService Verify);

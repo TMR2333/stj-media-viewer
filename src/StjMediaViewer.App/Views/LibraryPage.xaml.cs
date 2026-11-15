@@ -187,6 +187,13 @@ public sealed partial class LibraryPage : Page
         if (sender is ToggleButton { Tag: string tag }) ApplyDensity(tag);
     }
 
+    /// <summary>RAW 副本开关：关 = 按 JPG+RAW 分组折叠（默认），开 = 每个文件各成一项。</summary>
+    private void GroupCopiesToggle_Click(object sender, RoutedEventArgs e)
+    {
+        ViewModel.ShowGroupCopies = GroupCopiesToggle.IsChecked == true;
+        ViewModel.RequestRefresh(immediate: true);
+    }
+
     private void ApplyDensity(string tag)
     {
         _density = tag;

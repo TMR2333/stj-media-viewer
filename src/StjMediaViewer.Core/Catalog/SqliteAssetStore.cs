@@ -706,6 +706,9 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
             w.And("(theme IS NULL OR theme='') AND (tone IS NULL OR tone='')");
         if (q.OnlyProblems)
             w.And("((last_error IS NOT NULL AND last_error<>'') OR metadata_parsed_at IS NULL)");
+
+        // JPG+RAW 分组折叠：网格里一张照片只出现一次（取组代表）
+        if (q.CollapseGroups) w.And("is_group_cover = 1");
         return w;
     }
 

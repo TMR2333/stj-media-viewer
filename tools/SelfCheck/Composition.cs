@@ -3,6 +3,9 @@ using StjMediaViewer.Core.Ai;
 using StjMediaViewer.Core.Catalog;
 using StjMediaViewer.Core.Classification;
 using StjMediaViewer.Core.Dedup;
+using StjMediaViewer.Core.Devices;
+using StjMediaViewer.Core.Import;
+using StjMediaViewer.Core.Supply;
 using StjMediaViewer.Core.Geo;
 using StjMediaViewer.Core.Media;
 using StjMediaViewer.Core.Metadata;
@@ -49,6 +52,9 @@ public static class Composition
         var operations = new AssetOperations(store);
         var aiClient = new OpenAiCompatibleClient(settings);
         var ai = new AiClassificationService(aiClient, decoder, encoder, settings);
+        var devices = new StorageDeviceService();
+        var import = new ImportService(metadata, geocoder, library);
+        var verify = new FileVerificationService();
 
         await geocoder.EnsureLoadedAsync();
 
@@ -69,6 +75,9 @@ public static class Composition
             Ai: ai,
             Geocoder: geocoder,
             Xmp: xmp,
-            Operations: operations);
+            Operations: operations,
+            Devices: devices,
+            Import: import,
+            Verify: verify);
     }
 }

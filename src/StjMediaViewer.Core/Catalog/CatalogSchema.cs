@@ -8,7 +8,7 @@ namespace StjMediaViewer.Core.Catalog;
 /// </summary>
 internal static class CatalogSchema
 {
-    public const int Version = 1;
+    public const int Version = 2;
 
     /// <summary>数据库文件名（由 App 拼到 settings.AppDataDirectory 下）。</summary>
     public const string DefaultFileName = "catalog.db";
@@ -32,6 +32,13 @@ internal static class CatalogSchema
         Execute(conn, DdlLibraries);
         Execute(conn, DdlMeta);
 
+        // 迁移：v1 老库补 JPG/RAW 分组列（幂等）
+        EnsureColumn(conn, TableAssets, "group_id", "TEXT");
+        EnsureColumn(conn, TableAssets, "is_group_cover", "INTEGER NOT NULL DEFAULT 1");
+        EnsureColumn(conn, TableAssets, "group_has_raw", "INTEGER NOT NULL DEFAULT 0");
+        EnsureColumn(conn, TableAssets, "group_has_jpeg", "INTEGER NOT NULL DEFAULT 0");
+        EnsureColumn(conn, TableAssets, "companions_json", "TEXT NOT NULL DEFAULT '[]'");
+
         Execute(conn, "CREATE UNIQUE INDEX IF NOT EXISTS ux_assets_full_path ON assets(full_path);");
         Execute(conn, "CREATE INDEX IF NOT EXISTS ix_assets_library ON assets(library_id);");
         Execute(conn, "CREATE INDEX IF NOT EXISTS ix_assets_kind ON assets(kind);");
@@ -50,6 +57,8 @@ internal static class CatalogSchema
         Execute(conn, "CREATE INDEX IF NOT EXISTS ix_assets_file_modified ON assets(file_modified_ms);");
         Execute(conn, "CREATE INDEX IF NOT EXISTS ix_assets_indexed ON assets(indexed_ms);");
         Execute(conn, "CREATE INDEX IF NOT EXISTS ix_assets_postprocess ON assets(post_process);");
+        Execute(conn, "CREATE INDEX IF NOT EXISTS ix_assets_group ON assets(group_id);");
+        Execute(conn, "CREATE INDEX IF NOT EXISTS ix_assets_cover ON assets(is_group_cover);");
 
         Execute(conn,
             "INSERT INTO meta(key, value) VALUES('schema_version', '" + Version + "') " +
@@ -138,7 +147,12 @@ internal static class CatalogSchema
             indexed_at              TEXT,
             indexed_ms              INTEGER,
             metadata_parsed_at      TEXT,
-            last_error              TEXT
+            last_error              TEXT,
+            group_id                TEXT,
+            is_group_cover          INTEGER NOT NULL DEFAULT 1,
+            group_has_raw           INTEGER NOT NULL DEFAULT 0,
+            group_has_jpeg          INTEGER NOT NULL DEFAULT 0,
+            companions_json         TEXT NOT NULL DEFAULT '[]'
         );
         """;
 
@@ -165,6 +179,20 @@ internal static class CatalogSchema
             value   TEXT
         );
         """;
+
+    /// <summary>补列迁移：列不存在才 ALTER（SQLite 没有 ADD COLUMN IF NOT EXISTS）。</summary>
+    private static void EnsureColumn(SqliteConnection conn, string table, string column, string ddlType)
+    {
+        using var check = conn.CreateCommand();
+        check.CommandText = "PRAGMA table_info(" + table + ");";
+        using var reader = check.ExecuteReader();
+        while (reader.Read())
+        {
+            if (string.Equals(reader.GetString(1), column, StringComparison.OrdinalIgnoreCase)) return;
+        }
+        reader.Close();
+        Execute(conn, "ALTER TABLE " + table + " ADD COLUMN " + column + " " + ddlType + ";");
+    }
 
     private static void Execute(SqliteConnection conn, string sql)
     {

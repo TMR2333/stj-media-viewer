@@ -46,7 +46,13 @@ public sealed partial class AssetCardItem : ObservableObject
     public Visibility StarsVisibility => Rating > 0 ? Visibility.Visible : Visibility.Collapsed;
 
     // ---------------- 徽标 ----------------
-    public Visibility RawBadgeVisibility => Asset.IsRaw ? Visibility.Visible : Visibility.Collapsed;
+    // 配对组用 RAW&amp;JPEG 徽标统一表达，避免同时出现"RAW"和"RAW&amp;JPEG"两个角标
+    public Visibility RawBadgeVisibility => Asset.IsRaw && !Asset.IsRawJpegPair ? Visibility.Visible : Visibility.Collapsed;
+    /// <summary>RAW&amp;JPEG 配对标签：这一项同时拥有 RAW 原件与 JPEG 预览。</summary>
+    public Visibility RawJpegBadgeVisibility => Asset.IsRawJpegPair ? Visibility.Visible : Visibility.Collapsed;
+    /// <summary>组内副本数提示（如 "+1 RAW"），折叠时让用户知道还有别的文件。</summary>
+    public string CompanionText => Asset.CompanionPaths.Count == 0 ? "" : "+" + Asset.CompanionPaths.Count + " 个同组文件";
+    public Visibility CompanionVisibility => Asset.CompanionPaths.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
     public Visibility LogBadgeVisibility => Asset.IsLog == true ? Visibility.Visible : Visibility.Collapsed;
     public Visibility AiBadgeVisibility => HasAi ? Visibility.Visible : Visibility.Collapsed;
     public Visibility VideoBadgeVisibility => Asset.IsVideo ? Visibility.Visible : Visibility.Collapsed;
