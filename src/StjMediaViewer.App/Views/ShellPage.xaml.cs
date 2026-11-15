@@ -49,11 +49,10 @@ public sealed partial class ShellPage : Page
         _initialized = true;
 
         ApplySavedTheme();
-        SelectLanguage(AppServices.Design.CurrentId);
         AppServices.Design.Changed += OnDesignChanged;
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
 
-        // 页面重建（切换设计语言）后把搜索词恢复回搜索框。
+        // 页面重建（切换明暗主题）后把搜索词恢复回搜索框。
         if (!string.IsNullOrEmpty(ViewModel.SearchText) && SearchBox.Text != ViewModel.SearchText)
         {
             _syncingSearch = true;
@@ -126,50 +125,12 @@ public sealed partial class ShellPage : Page
 
     private void OnDesignChanged(object? sender, EventArgs e)
     {
-        SelectLanguage(AppServices.Design.CurrentId);
-        // 设置页里也可能改明暗模式：这里同步一次根元素主题与图标。
+        // 设计语言已收敛为单一 Fluent；这里只需要同步明暗模式。
         ApplyThemeFromSettings();
     }
 
     /// <summary>设置页改完明暗模式后调用，让 Shell 根元素立即按新主题重解析 token。</summary>
     public void ApplyThemeFromSettings() => ApplySavedTheme();
-
-    private void SelectLanguage(string? id)
-    {
-        var normalized = DesignLanguageIds.Normalize(id);
-        foreach (var item in LanguagePicker.Items.OfType<ComboBoxItem>())
-        {
-            if (string.Equals(item.Tag as string, normalized, StringComparison.OrdinalIgnoreCase))
-            {
-                if (!ReferenceEquals(LanguagePicker.SelectedItem, item)) LanguagePicker.SelectedItem = item;
-                break;
-            }
-        }
-    }
-
-    private async void LanguagePicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        if (!_initialized) return;
-        if (LanguagePicker.SelectedItem is not ComboBoxItem { Tag: string id }) return;
-        if (string.Equals(id, AppServices.Design.CurrentId, StringComparison.OrdinalIgnoreCase)) return;
-
-        try
-        {
-            await AppServices.Design.ApplyAsync(id);
-            AppEvents.SetStatus(id switch
-            {
-                DesignLanguageIds.Fluent => "已切换到 Fluent Design（微软）",
-                DesignLanguageIds.Md3 => "已切换到 Material Design 3（谷歌）",
-                DesignLanguageIds.Glass => "已切换到 Liquid Glass（苹果）",
-                _ => "已切换设计语言",
-            });
-        }
-        catch (Exception ex)
-        {
-            Log.Warn("切换设计语言失败", ex);
-            AppEvents.SetError($"切换设计语言失败：{ex.Message}");
-        }
-    }
 
     // ==================================================================================
     //  搜索

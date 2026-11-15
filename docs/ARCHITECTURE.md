@@ -1,12 +1,12 @@
 # stj-media-viewer 架构说明
 
-> 面向专业创作者的 Windows 原生素材整理软件。核心命题：**把一堆散落的照片/视频/音频，变成一个可按 9 个维度检索、可人工/AI 分类、可导出的结构化素材库**，并且界面能在 Fluent / Material Design 3 / Liquid Glass 三套设计语言之间实时切换。
+> 面向专业创作者的 Windows 原生素材整理软件。核心命题：**把一堆散落的照片/视频/音频，变成一个可按 9 个维度检索、可人工/AI 分类、可导出的结构化素材库**，界面遵循微软 Fluent 设计语言（WinUI 3 原生），支持明暗主题。
 
 ## 1. 技术选型与理由
 
 | 决策 | 选择 | 理由 |
 |---|---|---|
-| UI 框架 | WinUI 3（Windows App SDK 2.6.5） | 原生 DWM 背板（Mica/Acrylic）是"Fluent 与 Liquid Glass 皮肤"的必要条件；WPF 只能模拟 |
+| UI 框架 | WinUI 3（Windows App SDK 2.6.5） | 原生 DWM 背板（Mica/Acrylic）让 Fluent 的窗口材质成为可能；WPF 只能模拟 |
 | 运行时 | .NET 10，self-contained | 免装运行时，双击即跑 |
 | 打包 | unpackaged | 免 MSIX 签名/商店，方便交付绿色版 |
 | 索引 | SQLite（Microsoft.Data.Sqlite） | 万级素材的筛选/分面/时间线必须走 SQL，不能内存 LINQ |
@@ -23,7 +23,7 @@
 │  StjMediaViewer.App (WinUI 3)                                │
 │  Views/ ─ 壳、素材库、检视面板、预览、时间线、地图、设置…        │
 │  ViewModels/ ─ CommunityToolkit.Mvvm                         │
-│  Themes/ ─ 三套设计语言 token + 控件字典                       │
+│  Themes/ ─ 设计 token（Base 兜底 + Fluent 取值）              │
 │  Controls/ ─ GlassPanel / FacetChip / RatingStars / Badge …   │
 │  Services/ ─ DesignLanguageService / WindowChrome / Dialog    │
 ├──────────────────────────────────────────────────────────────┤
@@ -90,15 +90,18 @@ FolderPicker ──> LibraryRoot
 
 每个维度在 `MediaAsset.Provenance[ClassDimension]` 记录 **来源**（Derived/Sidecar/Manual/Ai）+ **置信度** + **模型 ID**，UI 上以徽标显示。**人工结果优先，AI 默认不覆盖人工值。**
 
-## 5. 三套设计语言如何共存
+## 5. 设计系统（Fluent + token 契约）
 
-关键设计：**界面只认语义 token，不认具体皮肤**。
+关键设计：**界面只认语义 token，不认具体颜色值**。
 
-- `Themes/Tokens.Base.xaml` 定义全量键（颜色/圆角/字号/动效/控件尺寸）作为兜底。
-- 每套皮肤一份 `Tokens.{Fluent,Md3,Glass}.xaml`：**同名键覆盖**，外加 `ThemeDictionaries` 处理明暗。
-- `DesignLanguageService` 运行时替换 `Application.Current.Resources.MergedDictionaries` 中的皮肤词典，并重建根内容（WinUI 3 已实例化元素不会重新求值 `ThemeResource`）。
-- 窗口背板随皮肤切换：Fluent → Mica；MD3 → 纯色（MD3 的哲学是"色调表面、零透明"）；Liquid Glass → DesktopAcrylic（WinUI 能拿到的最接近"玻璃"的系统背板）。
-- 结构性差异（MD3 的药丸按钮、玻璃面板的镜面描边）放在 `Themes/Controls.*.xaml`，不进页面代码。
+- `Themes/Tokens.Base.xaml` 定义全量键（颜色/圆角/字号/动效/控件尺寸）作为兜底与契约。
+- `Themes/Tokens.Fluent.xaml` 用**同名键覆盖**成 Fluent 取值，并内含 `ThemeDictionaries` 的 Light / Dark 两套；
+  另外覆盖约 140 个 WinUI 框架资源键，让 `NavigationView` / `TextBox` / `ComboBox` / `Button` 等标准控件同步跟随。
+- `DesignLanguageService` 负责在启动时把 Fluent 词典合并进 `Application.Current.Resources.MergedDictionaries`，
+  并管明暗模式（只改根元素 `RequestedTheme`，既有元素会由框架重新求值，不重建界面）。
+- 窗口背板：优先 `MicaBackdrop`，不支持时退 `DesktopAcrylicBackdrop`，再退纯色。
+- 历史版本的 Material Design 3 / Liquid Glass 皮肤因观感不达标已整体删除（词典、控件词典、背景光场控件、
+  切换入口全部移除；`DesignLanguageIds.Normalize` 会把旧的 `"md3"/"glass"` 配置回落到 Fluent）。
 
 详见 `docs/THEME-TOKENS.md`。
 
@@ -129,4 +132,4 @@ FolderPicker ──> LibraryRoot
 | [GeoNames cities15000](https://download.geonames.org/export/dump/) | 离线反向地理编码（CC BY 4.0） |
 | [exiftool 文档](https://exiftool.org/TagNames/) | EXIF/XMP/QuickTime 标签语义参考 |
 | [ISO/IEC 14496-12 (ISOBMFF)](https://www.iso.org/standard/83102.html) | MP4/MOV 盒子结构参考 |
-| [Material Design 3](https://m3.material.io/) / [Fluent 2](https://fluent2.microsoft.design/) / [Apple HIG](https://developer.apple.com/design/) | 三套设计语言的规范来源 |
+| [Fluent 2](https://fluent2.microsoft.design/) / [WinUI 3 文档](https://learn.microsoft.com/windows/apps/winui/winui3/) | 界面设计语言与控件规范来源 |

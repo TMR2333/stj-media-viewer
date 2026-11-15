@@ -12,7 +12,7 @@
 → 虚拟化网格 + 筛选 + 检视 + 详情 + AI 批量分类 + 重复检测 + 导出
 ```
 
-设计语言：**Fluent / Material Design 3 / Liquid Glass 三套可运行时切换**（token 层驱动）。
+设计语言：**微软 Fluent（单套，token 层驱动，支持明暗）**。Material Design 3 / Liquid Glass 已下线删除。
 
 ## 2. 技术底座（已冻结，不要改）
 
@@ -42,7 +42,7 @@
 | `src/StjMediaViewer.Core/Classification/` | intel-engine | 规则分类 |
 | `src/StjMediaViewer.Core/Geo/` | intel-engine | 离线反向地理编码 |
 | `src/StjMediaViewer.Core/Settings/` | intel-engine | 设置持久化 + DPAPI |
-| `src/StjMediaViewer.App/Themes/` | ui-shell | 三套皮肤 token/控件字典 |
+| `src/StjMediaViewer.App/Themes/` | ui-shell | 设计 token（Base 兜底 + Fluent 取值） |
 | `src/StjMediaViewer.App/Services/` | Lead + ui-shell（见任务） | 服务层 |
 | `src/StjMediaViewer.App/Controls/` | ui-shell | 通用控件 |
 | `src/StjMediaViewer.App/Views/` | Lead（ShellPage）+ ui-views（页面） | 界面 |

@@ -40,7 +40,7 @@
                 </Grid.ColumnDefinitions>
                 <StackPanel Spacing="2">
                     <TextBlock Text="设置" Style="{ThemeResource AppTitleTextStyle}" />
-                    <TextBlock Text="接入你自己的视觉 / 理解模型，调整界面皮肤与工具链。所有改动会自动保存。"
+                    <TextBlock Text="接入你自己的视觉 / 理解模型，调整界面与工具链。所有改动会自动保存。"
                                Style="{ThemeResource AppCaptionTextStyle}" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
@@ -285,65 +285,34 @@
             </uic:SectionCard>
 
             <!-- ==================================================================
-                 设计语言
+                 外观
                  ================================================================== -->
-            <uic:SectionCard Header="设计语言" Subtitle="三套皮肤运行时切换，点击立即生效（界面会重建一次）" Glyph="&#xE790;">
+            <uic:SectionCard Header="外观" Subtitle="当前使用微软 Fluent 设计语言；支持跟随系统 / 浅色 / 深色" Glyph="&#xE790;">
                 <StackPanel Spacing="12">
-                    <Grid ColumnSpacing="8">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-
-                        <Button Grid.Column="0" Style="{StaticResource ChoiceCardStyle}" Tag="fluent" Click="Design_Click">
-                            <Grid>
-                                <Border Background="{ThemeResource AppSurfaceAltBrush}"
-                                        BorderBrush="{ThemeResource AppCardStrokeBrush}" BorderThickness="{ThemeResource AppCardStrokeThickness}"
-                                        CornerRadius="{ThemeResource AppRadiusMedium}" />
-                                <Border BorderBrush="{ThemeResource AppSelectedBorderBrush}" BorderThickness="2"
-                                        CornerRadius="{ThemeResource AppRadiusMedium}"
-                                        Visibility="{x:Bind ViewModel.FluentSelectedVisibility, Mode=OneWay}" />
-                                <StackPanel Margin="12,10" Spacing="3">
-                                    <TextBlock Text="Fluent Design" Style="{ThemeResource AppBodyTextStyle}"
-                                               Foreground="{ThemeResource TextPrimaryBrush}" />
-                                    <TextBlock Text="微软原生 · 克制、清晰、键盘友好" Style="{ThemeResource AppMicroTextStyle}" TextWrapping="Wrap" />
-                                </StackPanel>
-                            </Grid>
-                        </Button>
-
-                        <Button Grid.Column="1" Style="{StaticResource ChoiceCardStyle}" Tag="md3" Click="Design_Click">
-                            <Grid>
-                                <Border Background="{ThemeResource AppSurfaceAltBrush}"
-                                        BorderBrush="{ThemeResource AppCardStrokeBrush}" BorderThickness="{ThemeResource AppCardStrokeThickness}"
-                                        CornerRadius="{ThemeResource AppRadiusMedium}" />
-                                <Border BorderBrush="{ThemeResource AppSelectedBorderBrush}" BorderThickness="2"
-                                        CornerRadius="{ThemeResource AppRadiusMedium}"
-                                        Visibility="{x:Bind ViewModel.Md3SelectedVisibility, Mode=OneWay}" />
-                                <StackPanel Margin="12,10" Spacing="3">
-                                    <TextBlock Text="Material Design 3" Style="{ThemeResource AppBodyTextStyle}"
-                                               Foreground="{ThemeResource TextPrimaryBrush}" />
-                                    <TextBlock Text="谷歌 · 大圆角、色彩容器、胶囊控件" Style="{ThemeResource AppMicroTextStyle}" TextWrapping="Wrap" />
-                                </StackPanel>
-                            </Grid>
-                        </Button>
-
-                        <Button Grid.Column="2" Style="{StaticResource ChoiceCardStyle}" Tag="glass" Click="Design_Click">
-                            <Grid>
-                                <Border Background="{ThemeResource AppSurfaceAltBrush}"
-                                        BorderBrush="{ThemeResource AppCardStrokeBrush}" BorderThickness="{ThemeResource AppCardStrokeThickness}"
-                                        CornerRadius="{ThemeResource AppRadiusMedium}" />
-                                <Border BorderBrush="{ThemeResource AppSelectedBorderBrush}" BorderThickness="2"
-                                        CornerRadius="{ThemeResource AppRadiusMedium}"
-                                        Visibility="{x:Bind ViewModel.GlassSelectedVisibility, Mode=OneWay}" />
-                                <StackPanel Margin="12,10" Spacing="3">
-                                    <TextBlock Text="Liquid Glass" Style="{ThemeResource AppBodyTextStyle}"
-                                               Foreground="{ThemeResource TextPrimaryBrush}" />
-                                    <TextBlock Text="苹果 · 半透明玻璃、镜面描边、顶部高光" Style="{ThemeResource AppMicroTextStyle}" TextWrapping="Wrap" />
-                                </StackPanel>
-                            </Grid>
-                        </Button>
-                    </Grid>
+                    <Border Background="{ThemeResource AppSurfaceAltBrush}"
+                            BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                            BorderThickness="{ThemeResource AppCardStrokeThickness}"
+                            CornerRadius="{ThemeResource AppRadiusMedium}"
+                            Padding="12,10">
+                        <StackPanel Spacing="3">
+                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <FontIcon Glyph="&#xE8B9;" FontSize="{ThemeResource AppFontBodySize}"
+                                          Foreground="{ThemeResource AccentBrush}" />
+                                <TextBlock Text="Fluent Design" Style="{ThemeResource AppBodyTextStyle}"
+                                           Foreground="{ThemeResource TextPrimaryBrush}" />
+                                <Border Background="{ThemeResource AccentSubtleBrush}"
+                                        BorderBrush="{ThemeResource AccentBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="{ThemeResource AppRadiusPill}"
+                                        Padding="8,1" VerticalAlignment="Center">
+                                    <TextBlock Text="当前" Style="{ThemeResource AppMicroTextStyle}"
+                                               Foreground="{ThemeResource AccentBrush}" />
+                                </Border>
+                            </StackPanel>
+                            <TextBlock Text="微软原生设计语言：Mica 背板、Segoe UI Variable 字阶、细描边、键盘友好的焦点视觉。"
+                                       Style="{ThemeResource AppMicroTextStyle}" TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
 
                     <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
                         <TextBlock Text="明暗模式" Style="{StaticResource FieldLabelStyle}" MinWidth="104" />
@@ -352,8 +321,6 @@
                             <ComboBoxItem Content="浅色" Tag="light" />
                             <ComboBoxItem Content="深色" Tag="dark" />
                         </ComboBox>
-                        <TextBlock Text="切换皮肤会自动回到当前页面（设置会记住你所在的视图）"
-                                   Style="{ThemeResource AppMicroTextStyle}" VerticalAlignment="Center" />
                     </StackPanel>
                 </StackPanel>
             </uic:SectionCard>
@@ -560,7 +527,7 @@
 
                     <TextBlock Text="开源致谢" Style="{ThemeResource AppSectionHeaderTextStyle}" />
                     <TextBlock Style="{ThemeResource AppMicroTextStyle}" TextWrapping="Wrap"
-                               Text="MetadataExtractor（Apache-2.0）· FFmpeg（LGPL/GPL，按发行版许可）· GeoNames 城市数据（CC BY 4.0）· Microsoft.WindowsAppSDK / WinUI 3（MIT）· CommunityToolkit.Mvvm（MIT）· Microsoft.Data.Sqlite（MIT）。设计语言参考 Fluent Design（微软）、Material Design 3（谷歌）、Apple Liquid Glass（苹果）公开规范。" />
+                               Text="MetadataExtractor（Apache-2.0）· FFmpeg（LGPL/GPL，按发行版许可）· GeoNames 城市数据（CC BY 4.0）· Microsoft.WindowsAppSDK / WinUI 3（MIT）· CommunityToolkit.Mvvm（MIT）· Microsoft.Data.Sqlite（MIT）。界面遵循微软 Fluent Design 公开规范。" />
                     <TextBlock Text="素材本身不会被上传；只有你主动点击 AI 分类时，压缩后的预览图才会发送到你配置的模型端点。"
                                Style="{ThemeResource AppMicroTextStyle}" TextWrapping="Wrap" />
                 </StackPanel>

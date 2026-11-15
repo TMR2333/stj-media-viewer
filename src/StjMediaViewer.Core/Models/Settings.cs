@@ -71,14 +71,17 @@ public sealed class AppSettings
     public string? LastViewId { get; set; }
 }
 
+/// <summary>
+/// 设计语言标识。当前产品只保留一套：Fluent（微软设计语言）。
+/// 历史版本尝试过 Material Design 3 与 Liquid Glass 皮肤，因观感不达标已下线；
+/// 这里保留 Normalize 收口，保证旧 settings.json 里的 "md3"/"glass" 会安全回落到 Fluent。
+/// </summary>
 public static class DesignLanguageIds
 {
     public const string Fluent = "fluent";
-    public const string Md3 = "md3";
-    public const string Glass = "glass";
 
-    public static readonly string[] All = { Fluent, Md3, Glass };
+    public static readonly string[] All = { Fluent };
 
-    public static bool IsValid(string? id) => id is Fluent or Md3 or Glass;
-    public static string Normalize(string? id) => IsValid(id) ? id! : Fluent;
+    public static bool IsValid(string? id) => id is Fluent;
+    public static string Normalize(string? id) => Fluent;
 }

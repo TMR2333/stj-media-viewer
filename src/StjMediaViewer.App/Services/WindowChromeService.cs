@@ -120,31 +120,13 @@ public sealed class WindowChromeService : IWindowChromeService
     {
         if (_window is null) return;
 
-        var languageId = ResolveDesignLanguageId();
-        var key = languageId; // Fluent 在 Mica 不可用时 key 会变体，见下
-        SystemBackdrop? backdrop;
-
-        switch (languageId)
+        // 单一设计语言（Fluent）：优先 Mica，Win10 / 远程桌面等不支持时退 Acrylic，再退纯色。
+        var key = "fluent";
+        SystemBackdrop? backdrop = CreateMica();
+        if (backdrop is null)
         {
-            case DesignLanguageIds.Md3:
-                // MD3：零透明，系统背板关掉，窗口底色由 AppWindowBackgroundBrush 画。
-                backdrop = null;
-                break;
-
-            case DesignLanguageIds.Glass:
-                // Liquid Glass：Acrylic 是 WinUI 能拿到的"最像玻璃"的系统背板。
-                backdrop = CreateAcrylic();
-                break;
-
-            default:
-                backdrop = CreateMica();
-                if (backdrop is null)
-                {
-                    // Win10 / 不支持 Mica 时的 Fluent 降级路径。
-                    backdrop = CreateAcrylic();
-                    key = "fluent-acrylic";
-                }
-                break;
+            backdrop = CreateAcrylic();
+            key = "fluent-acrylic";
         }
 
         if (string.Equals(_appliedBackdropKey, key, StringComparison.Ordinal))
@@ -156,7 +138,7 @@ public sealed class WindowChromeService : IWindowChromeService
         {
             _window.SystemBackdrop = backdrop;
             _appliedBackdropKey = key;
-            Log.Info($"系统背板 → {backdrop?.GetType().Name ?? "null（纯色）"}（{languageId}）");
+            Log.Info($"系统背板 → {backdrop?.GetType().Name ?? "null（纯色）"}（fluent）");
         }
         catch (Exception ex)
         {
@@ -264,24 +246,13 @@ public sealed class WindowChromeService : IWindowChromeService
             var hover = dark ? DarkHover : LightHover;
             var pressed = dark ? DarkPressed : LightPressed;
 
-            return languageId switch
-            {
-                // MD3：零透明 → 标题栏 = surface 实色
-                DesignLanguageIds.Md3 => new TitleBarColors(
-                    dark ? Color.FromArgb(255, 0x1D, 0x1B, 0x20) : Color.FromArgb(255, 0xFE, 0xF7, 0xFF),
-                    foreground,
-                    inactive,
-                    hover,
-                    pressed),
-
-                // Glass / Fluent：透明标题栏，让 Mica / Acrylic 透出来
-                _ => new TitleBarColors(
-                    Transparent,
-                    foreground,
-                    inactive,
-                    hover,
-                    pressed),
-            };
+            // Fluent：透明标题栏，让 Mica / Acrylic 透出来
+            return new TitleBarColors(
+                Transparent,
+                foreground,
+                inactive,
+                hover,
+                pressed);
         }
     }
 

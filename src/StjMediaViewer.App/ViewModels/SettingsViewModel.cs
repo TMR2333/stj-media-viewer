@@ -214,39 +214,13 @@ public sealed partial class SettingsViewModel : ObservableObject
     }
 
     // ==================================================================================
-    //  设计语言 / 明暗
+    //  外观 / 明暗（设计语言已收敛为单一 Fluent，不再提供切换）
     // ==================================================================================
     [ObservableProperty]
     private string _designId = DesignLanguageIds.Fluent;
 
     [ObservableProperty]
     private string _themeMode = "system";
-
-    public Visibility FluentSelectedVisibility => DesignId == DesignLanguageIds.Fluent ? Visibility.Visible : Visibility.Collapsed;
-    public Visibility Md3SelectedVisibility => DesignId == DesignLanguageIds.Md3 ? Visibility.Visible : Visibility.Collapsed;
-    public Visibility GlassSelectedVisibility => DesignId == DesignLanguageIds.Glass ? Visibility.Visible : Visibility.Collapsed;
-
-    partial void OnDesignIdChanged(string value)
-    {
-        OnPropertyChanged(nameof(FluentSelectedVisibility));
-        OnPropertyChanged(nameof(Md3SelectedVisibility));
-        OnPropertyChanged(nameof(GlassSelectedVisibility));
-    }
-
-    public async Task ApplyDesignAsync(string id)
-    {
-        try
-        {
-            await AppServices.Design.ApplyAsync(id);
-            DesignId = AppServices.Design.CurrentId;
-            AppEvents.SetStatus($"已切换到 {DesignDisplayName(DesignId)}");
-        }
-        catch (Exception ex)
-        {
-            Log.Warn("切换设计语言失败", ex);
-            AppEvents.SetError($"切换设计语言失败：{ex.Message}");
-        }
-    }
 
     public async Task ApplyThemeModeAsync(string mode)
     {
@@ -275,12 +249,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         catch (Exception ex) { Log.Warn("同步 Shell 主题失败", ex); }
     }
 
-    public static string DesignDisplayName(string id) => id switch
-    {
-        DesignLanguageIds.Md3 => "Material Design 3",
-        DesignLanguageIds.Glass => "Liquid Glass",
-        _ => "Fluent Design",
-    };
+    public static string DesignDisplayName(string id) => "Fluent Design";
 
     // ==================================================================================
     //  媒体库

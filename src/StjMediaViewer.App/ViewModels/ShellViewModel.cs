@@ -155,12 +155,8 @@ public sealed partial class ShellViewModel : ObservableObject
 
     private void UpdateSkinName()
     {
-        SkinText = AppServices.Design?.CurrentId switch
-        {
-            DesignLanguageIds.Md3 => "Material Design 3",
-            DesignLanguageIds.Glass => "Liquid Glass",
-            _ => "Fluent",
-        };
+        // 单一设计语言：Fluent
+        SkinText = "Fluent";
     }
 
     /// <summary>扫描/写入完成后刷新缓存体积（异步，不阻塞 UI）。</summary>

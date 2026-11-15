@@ -1,22 +1,19 @@
 # stj-media-viewer
 
-面向专业创作者的 **Windows 原生素材整理软件**。选一个媒体库文件夹，它递归扫描、排除非媒体、解析元数据、自动分类，并给你一个能按 9 个维度检索的素材库——同时**界面可以在 Fluent / Material Design 3 / Liquid Glass 三套设计语言之间实时切换**。
+面向专业创作者的 **Windows 原生素材整理软件**。选一个媒体库文件夹，它递归扫描、排除非媒体、解析元数据、自动分类，并给你一个能按 9 个维度检索的素材库。界面遵循**微软 Fluent 设计语言**（WinUI 3 原生、Mica 背板、Segoe UI Variable 字阶），支持跟随系统 / 浅色 / 深色。
 
 <p align="center">
-  <img src="shots/final-fluent.png" width="49%" alt="Fluent 皮肤 · 素材库" />
-  <img src="shots/final-md3.png" width="49%" alt="Material Design 3 皮肤 · 素材库" />
-</p>
-<p align="center">
-  <img src="shots/final-glass.png" width="49%" alt="Liquid Glass 皮肤 · 素材库" />
-  <img src="shots/final-settings.png" width="49%" alt="设置页：接入你自己的视觉模型" />
+  <img src="shots/final-fluent.png" width="70%" alt="素材库主界面" />
 </p>
 <p align="center">
   <img src="shots/final-timeline.png" width="32%" alt="时间线" />
   <img src="shots/final-aiqueue.png" width="32%" alt="AI 分类队列" />
-  <img src="shots/final-duplicates.png" width="32%" alt="重复项" />
+</p>
+<p align="center">
+  <img src="shots/final-settings.png" width="49%" alt="设置页：接入你自己的视觉模型" />
+  <img src="shots/final-duplicates.png" width="49%" alt="重复项" />
 </p>
 
-> 三套皮肤不是换个主色：材质（Mica / 五级色调表面 / 背景光场+七层玻璃）、圆角尺度（4-12 / 12-28 / 10-32）、控件密度、字阶字重、状态反馈（6% hover / 8%-12% state layer / 渐变高光+sheen）全部不同。
 > 截图由应用自身渲染导出（`STJ_CAPTURE=<png>` 环境变量），不依赖外部截屏工具。
 
 ---
@@ -85,11 +82,10 @@
 - 重复检测：`size + 快速 FNV 指纹` 粗筛 → `SHA-256` 精确 → `8x8 aHash` 近重复。
 - 缩略图磁盘缓存 + 内存 LRU；缓存大小可见、可清理。
 
-### 2.6 界面与皮肤
+### 2.6 界面
 
-- 三套设计语言运行时切换，**不重启**（WinUI 3 的 `ThemeResource` 对已实例化元素不刷新，所以切换时会重建视觉树）。
-- 明暗模式：跟随系统 / 浅色 / 深色。
-- 窗口背板随皮肤变：Fluent → Mica，MD3 → 纯色（MD3 的哲学是零透明），Glass → Desktop Acrylic。
+- 微软 Fluent 设计语言：Mica 窗口背板、Segoe UI Variable 字阶、细描边、键盘友好的焦点视觉；标准控件（NavigationView / TextBox / ComboBox / Button…）由 ~140 个框架资源键统一覆盖。
+- 明暗模式：跟随系统 / 浅色 / 深色，切换只重解析 token，不重建界面。
 - 全部界面只用语义 token（`{ThemeResource ...}`），页面里没有一处硬编码颜色/字号/圆角。
 
 ## 3. 快速开始
@@ -148,14 +144,13 @@ dotnet build tools/SelfCheck/StjMediaViewer.SelfCheck.csproj
 .\tools\SelfCheck\bin\Debug\net10.0-windows10.0.19041.0\win-x64\StjMediaViewer.SelfCheck.exe
 ```
 
-## 5. 设计语言系统
+## 5. 设计系统（Fluent）
 
-界面只认**语义 token**，不认具体皮肤：
+界面只认**语义 token**，不认具体颜色值：
 
 - `App/Themes/Tokens.Base.xaml` 定义全量键（颜色/圆角/字号/动效/控件尺寸）作为兜底与契约。
-- `Tokens.Fluent.xaml` / `Tokens.Md3.xaml` / `Tokens.Glass.xaml` 用**同名键**覆盖，另含各 ~140 个 WinUI 框架资源键（`NavigationView*`、`TextControl*`、`ComboBox*`、`Button*`…），所以标准控件也跟着皮肤变。
-- `Controls.Md3.xaml` / `Controls.Glass.xaml` 承载**结构性差异**（MD3 的 pill/tonal 按钮、Glass 的镜面描边按钮与玻璃胶囊）。
-- `DesignLanguageService` 运行时替换 `MergedDictionaries` → 持久化 → 换窗口背板 → **重建视觉树**，无需重启。
+- `App/Themes/Tokens.Fluent.xaml` 用**同名键**覆盖成 Fluent 取值，另含 ~140 个 WinUI 框架资源键（`NavigationView*`、`TextControl*`、`ComboBox*`、`Button*`…），所以标准控件也跟着 token 走；Light / Dark 两套 `ThemeDictionaries` 让明暗切换只重解析、不重建界面。
+- 早期版本尝试过 Material Design 3 与 Liquid Glass 皮肤，因观感不达标已下线（词典文件与切换入口都已删除，`DesignLanguageIds` 会把旧的 `"md3"/"glass"` 配置安全回落到 Fluent）。
 
 细节见 [docs/THEME-TOKENS.md](docs/THEME-TOKENS.md) 与 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
@@ -166,8 +161,7 @@ dotnet build tools/SelfCheck/StjMediaViewer.SelfCheck.csproj
 - 城市反查用离线 GeoNames cities15000（31,701 城市，含中文名）：极少数坐标会落到邻近区县；非中国城市的 `Province` 仍是 admin1 代码。
 - 视频色彩字段用可读名（`HLG` / `S-Log3` / `BT.709`），与 ffprobe 的 `arib-std-b67` 之类原始枚举名不同（仅命名口径差异）。
 - 批量 AI 分类的 token 用量未落库（只统计本次运行）。
-- 未做 HighContrast 主题；未内置 Roboto / Noto Sans SC（MD3 暂用 Segoe UI Variable），接入步骤写在 `docs/THEME-TOKENS.md`。
-- Glass 皮肤的 `ThemeShadow` 在 ScrollViewer 边缘可能被裁剪（WinUI 限制）。
+- 未做 HighContrast 主题。
 - 时间线一次构建全部日桶（1 万条约 1000 天，已折叠到月份里），超大库建议改成按月懒加载。
 - AI 队列的"暂停"是取消当前批次并保留进度，不是协程级暂停。
 - 没有 GPU 加速的图片渲染（WIC 解码 + XAML 虚拟化），10 万级库需要分库或增量加载策略。
@@ -182,6 +176,6 @@ dotnet build tools/SelfCheck/StjMediaViewer.SelfCheck.csproj
 | [Microsoft.Data.Sqlite](https://learn.microsoft.com/dotnet/standard/data/sqlite/) | 索引库 | MIT |
 | [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) | MVVM | MIT |
 | [ExifTool 标签文档](https://exiftool.org/TagNames/) / [ISO/IEC 14496-12](https://www.iso.org/standard/83102.html) | 标签与容器语义参考 | — |
-| [Material Design 3](https://m3.material.io/) · [Fluent 2](https://fluent2.microsoft.design/) · [Apple HIG](https://developer.apple.com/design/) | 三套设计语言规范 | — |
+| [Fluent 2 设计规范](https://fluent2.microsoft.design/) · [WinUI 3 文档](https://learn.microsoft.com/windows/apps/winui/winui3/) | 界面设计语言与控件规范 | — |
 
-> sf pro / SF Symbols 受 Apple 许可限制，未随本项目分发；Liquid Glass 皮肤使用系统字体与自绘图标。
+> 界面字体使用系统内置的 Segoe UI Variable / Segoe Fluent Icons，不额外分发第三方字体。

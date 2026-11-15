@@ -27,22 +27,16 @@ public sealed class DesignLanguageService : IDesignLanguageService
 {
     private static readonly string[] SupportedThemeModes = { "system", "light", "dark" };
 
-    /// <summary>每种设计语言要合并的词典（顺序即合并顺序，后面的胜出）。</summary>
+    /// <summary>
+    /// 皮肤词典表。产品已收敛为**单一设计语言 Fluent**（Material Design 3 / Liquid Glass
+    /// 因观感不达标下线，词典文件已删除）。保留这张表是为了让"换皮肤 → 换窗口背板 →
+    /// 必要时重建视觉树"的机制仍然成立，将来若要再加皮肤，只需在这里补条目。
+    /// </summary>
     private static readonly Dictionary<string, string[]> SkinDictionaries = new(StringComparer.OrdinalIgnoreCase)
     {
         [DesignLanguageIds.Fluent] = new[]
         {
             "ms-appx:///Themes/Tokens.Fluent.xaml",
-        },
-        [DesignLanguageIds.Md3] = new[]
-        {
-            "ms-appx:///Themes/Tokens.Md3.xaml",
-            "ms-appx:///Themes/Controls.Md3.xaml",
-        },
-        [DesignLanguageIds.Glass] = new[]
-        {
-            "ms-appx:///Themes/Tokens.Glass.xaml",
-            "ms-appx:///Themes/Controls.Glass.xaml",
         },
     };
 

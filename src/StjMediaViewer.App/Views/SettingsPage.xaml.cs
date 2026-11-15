@@ -86,14 +86,8 @@ public sealed partial class SettingsPage : Page
     }
 
     // ==================================================================================
-    //  设计语言 / 明暗
+    //  外观（明暗；设计语言已收敛为单一 Fluent）
     // ==================================================================================
-    private async void Design_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is FrameworkElement { Tag: string id }) await ViewModel.ApplyDesignAsync(id);
-        // 切皮肤后 ShellPage 会重建并回到本页（LastViewId），这里不需要额外处理。
-    }
-
     private async void ThemeMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_suppressUiEvents) return;
