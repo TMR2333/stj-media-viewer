@@ -86,8 +86,12 @@ public sealed class MediaAsset
 
     /// <summary>同组共享的分组键（同一张照片的 JPG / RAW / 边车同属一组）。</summary>
     public string? GroupId { get; set; }
-    /// <summary>是否是这一组在网格里的代表（优先 JPG，没有 JPG 时用 RAW）。</summary>
-    public bool IsGroupCover { get; set; }
+    /// <summary>
+    /// 是否是这一组在网格里的代表（优先 JPG，没有 JPG 时用 RAW）。
+    /// 默认 true：不属于任何 JPG/RAW 组的素材（视频 / 音频 / 单张图）本身就是一格，
+    /// 折叠（CollapseGroups）查询按 `is_group_cover = 1` 过滤，默认 false 会让它们整类消失。
+    /// </summary>
+    public bool IsGroupCover { get; set; } = true;
     /// <summary>组内是否含 RAW。</summary>
     public bool GroupHasRaw { get; set; }
     /// <summary>组内是否含 JPEG。</summary>

@@ -32,6 +32,8 @@
             <Setter Property="MinHeight" Value="26" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <!-- 垂直也要撑满：否则选中色块只有文字高度，看起来像行中间的一条小胶囊 -->
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
             <Setter Property="CornerRadius" Value="{ThemeResource AppRadiusSmall}" />
             <Setter Property="FontSize" Value="{ThemeResource AppFontCaptionSize}" />
             <Setter Property="Foreground" Value="{ThemeResource TextSecondaryBrush}" />
@@ -580,38 +582,45 @@
                                             </Grid>
                                         </Expander.Header>
 
-                                        <ItemsControl ItemsSource="{x:Bind Options}">
+                                        <!--
+                                            负边距抵消 Expander 内容区的内边距：让行（含选中色块）宽度逼近卡片边缘，
+                                            只保留 4px 呼吸位，这样色块和卡片这张"大圆角矩形"才是同一条边。
+                                        -->
+                                        <ItemsControl ItemsSource="{x:Bind Options}"
+                                                      Margin="-15,0,-15,0">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate x:DataType="vm:FilterOptionViewModel">
                                                     <Button Style="{StaticResource FilterRowButtonStyle}"
                                                             Click="FilterOption_Click"
                                                             Opacity="{x:Bind RowOpacity, Mode=OneWay}">
-                                                        <Grid ColumnSpacing="6" Margin="6,0,6,0">
-                                                            <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="14" />
-                                                                <ColumnDefinition Width="*" />
-                                                                <ColumnDefinition Width="Auto" />
-                                                            </Grid.ColumnDefinitions>
-                                                            <Border Grid.ColumnSpan="3"
-                                                                    Background="{ThemeResource AppSelectedBrush}"
+                                                        <Grid>
+                                                            <!-- 选中色块满铺整行（与按钮 hover 底严格重合），内容再内缩 -->
+                                                            <Border Background="{ThemeResource AppSelectedBrush}"
                                                                     CornerRadius="{ThemeResource AppRadiusSmall}"
                                                                     Visibility="{x:Bind SelectionVisibility, Mode=OneWay}" />
-                                                            <FontIcon Grid.Column="0"
-                                                                      Glyph="&#xE73E;"
-                                                                      FontSize="{ThemeResource AppFontMicroSize}"
-                                                                      Foreground="{ThemeResource AccentBrush}"
-                                                                      VerticalAlignment="Center"
-                                                                      Visibility="{x:Bind SelectionVisibility, Mode=OneWay}" />
-                                                            <TextBlock Grid.Column="1"
-                                                                       Text="{x:Bind Display, Mode=OneWay}"
-                                                                       Style="{ThemeResource AppCaptionTextStyle}"
-                                                                       VerticalAlignment="Center"
-                                                                       TextTrimming="CharacterEllipsis" />
-                                                            <TextBlock Grid.Column="2"
-                                                                       Text="{x:Bind CountText, Mode=OneWay}"
-                                                                       Style="{ThemeResource AppMicroTextStyle}"
-                                                                       VerticalAlignment="Center"
-                                                                       Visibility="{x:Bind CountVisibility, Mode=OneWay}" />
+                                                            <Grid ColumnSpacing="6" Margin="6,0,6,0">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="14" />
+                                                                    <ColumnDefinition Width="*" />
+                                                                    <ColumnDefinition Width="Auto" />
+                                                                </Grid.ColumnDefinitions>
+                                                                <FontIcon Grid.Column="0"
+                                                                          Glyph="&#xE73E;"
+                                                                          FontSize="{ThemeResource AppFontMicroSize}"
+                                                                          Foreground="{ThemeResource AccentBrush}"
+                                                                          VerticalAlignment="Center"
+                                                                          Visibility="{x:Bind SelectionVisibility, Mode=OneWay}" />
+                                                                <TextBlock Grid.Column="1"
+                                                                           Text="{x:Bind Display, Mode=OneWay}"
+                                                                           Style="{ThemeResource AppCaptionTextStyle}"
+                                                                           VerticalAlignment="Center"
+                                                                           TextTrimming="CharacterEllipsis" />
+                                                                <TextBlock Grid.Column="2"
+                                                                           Text="{x:Bind CountText, Mode=OneWay}"
+                                                                           Style="{ThemeResource AppMicroTextStyle}"
+                                                                           VerticalAlignment="Center"
+                                                                           Visibility="{x:Bind CountVisibility, Mode=OneWay}" />
+                                                            </Grid>
                                                         </Grid>
                                                     </Button>
                                                 </DataTemplate>

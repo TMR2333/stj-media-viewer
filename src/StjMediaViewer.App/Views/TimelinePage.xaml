@@ -36,6 +36,8 @@
             <Setter Property="MinHeight" Value="30" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <!-- 垂直撑满：让选中色块与整行重合，而不是只有文字高度 -->
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
             <Setter Property="CornerRadius" Value="{ThemeResource AppRadiusSmall}" />
         </Style>
 
@@ -113,7 +115,8 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:YearChipViewModel">
                                 <Button Style="{ThemeResource AppSubtleButtonStyle}" Tag="{x:Bind Year}" Click="Year_Click"
-                                        HorizontalContentAlignment="Stretch" Padding="0" MinHeight="28"
+                                        HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"
+                                        Padding="0" MinHeight="28"
                                         CornerRadius="{ThemeResource AppRadiusSmall}">
                                     <Grid>
                                         <Border Background="{ThemeResource AppSelectedBrush}"

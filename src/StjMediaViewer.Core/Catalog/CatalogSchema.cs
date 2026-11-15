@@ -39,6 +39,11 @@ internal static class CatalogSchema
         EnsureColumn(conn, TableAssets, "group_has_jpeg", "INTEGER NOT NULL DEFAULT 0");
         EnsureColumn(conn, TableAssets, "companions_json", "TEXT NOT NULL DEFAULT '[]'");
 
+        // 迁移：v2 之前"不属于任何 JPG/RAW 组"的素材（视频 / 音频 / 单张图）没被标成组封面，
+        // 折叠模式下这些素材会被 `is_group_cover = 1` 过滤掉 → 按"视频"筛选出现 0 条。
+        // 这里把"没有组"的行补成封面（幂等，可重复执行）。
+        Execute(conn, "UPDATE assets SET is_group_cover = 1 WHERE COALESCE(group_id, '') = '' AND is_group_cover = 0;");
+
         Execute(conn, "CREATE UNIQUE INDEX IF NOT EXISTS ux_assets_full_path ON assets(full_path);");
         Execute(conn, "CREATE INDEX IF NOT EXISTS ix_assets_library ON assets(library_id);");
         Execute(conn, "CREATE INDEX IF NOT EXISTS ix_assets_kind ON assets(kind);");

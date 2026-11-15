@@ -15,6 +15,19 @@ public static partial class Program
         var all = await s.Store.QueryAsync(new AssetQuery { Limit = 0, CollapseGroups = false });
         var collapsed = await s.Store.QueryAsync(new AssetQuery { Limit = 0, CollapseGroups = true });
 
+        // 回归：视频 / 音频 / 单张图不属于 JPG+RAW 组，折叠查询也必须能查到
+        // （曾经 IsGroupCover 默认 false，导致「媒体类型 = 视频」筛选结果为 0）
+        var videos = await s.Store.QueryAsync(new AssetQuery
+        {
+            Limit = 0,
+            CollapseGroups = true,
+            Kinds = { MediaKind.Video },
+        });
+        var expectedVideos = all.Count(a => a.Kind == MediaKind.Video);
+        Check("折叠模式下视频/音频仍可见",
+              videos.Count >= expectedVideos,
+              $"视频 {videos.Count} / 总计 {expectedVideos}");
+
         var groups = all.Where(a => !string.IsNullOrEmpty(a.GroupId)).ToList();
         var paired = groups.Where(a => a.GroupHasRaw && a.GroupHasJpeg)
                            .GroupBy(a => a.GroupId!)
