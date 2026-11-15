@@ -32,7 +32,7 @@
         <Style x:Key="DayRowStyle" TargetType="Button">
             <Setter Property="Background" Value="{ThemeResource AppTransparentBrush}" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Padding" Value="6,3,6,3" />
+            <Setter Property="Padding" Value="0" />
             <Setter Property="MinHeight" Value="30" />
             <Setter Property="HorizontalAlignment" Value="Stretch" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
@@ -113,13 +113,13 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:YearChipViewModel">
                                 <Button Style="{ThemeResource AppSubtleButtonStyle}" Tag="{x:Bind Year}" Click="Year_Click"
-                                        HorizontalContentAlignment="Stretch" Padding="10,4,10,4" MinHeight="28"
-                                        CornerRadius="{ThemeResource AppRadiusPill}">
+                                        HorizontalContentAlignment="Stretch" Padding="0" MinHeight="28"
+                                        CornerRadius="{ThemeResource AppRadiusSmall}">
                                     <Grid>
                                         <Border Background="{ThemeResource AppSelectedBrush}"
-                                                CornerRadius="{ThemeResource AppRadiusPill}"
+                                                CornerRadius="{ThemeResource AppRadiusSmall}"
                                                 Visibility="{x:Bind SelectionVisibility, Mode=OneWay}" />
-                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="10,4">
                                             <TextBlock Text="{x:Bind Title}" Style="{ThemeResource AppCaptionTextStyle}" />
                                             <TextBlock Text="{x:Bind CountText}" Style="{ThemeResource AppMicroTextStyle}" />
                                         </StackPanel>
@@ -180,7 +180,7 @@
                                                                         <Border Background="{ThemeResource AppSelectedBrush}"
                                                                                 CornerRadius="{ThemeResource AppRadiusSmall}"
                                                                                 Visibility="{x:Bind SelectionVisibility, Mode=OneWay}" />
-                                                                        <Grid ColumnSpacing="8">
+                                                                        <Grid ColumnSpacing="8" Margin="6,3">
                                                                             <Grid.ColumnDefinitions>
                                                                                 <ColumnDefinition Width="Auto" />
                                                                                 <ColumnDefinition Width="Auto" />

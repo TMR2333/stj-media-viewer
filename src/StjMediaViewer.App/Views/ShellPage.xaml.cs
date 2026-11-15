@@ -84,6 +84,21 @@ public sealed partial class ShellPage : Page
             });
         }
 
+        // 调试用：STJ_DEMO_FILTER=<optionText> 预选一个分面筛选项（截图验收用）
+        var demoFilter = Environment.GetEnvironmentVariable("STJ_DEMO_FILTER");
+        if (!string.IsNullOrEmpty(demoFilter))
+        {
+            _ = DispatcherQueue.TryEnqueue(async () =>
+            {
+                await Task.Delay(1500);
+                var vm = ViewModels.LibraryViewModel.Shared;
+                var option = vm.Groups.SelectMany(g => g.Options)
+                    .FirstOrDefault(o => o.Display.Contains(demoFilter, StringComparison.OrdinalIgnoreCase));
+                if (option is null) return;
+                option.IsSelected = true;
+            });
+        }
+
         // 调试用：STJ_DEMO_DIALOG=transcode 时自动对第一条视频打开转码对话框（截图验收）
         if (Environment.GetEnvironmentVariable("STJ_DEMO_DIALOG") == "transcode")
         {
