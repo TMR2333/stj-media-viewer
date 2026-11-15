@@ -180,6 +180,10 @@
                                            Visibility="{x:Bind RawJpegBadgeVisibility, Mode=OneWay}"
                                            ToolTipService.ToolTip="该照片同时拥有 JPEG 预览与 RAW 原件" />
                                 <uic:Badge Text="LOG" Kind="Log" Visibility="{x:Bind LogBadgeVisibility, Mode=OneWay}" />
+                                <!-- 视频编码：H.264 / H.265 / AV1…（便于一眼看出是否需要转码） -->
+                                <uic:Badge Text="{x:Bind CodecBadgeText, Mode=OneWay}" Kind="Video"
+                                           Visibility="{x:Bind CodecBadgeVisibility, Mode=OneWay}"
+                                           ToolTipService.ToolTip="视频编码格式" />
                             </StackPanel>
 
                             <!-- 右上：AI 标记 -->
@@ -351,6 +355,8 @@
                             <uic:Badge Text="RAW" Kind="Raw" Visibility="{x:Bind RawBadgeVisibility, Mode=OneWay}" />
                             <uic:Badge Text="RAW&amp;JPEG" Kind="Raw" Visibility="{x:Bind RawJpegBadgeVisibility, Mode=OneWay}" />
                             <uic:Badge Text="LOG" Kind="Log" Visibility="{x:Bind LogBadgeVisibility, Mode=OneWay}" />
+                            <uic:Badge Text="{x:Bind CodecBadgeText, Mode=OneWay}" Kind="Video"
+                                       Visibility="{x:Bind CodecBadgeVisibility, Mode=OneWay}" />
                         </StackPanel>
 
                         <TextBlock Grid.Column="4"

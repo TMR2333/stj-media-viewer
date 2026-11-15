@@ -326,3 +326,42 @@ public interface ICloudSyncService
         IProgress<CloudSyncProgress>? progress = null,
         CancellationToken ct = default);
 }
+
+// ---------------------------- 转码 / 压缩 ----------------------------
+
+/// <summary>
+/// 视频转码与压缩：探测编码信息、列内置预设、单文件/批量转码、硬件编码器自动选择。
+/// 实现基于 ffmpeg CLI（不依赖 ffprobe）。
+/// </summary>
+public interface ITranscodeService
+{
+    bool IsAvailable { get; }
+    string? FfmpegPath { get; }
+
+    /// <summary>内置预设（压缩 / 高画质 / 转封装 / AV1）。</summary>
+    IReadOnlyList<TranscodeProfile> BuiltInProfiles { get; }
+
+    /// <summary>探测源视频：编码、分辨率、码率、时长、帧率、位深、HDR、音轨。</summary>
+    Task<VideoProbe> ProbeAsync(string path, CancellationToken ct = default);
+
+    /// <summary>探测本机可用编码器（含硬件 NVENC/QSV/AMF），结果内部缓存。</summary>
+    Task<EncoderAvailability> DetectEncodersAsync(CancellationToken ct = default);
+
+    /// <summary>单文件转码。</summary>
+    Task<TranscodeResult> TranscodeAsync(
+        TranscodeRequest request,
+        IProgress<TranscodeProgress>? progress = null,
+        CancellationToken ct = default);
+
+    /// <summary>批量转码（逐个执行，进度按文件数加权）。</summary>
+    Task<TranscodeBatchReport> TranscodeManyAsync(
+        IReadOnlyList<TranscodeRequest> requests,
+        IProgress<TranscodeProgress>? progress = null,
+        CancellationToken ct = default);
+
+    /// <summary>默认输出路径（同目录 + 编码/分辨率后缀）。</summary>
+    string DefaultOutputPath(string sourcePath, TranscodeProfile profile);
+
+    /// <summary>按预设粗估输出体积（界面提示用）。</summary>
+    long EstimateOutputBytes(VideoProbe probe, TranscodeProfile profile);
+}

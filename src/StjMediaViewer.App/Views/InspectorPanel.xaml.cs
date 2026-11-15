@@ -67,6 +67,21 @@ public sealed partial class InspectorPanel : UserControl
     // ==================================================================================
     private async void Save_Click(object sender, RoutedEventArgs e) => await ViewModel.SaveAsync();
 
+    private async void Transcode_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var asset = ViewModel.CurrentAsset;
+            if (asset is null || !asset.IsVideo) return;
+            var dialog = new TranscodeDialog(asset) { XamlRoot = XamlRoot };
+            await dialog.ShowAsync();
+        }
+        catch (Exception ex)
+        {
+            StjMediaViewer.Core.Util.Log.Warn("打开转码对话框失败", ex);
+        }
+    }
+
     private async void Ai_Click(object sender, RoutedEventArgs e) => await ViewModel.AnalyzeAsync();
 
     private async void Xmp_Click(object sender, RoutedEventArgs e) => await ViewModel.WriteXmpAsync();

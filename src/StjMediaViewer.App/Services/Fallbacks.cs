@@ -441,3 +441,41 @@ internal sealed class FallbackCloudSyncService : ICloudSyncService
             Messages = { "演示模式不执行云同步。" },
         });
 }
+
+// =====================================================================================
+//  转码（演示模式兜底）
+// =====================================================================================
+
+internal sealed class FallbackTranscodeService : ITranscodeService
+{
+    public bool IsAvailable => false;
+    public string? FfmpegPath => null;
+    public IReadOnlyList<TranscodeProfile> BuiltInProfiles { get; } = new List<TranscodeProfile>
+    {
+        new() { Id = "hevc-1080p", Name = "压缩 · H.265 / HEVC 1080p", Encoder = VideoEncoderFamily.H265 },
+    };
+
+    public Task<VideoProbe> ProbeAsync(string path, CancellationToken ct = default)
+        => Task.FromResult(new VideoProbe { Path = path, Error = "演示模式不探测视频" });
+
+    public Task<EncoderAvailability> DetectEncodersAsync(CancellationToken ct = default)
+        => Task.FromResult(new EncoderAvailability());
+
+    public Task<TranscodeResult> TranscodeAsync(TranscodeRequest request,
+        IProgress<TranscodeProgress>? progress = null, CancellationToken ct = default)
+        => Task.FromResult(new TranscodeResult
+        {
+            SourcePath = request.SourcePath,
+            SourceBytes = 0,
+            Error = "演示模式不支持转码（真实服务装配失败）",
+        });
+
+    public Task<TranscodeBatchReport> TranscodeManyAsync(IReadOnlyList<TranscodeRequest> requests,
+        IProgress<TranscodeProgress>? progress = null, CancellationToken ct = default)
+        => Task.FromResult(new TranscodeBatchReport());
+
+    public string DefaultOutputPath(string sourcePath, TranscodeProfile profile)
+        => Path.ChangeExtension(sourcePath, "." + profile.Container);
+
+    public long EstimateOutputBytes(VideoProbe probe, TranscodeProfile profile) => 0;
+}

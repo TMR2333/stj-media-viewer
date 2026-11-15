@@ -104,7 +104,17 @@
 - **凭据安全**：WebDAV 密码用 Windows DPAPI（当前用户域）加密后存 settings.json，明文不落盘。
 - 实现细节：`Core/Cloud/` 里 `ICloudStorage` 把协议抹平（`WebDavCloudStorage` 用 `PROPFIND Depth:1` 逐层下钻 + Basic 认证 + 分段 URL 编码；`LocalFolderCloudStorage` 走文件系统），`CloudSyncService` 只做一次"本地索引 ↔ 云端条目"比对再分发动作，所以以后加 S3/FTP 只需再写一个适配器。
 
-### 2.8 界面
+### 2.8 视频编码识别与转码 / 压缩
+
+- **编码显示**：视频卡片与检视面板显示归一化编码（`avc1/h264/x264` → **H.264 / AVC**，`hev1/hvc1/hevc` → **H.265 / HEVC**，另有 AV1 / VP9 / ProRes / DNxHR / Dolby Vision / MPEG-4/2 等），一眼看出是否需要转码。
+- **探测**：不依赖 ffprobe —— 直接解析 `ffmpeg -i` 的流信息，拿到编码、分辨率、码率、时长、帧率、位深、像素格式、HDR（HLG/PQ）、音轨、旋转。
+- **内置预设**：H.265 1080p 压缩、H.264 1080p 压缩（兼容性最好）、H.265 720p 手机分享、高画质 H.264 原分辨率、**转封装（`-c copy` 不重编码，零画质损失）**、AV1 720p（最省体积）。
+- **可调参数**：编码器（H.265 / H.264 / AV1 / 不重编码）、CRF 质量、目标分辨率、速度预设、硬件加速开关；输出体积按源码率/时长/CRF 估算并给出"预计减少 %"。
+- **硬件加速**：启动时用 `ffmpeg -encoders` 探测本机能力，优先 `h264_nvenc` / `hevc_nvenc` / `av1_nvenc`（QSV/AMF 同理），不可用自动回落 `libx264` / `libx265` / `libsvtav1`；对话框里直接显示当前机器可用编码器。
+- **执行与校验**：实时进度（已处理时长、倍速、剩余 ETA）、完成后**重新解析输出**确认编码/分辨率正确，并给出"体积从 x 到 y、减少 z%"；输出文件名自动带 `_hevc1080p` 之类的后缀，避免覆盖原件。
+- **批处理**：`ITranscodeService.TranscodeManyAsync` 支持批量（进度按文件数加权），供后续"选中多个视频一起压"使用。
+
+### 2.9 界面
 
 - 微软 Fluent 设计语言：Mica 窗口背板、Segoe UI Variable 字阶、细描边、键盘友好的焦点视觉；标准控件（NavigationView / TextBox / ComboBox / Button…）由 ~140 个框架资源键统一覆盖。
 - 明暗模式：跟随系统 / 浅色 / 深色，切换只重解析 token，不重建界面。

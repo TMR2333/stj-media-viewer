@@ -54,6 +54,13 @@ public sealed partial class AssetCardItem : ObservableObject
     public string CompanionText => Asset.CompanionPaths.Count == 0 ? "" : "+" + Asset.CompanionPaths.Count + " 个同组文件";
     public Visibility CompanionVisibility => Asset.CompanionPaths.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
     public Visibility LogBadgeVisibility => Asset.IsLog == true ? Visibility.Visible : Visibility.Collapsed;
+    /// <summary>视频编码徽标（H.264 / H.265 等），只有视频显示。</summary>
+    public string CodecBadgeText => Asset.IsVideo
+        ? StjMediaViewer.Core.Transcode.VideoCodecNames.ShortBadge(Asset.VideoCodec)
+        : "";
+    public Visibility CodecBadgeVisibility => Asset.IsVideo && !string.IsNullOrEmpty(CodecBadgeText)
+        ? Visibility.Visible
+        : Visibility.Collapsed;
     public Visibility AiBadgeVisibility => HasAi ? Visibility.Visible : Visibility.Collapsed;
     public Visibility VideoBadgeVisibility => Asset.IsVideo ? Visibility.Visible : Visibility.Collapsed;
     public Visibility AudioBadgeVisibility => Asset.IsAudio ? Visibility.Visible : Visibility.Collapsed;

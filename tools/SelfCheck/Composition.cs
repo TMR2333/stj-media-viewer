@@ -6,6 +6,7 @@ using StjMediaViewer.Core.Dedup;
 using StjMediaViewer.Core.Devices;
 using StjMediaViewer.Core.Import;
 using StjMediaViewer.Core.Supply;
+using StjMediaViewer.Core.Transcode;
 using StjMediaViewer.Core.Geo;
 using StjMediaViewer.Core.Media;
 using StjMediaViewer.Core.Metadata;
@@ -55,6 +56,7 @@ public static class Composition
         var devices = new StorageDeviceService();
         var import = new ImportService(metadata, geocoder, library);
         var verify = new FileVerificationService();
+        var transcode = new TranscodeService(ffmpeg);
 
         await geocoder.EnsureLoadedAsync();
 
@@ -78,6 +80,7 @@ public static class Composition
             Operations: operations,
             Devices: devices,
             Import: import,
-            Verify: verify);
+            Verify: verify,
+            Transcode: transcode);
     }
 }

@@ -44,6 +44,10 @@ public sealed partial class InspectorViewModel : ObservableObject
     [ObservableProperty]
     private Visibility _contentVisibility = Visibility.Collapsed;
 
+    /// <summary>只有视频才显示「转码」按钮。</summary>
+    [ObservableProperty]
+    private Visibility _transcodeVisibility = Visibility.Collapsed;
+
     [ObservableProperty]
     private string _headerTitle = "";
 
@@ -143,6 +147,7 @@ public sealed partial class InspectorViewModel : ObservableObject
         HasAsset = asset is not null;
         EmptyVisibility = asset is null ? Visibility.Visible : Visibility.Collapsed;
         ContentVisibility = asset is null ? Visibility.Collapsed : Visibility.Visible;
+        TranscodeVisibility = asset?.IsVideo == true ? Visibility.Visible : Visibility.Collapsed;
         if (asset is null)
         {
             Groups.Clear();
@@ -256,7 +261,7 @@ public sealed partial class InspectorViewModel : ObservableObject
             tech.Add("时长", Formatting.Duration(a.DurationSeconds));
             tech.Add("帧率", Formatting.FrameRate(a.FrameRate));
             tech.Add("码率", Formatting.Bitrate(a.BitrateBps));
-            tech.Add("视频编码", a.VideoCodec);
+            tech.Add("视频编码", StjMediaViewer.Core.Transcode.VideoCodecNames.DisplayLabel(a.VideoCodec));
             tech.Add("音频编码", a.AudioCodec);
             tech.Add("声道", a.AudioChannels is null ? null : $"{a.AudioChannels} ch");
             tech.Add("采样率", a.AudioSampleRate is null ? null : $"{a.AudioSampleRate} Hz");

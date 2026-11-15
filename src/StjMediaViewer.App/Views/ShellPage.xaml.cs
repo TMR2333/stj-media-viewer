@@ -67,6 +67,43 @@ public sealed partial class ShellPage : Page
         NavigateTo(initialView!);
         SyncNavSelection(initialView!);
 
+        // 调试用：STJ_DEMO_SEARCH=<词> 预设搜索词 / STJ_DEMO_SORT=<sortKey> 预设排序（截图验收用）
+        var demoSearch = Environment.GetEnvironmentVariable("STJ_DEMO_SEARCH");
+        if (!string.IsNullOrEmpty(demoSearch))
+        {
+            ViewModels.LibraryViewModel.Shared.SearchText = demoSearch;
+        }
+        var demoSort = Environment.GetEnvironmentVariable("STJ_DEMO_SORT");
+        if (!string.IsNullOrEmpty(demoSort))
+        {
+            // 等 LibraryPage 初始化完再改排序，否则会被 Initialize 覆盖
+            _ = DispatcherQueue.TryEnqueue(async () =>
+            {
+                await Task.Delay(1200);
+                ViewModels.LibraryViewModel.Shared.SetSort(demoSort, descending: false);
+            });
+        }
+
+        // 调试用：STJ_DEMO_DIALOG=transcode 时自动对第一条视频打开转码对话框（截图验收）
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_DIALOG") == "transcode")
+        {
+            _ = DispatcherQueue.TryEnqueue(async () =>
+            {
+                try
+                {
+                    var videos = await AppServices.Store.QueryAsync(new Core.Models.AssetQuery
+                    {
+                        Kinds = { Core.Models.MediaKind.Video },
+                        Limit = 1,
+                    });
+                    if (videos.Count == 0) return;
+                    var dialog = new TranscodeDialog(videos[0]) { XamlRoot = Content.XamlRoot };
+                    await dialog.ShowAsync();
+                }
+                catch (Exception ex) { Core.Util.Log.Warn("演示转码对话框失败", ex); }
+            });
+        }
+
         AppEvents.SetStatus(AppServices.IsDemoMode
             ? "演示模式：正在使用内置样本素材（72 条），可直接体验筛选 / 检视 / 预览"
             : "就绪");

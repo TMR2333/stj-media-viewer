@@ -3,6 +3,7 @@ using StjMediaViewer.Core.Cloud;
 using StjMediaViewer.Core.Devices;
 using StjMediaViewer.Core.Import;
 using StjMediaViewer.Core.Supply;
+using StjMediaViewer.Core.Transcode;
 using StjMediaViewer.Core.Ai;
 using StjMediaViewer.Core.Catalog;
 using StjMediaViewer.Core.Classification;
@@ -52,6 +53,9 @@ public static class AppServices
     // ---- 云同步 ----
     public static ICloudSyncService Cloud { get; private set; } = null!;
     public static CloudAutoSyncService CloudAuto { get; private set; } = null!;
+
+    // ---- 转码 / 压缩 ----
+    public static ITranscodeService Transcode { get; private set; } = null!;
 
     /// <summary>密码加解密（DPAPI）：UI 只碰明文，落盘一律密文。</summary>
     public static class Secrets
@@ -139,6 +143,7 @@ public static class AppServices
         Devices = new StorageDeviceService();
         Import = new ImportService(Metadata, Geocoder, Library);
         Verify = new FileVerificationService();
+        Transcode = new TranscodeService(Ffmpeg);
         Cloud = new CloudSyncService();
         CloudAuto = new CloudAutoSyncService(Settings, Cloud);
 
@@ -175,6 +180,7 @@ public static class AppServices
         Devices = new FallbackStorageDeviceService();
         Import = new FallbackImportService();
         Verify = new FallbackVerificationService();
+        Transcode = new FallbackTranscodeService();
         Cloud = new FallbackCloudSyncService();
         CloudAuto = new CloudAutoSyncService(Settings, Cloud);
         return Task.CompletedTask;
