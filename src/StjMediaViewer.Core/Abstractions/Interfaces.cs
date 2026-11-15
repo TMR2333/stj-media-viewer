@@ -274,3 +274,55 @@ public interface IVerificationService
         IProgress<int>? progress = null,
         CancellationToken ct = default);
 }
+// ---------------------------- 云同步 ----------------------------
+
+/// <summary>
+/// 云存储适配器（一个目标一个实例）：只做"列目录 / 上传 / 下载 / 建目录"四件事，
+/// 把不同云服务（坚果云 WebDAV、Nextcloud、群晖 NAS、本地挂载目录…）抹平成统一形态。
+/// </summary>
+public interface ICloudStorage : IAsyncDisposable
+{
+    CloudProviderKind Kind { get; }
+
+    /// <summary>连通性/鉴权自检。返回 false 时把原因写进 <paramref name="error"/>。</summary>
+    Task<bool> TestAsync(out string? error, CancellationToken ct = default);
+
+    /// <summary>递归列出同步根下的所有文件（相对路径统一 '/'）。</summary>
+    Task<IReadOnlyList<CloudEntry>> ListAllAsync(IProgress<string>? progress = null, CancellationToken ct = default);
+
+    Task DownloadAsync(string relativePath, string localPath, CancellationToken ct = default);
+
+    Task UploadAsync(string localPath, string relativePath, CancellationToken ct = default);
+
+    Task EnsureFolderAsync(string relativePath, CancellationToken ct = default);
+}
+
+/// <summary>
+/// 云同步引擎：双向比对本地目录与云端条目 → 出计划（可预览）→ 执行（可选 dry-run）
+/// → 报告里带上逐文件结果与哈希核验。
+/// </summary>
+public interface ICloudSyncService
+{
+    /// <summary>按目标配置创建适配器（LocalFolder / WebDAV）。</summary>
+    ICloudStorage CreateStorage(CloudTarget target);
+
+    /// <summary>只读比对，不改任何一边。</summary>
+    Task<CloudSyncPlan> BuildPlanAsync(
+        CloudTarget target,
+        IProgress<CloudSyncProgress>? progress = null,
+        CancellationToken ct = default);
+
+    /// <summary>执行计划；dryRun=true 时只统计不落盘。</summary>
+    Task<CloudSyncReport> ExecuteAsync(
+        CloudSyncPlan plan,
+        bool dryRun = false,
+        IProgress<CloudSyncProgress>? progress = null,
+        CancellationToken ct = default);
+
+    /// <summary>一步到位：比对 + 执行。</summary>
+    Task<CloudSyncReport> SyncAsync(
+        CloudTarget target,
+        bool dryRun = false,
+        IProgress<CloudSyncProgress>? progress = null,
+        CancellationToken ct = default);
+}

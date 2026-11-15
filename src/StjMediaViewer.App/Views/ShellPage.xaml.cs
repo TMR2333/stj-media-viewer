@@ -209,6 +209,7 @@ public sealed partial class ShellPage : Page
         "import" => typeof(ImportPage),
         "timeline" => typeof(TimelinePage),
         "duplicates" => typeof(DuplicatesPage),
+        "cloud" => typeof(CloudPage),
         "aiqueue" => typeof(AiQueuePage),
         "settings" => typeof(SettingsPage),
         _ => null,

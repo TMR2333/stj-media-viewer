@@ -67,6 +67,12 @@ public sealed class AppSettings
     public int ThumbnailCacheMb { get; set; } = 512;
     public int ScanParallelism { get; set; } = 4;
     public bool WatchLibraries { get; set; } = true;
+
+    /// <summary>云同步目标（坚果云 WebDAV / Nextcloud / 群晖 NAS / 本地挂载目录）。</summary>
+    public List<CloudTarget> CloudTargets { get; set; } = new();
+
+    /// <summary>自动同步总开关（单目标另有自己的 AutoSync）。</summary>
+    public bool CloudAutoSyncEnabled { get; set; } = true;
     public bool ShowGlassShowcase { get; set; }
     public string? LastViewId { get; set; }
 }

@@ -1,4 +1,5 @@
 using StjMediaViewer.Core.Abstractions;
+using StjMediaViewer.Core.Cloud;
 using StjMediaViewer.Core.Devices;
 using StjMediaViewer.Core.Import;
 using StjMediaViewer.Core.Supply;
@@ -47,6 +48,25 @@ public static class AppServices
     public static IStorageDeviceService Devices { get; private set; } = null!;
     public static IImportService Import { get; private set; } = null!;
     public static IVerificationService Verify { get; private set; } = null!;
+
+    // ---- 云同步 ----
+    public static ICloudSyncService Cloud { get; private set; } = null!;
+    public static CloudAutoSyncService CloudAuto { get; private set; } = null!;
+
+    /// <summary>密码加解密（DPAPI）：UI 只碰明文，落盘一律密文。</summary>
+    public static class Secrets
+    {
+        public static string Protect(string plain) => Dpapi.Protect(plain) ?? "";
+        public static bool TryUnprotect(string? protectedText, out string plain)
+        {
+            plain = "";
+            if (string.IsNullOrEmpty(protectedText)) return false;
+            var raw = Dpapi.Unprotect(protectedText);
+            if (raw is null) return false;
+            plain = raw;
+            return true;
+        }
+    }
 
     // ---- UI 侧服务 ----
     public static IDesignLanguageService Design { get; private set; } = null!;
@@ -119,6 +139,8 @@ public static class AppServices
         Devices = new StorageDeviceService();
         Import = new ImportService(Metadata, Geocoder, Library);
         Verify = new FileVerificationService();
+        Cloud = new CloudSyncService();
+        CloudAuto = new CloudAutoSyncService(Settings, Cloud);
 
         AiClient = new OpenAiCompatibleClient(Settings);
         Ai = new AiClassificationService(AiClient, Decoder, Encoder, Settings);
@@ -153,6 +175,8 @@ public static class AppServices
         Devices = new FallbackStorageDeviceService();
         Import = new FallbackImportService();
         Verify = new FallbackVerificationService();
+        Cloud = new FallbackCloudSyncService();
+        CloudAuto = new CloudAutoSyncService(Settings, Cloud);
         return Task.CompletedTask;
     }
 

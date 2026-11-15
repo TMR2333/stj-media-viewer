@@ -391,3 +391,53 @@ internal sealed class FallbackVerificationService : IVerificationService
         IProgress<int>? progress = null, CancellationToken ct = default)
         => Task.FromResult(new VerifyReport { Errors = 1 });
 }
+
+// =====================================================================================
+//  云同步（演示模式兜底：不联网、不动真实文件）
+// =====================================================================================
+
+internal sealed class FallbackCloudStorage : ICloudStorage
+{
+    private readonly CloudTarget _target;
+    public FallbackCloudStorage(CloudTarget target) => _target = target;
+    public CloudProviderKind Kind => _target.Kind;
+    public Task<bool> TestAsync(out string? error, CancellationToken ct = default)
+    {
+        error = "演示模式不联网";
+        return Task.FromResult(false);
+    }
+    public Task<IReadOnlyList<CloudEntry>> ListAllAsync(IProgress<string>? progress = null, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<CloudEntry>>(Array.Empty<CloudEntry>());
+    public Task DownloadAsync(string relativePath, string localPath, CancellationToken ct = default)
+        => throw new NotSupportedException("演示模式不执行同步");
+    public Task UploadAsync(string localPath, string relativePath, CancellationToken ct = default)
+        => throw new NotSupportedException("演示模式不执行同步");
+    public Task EnsureFolderAsync(string relativePath, CancellationToken ct = default) => Task.CompletedTask;
+    public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+}
+
+internal sealed class FallbackCloudSyncService : ICloudSyncService
+{
+    public ICloudStorage CreateStorage(CloudTarget target) => new FallbackCloudStorage(target);
+
+    public Task<CloudSyncPlan> BuildPlanAsync(CloudTarget target, IProgress<CloudSyncProgress>? progress = null, CancellationToken ct = default)
+        => Task.FromResult(new CloudSyncPlan { Target = target });
+
+    public Task<CloudSyncReport> ExecuteAsync(CloudSyncPlan plan, bool dryRun = false, IProgress<CloudSyncProgress>? progress = null, CancellationToken ct = default)
+        => Task.FromResult(new CloudSyncReport
+        {
+            TargetId = plan.Target.Id,
+            TargetName = plan.Target.Name,
+            DryRun = dryRun,
+            Messages = { "演示模式不执行云同步。" },
+        });
+
+    public Task<CloudSyncReport> SyncAsync(CloudTarget target, bool dryRun = false, IProgress<CloudSyncProgress>? progress = null, CancellationToken ct = default)
+        => Task.FromResult(new CloudSyncReport
+        {
+            TargetId = target.Id,
+            TargetName = target.Name,
+            DryRun = dryRun,
+            Messages = { "演示模式不执行云同步。" },
+        });
+}

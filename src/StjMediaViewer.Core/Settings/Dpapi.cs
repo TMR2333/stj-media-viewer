@@ -8,7 +8,7 @@ namespace StjMediaViewer.Core.Settings;
 /// Windows DPAPI（当前用户域）薄封装：<c>CryptProtectData</c> / <c>CryptUnprotectData</c>。
 /// 仅用于保护 API Key 之类的短密文；失败返回 null，调用方自行降级。
 /// </summary>
-internal static class Dpapi
+public static class Dpapi
 {
     private const int CryptProtectUiForbidden = 0x00000001;
     private const int ErrorSuccess = 0;

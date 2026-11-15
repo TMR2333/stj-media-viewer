@@ -201,6 +201,11 @@
                 <NavigationViewItem Content="时间线" Tag="timeline" Icon="Calendar" />
                 <NavigationViewItem Content="地图" Tag="map" Icon="Map" />
                 <NavigationViewItem Content="重复项" Tag="duplicates" Icon="Copy" />
+                <NavigationViewItem Content="云同步" Tag="cloud">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE753;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
                 <NavigationViewItem Content="AI 队列" Tag="aiqueue" Icon="Bullets" />
             </NavigationView.MenuItems>
             <NavigationView.FooterMenuItems>

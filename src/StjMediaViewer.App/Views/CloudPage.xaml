@@ -1,0 +1,422 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="StjMediaViewer.App.Views.CloudPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:uic="using:StjMediaViewer.App.Controls"
+    xmlns:vm="using:StjMediaViewer.App.ViewModels">
+
+    <!--
+        云同步页：目标管理（本地挂载目录 / WebDAV）→ 差异预览 → 执行 → 报告。
+        数据全部来自 CloudViewModel.Shared；页面里没有任何硬编码颜色/字号/圆角。
+    -->
+    <Grid Background="{ThemeResource AppWindowBackgroundBrush}">
+        <ScrollViewer VerticalScrollMode="Enabled" VerticalScrollBarVisibility="Auto" Padding="24,18,24,24">
+            <StackPanel Spacing="16" MaxWidth="1240">
+
+                <!-- ============ 标题 ============ -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="云同步" Style="{ThemeResource AppDisplayTextStyle}" />
+                        <TextBlock Text="把素材库同步到坚果云 / Nextcloud / 群晖 NAS，或任意本地挂载目录；支持双向同步与后台自动同步。"
+                                   Style="{ThemeResource AppCaptionTextStyle}"
+                                   Foreground="{ThemeResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+                        <StackPanel Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="{x:Bind ViewModel.AutoText, Mode=OneWay}"
+                                       Style="{ThemeResource AppMicroTextStyle}"
+                                       Foreground="{ThemeResource AccentBrush}"
+                                       HorizontalAlignment="Right" />
+                            <TextBlock Text="{x:Bind ViewModel.AutoSyncStatus, Mode=OneWay}"
+                                       Style="{ThemeResource AppMicroTextStyle}"
+                                       Foreground="{ThemeResource TextTertiaryBrush}"
+                                       HorizontalAlignment="Right"
+                                       TextTrimming="CharacterEllipsis"
+                                       MaxWidth="360" />
+                        </StackPanel>
+                        <Button Content="立即全部同步"
+                                Style="{ThemeResource AppSubtleButtonStyle}"
+                                Click="SyncAll_Click"
+                                IsEnabled="{x:Bind ViewModel.IsNotBusy, Mode=OneWay}" />
+                        <Button Content="添加同步目标"
+                                Style="{ThemeResource AppSubtleButtonStyle}"
+                                Click="AddTarget_Click" />
+                    </StackPanel>
+                </Grid>
+
+                <!-- ============ 状态条 ============ -->
+                <Border Background="{ThemeResource AppSurfaceAltBrush}"
+                        BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                        BorderThickness="{ThemeResource AppCardStrokeThickness}"
+                        CornerRadius="{ThemeResource AppRadiusMedium}"
+                        Padding="12,8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <FontIcon Glyph="&#xE946;" FontSize="{ThemeResource AppFontCaptionSize}"
+                                  Foreground="{ThemeResource TextTertiaryBrush}" />
+                        <TextBlock Text="{x:Bind ViewModel.StatusText, Mode=OneWay}"
+                                   Style="{ThemeResource AppCaptionTextStyle}"
+                                   Foreground="{ThemeResource TextSecondaryBrush}"
+                                   TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Border>
+
+                <!-- ============ 目标列表 ============ -->
+                <ItemsControl ItemsSource="{x:Bind ViewModel.Targets, Mode=OneWay}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:CloudTargetRow">
+                            <Border Background="{ThemeResource AppSurfaceBrush}"
+                                    BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                                    BorderThickness="{ThemeResource AppCardStrokeThickness}"
+                                    CornerRadius="{ThemeResource AppCardRadius}"
+                                    Padding="16,14"
+                                    Margin="0,0,0,10">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <StackPanel Spacing="6">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="{x:Bind Name}" Style="{ThemeResource AppSubtitleTextStyle}" />
+                                            <uic:Badge Text="{x:Bind KindText}" Kind="Neutral" VerticalAlignment="Center" />
+                                            <uic:Badge Text="{x:Bind DirectionText}" Kind="Ai" VerticalAlignment="Center" />
+                                            <TextBlock Text="{x:Bind ConflictText}" Style="{ThemeResource AppMicroTextStyle}"
+                                                       Foreground="{ThemeResource TextTertiaryBrush}" VerticalAlignment="Center" />
+                                        </StackPanel>
+
+                                        <TextBlock Style="{ThemeResource AppMicroTextStyle}"
+                                                   Foreground="{ThemeResource TextSecondaryBrush}"
+                                                   TextTrimming="CharacterEllipsis">
+                                            <Run Text="本地：" /><Run Text="{x:Bind LocalPath}" />
+                                        </TextBlock>
+                                        <TextBlock Style="{ThemeResource AppMicroTextStyle}"
+                                                   Foreground="{ThemeResource TextSecondaryBrush}"
+                                                   TextTrimming="CharacterEllipsis">
+                                            <Run Text="云端：" /><Run Text="{x:Bind RemotePath}" />
+                                        </TextBlock>
+
+                                        <StackPanel Orientation="Horizontal" Spacing="12">
+                                            <TextBlock Text="{x:Bind LastSyncText}" Style="{ThemeResource AppMicroTextStyle}"
+                                                       Foreground="{ThemeResource TextTertiaryBrush}" />
+                                            <TextBlock Text="{x:Bind CountersText}" Style="{ThemeResource AppMicroTextStyle}"
+                                                       Foreground="{ThemeResource TextTertiaryBrush}" />
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <StackPanel Grid.Column="1" Spacing="8" MinWidth="240">
+                                        <ToggleSwitch Header="自动同步"
+                                                      IsOn="{x:Bind AutoSync, Mode=OneWay}"
+                                                      Tag="{x:Bind}"
+                                                      Toggled="AutoSync_Toggled"
+                                                      MinWidth="0" />
+                                        <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Right">
+                                            <Button Content="预览差异" Style="{ThemeResource AppSubtleButtonStyle}"
+                                                    Tag="{x:Bind}" Click="Preview_Click" />
+                                            <Button Content="立即同步" Style="{ThemeResource AppSubtleButtonStyle}"
+                                                    Tag="{x:Bind}" Click="SyncOne_Click" />
+                                            <Button Style="{ThemeResource AppIconButtonStyle}"
+                                                    Tag="{x:Bind}" Click="Edit_Click"
+                                                    ToolTipService.ToolTip="编辑">
+                                                <FontIcon Glyph="&#xE70F;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                                            </Button>
+                                            <Button Style="{ThemeResource AppIconButtonStyle}"
+                                                    Tag="{x:Bind}" Click="Delete_Click"
+                                                    ToolTipService.ToolTip="删除">
+                                                <FontIcon Glyph="&#xE74D;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                                            </Button>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <uic:EmptyState Visibility="{x:Bind ViewModel.EmptyVisibility, Mode=OneWay}"
+                                Title="还没有同步目标"
+                                Description="添加一个目标：坚果云 / Nextcloud / 群晖 NAS 走 WebDAV；OneDrive、坚果云客户端目录、SMB 映射盘走「本地挂载目录」。"
+                                Glyph="&#xE753;"
+                                ActionText="添加同步目标"
+                                ActionInvoked="AddTargetFromEmpty_Click" />
+
+                <!-- ============ 添加 / 编辑 ============ -->
+                <Border Visibility="{x:Bind ViewModel.EditorVisibility, Mode=OneWay}"
+                        Background="{ThemeResource AppSurfaceBrush}"
+                        BorderBrush="{ThemeResource AppSelectedBorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{ThemeResource AppCardRadius}"
+                        Padding="18,16">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="{x:Bind ViewModel.EditorTitle, Mode=OneWay}"
+                                   Style="{ThemeResource AppSectionHeaderTextStyle}" />
+
+                        <!-- 接入方式 -->
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="接入方式" Style="{ThemeResource AppCaptionTextStyle}"
+                                       Foreground="{ThemeResource TextSecondaryBrush}" VerticalAlignment="Center" MinWidth="88" />
+                            <Button Content="本地挂载目录" Tag="localfolder" Click="Kind_Click"
+                                    Style="{ThemeResource AppSubtleButtonStyle}" />
+                            <Button Content="WebDAV" Tag="webdav" Click="Kind_Click"
+                                    Style="{ThemeResource AppSubtleButtonStyle}" />
+                            <Border Width="1" Height="16" Background="{ThemeResource AppDividerBrush}" Margin="8,0" />
+                            <TextBlock Text="预设" Style="{ThemeResource AppMicroTextStyle}"
+                                       Foreground="{ThemeResource TextTertiaryBrush}" VerticalAlignment="Center" />
+                            <Button Content="坚果云" Tag="nutstore" Click="Preset_Click" Style="{ThemeResource AppSubtleButtonStyle}" />
+                            <Button Content="Nextcloud" Tag="nextcloud" Click="Preset_Click" Style="{ThemeResource AppSubtleButtonStyle}" />
+                            <Button Content="群晖 NAS" Tag="synology" Click="Preset_Click" Style="{ThemeResource AppSubtleButtonStyle}" />
+                        </StackPanel>
+
+                        <Grid ColumnSpacing="12" RowSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="88" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Text="名称" Style="{ThemeResource AppCaptionTextStyle}" VerticalAlignment="Center" />
+                            <TextBox Grid.Column="1" Text="{x:Bind ViewModel.EditorName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                            <TextBlock Grid.Row="1" Text="本地同步目录" Style="{ThemeResource AppCaptionTextStyle}" VerticalAlignment="Center" />
+                            <Grid Grid.Row="1" Grid.Column="1" ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox Text="{x:Bind ViewModel.EditorLocalFolder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                         PlaceholderText="通常是媒体库根目录" />
+                                <Button Grid.Column="1" Content="选择…" Tag="local" Click="PickFolder_Click"
+                                        Style="{ThemeResource AppSubtleButtonStyle}" />
+                            </Grid>
+
+                            <StackPanel Grid.Row="2" Grid.ColumnSpan="2"
+                                        Visibility="{x:Bind ViewModel.LocalFolderFieldsVisibility, Mode=OneWay}">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="88" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="云端挂载目录" Style="{ThemeResource AppCaptionTextStyle}" VerticalAlignment="Center" />
+                                    <TextBox Grid.Column="1"
+                                             Text="{x:Bind ViewModel.EditorRemoteFolder, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             PlaceholderText="例如 D:\Nutstore\照片 或 \\NAS\photo" />
+                                    <Button Grid.Column="2" Content="选择…" Tag="remote" Click="PickFolder_Click"
+                                            Style="{ThemeResource AppSubtleButtonStyle}" />
+                                </Grid>
+                            </StackPanel>
+
+                            <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Spacing="8"
+                                        Visibility="{x:Bind ViewModel.WebDavFieldsVisibility, Mode=OneWay}">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="88" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="服务器地址" Style="{ThemeResource AppCaptionTextStyle}" VerticalAlignment="Center" />
+                                    <TextBox Grid.Column="1"
+                                             Text="{x:Bind ViewModel.EditorEndpoint, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             PlaceholderText="https://dav.jianguoyun.com/dav/" />
+                                </Grid>
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="88" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="88" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="用户名" Style="{ThemeResource AppCaptionTextStyle}" VerticalAlignment="Center" />
+                                    <TextBox Grid.Column="1" Text="{x:Bind ViewModel.EditorUsername, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Grid.Column="2" Text="密码" Style="{ThemeResource AppCaptionTextStyle}" VerticalAlignment="Center" Margin="8,0,0,0" />
+                                    <PasswordBox Grid.Column="3" Password="{x:Bind ViewModel.EditorPassword, Mode=TwoWay}"
+                                                 PlaceholderText="坚果云请用「应用密码」" />
+                                </Grid>
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="88" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="云端子目录" Style="{ThemeResource AppCaptionTextStyle}" VerticalAlignment="Center" />
+                                    <TextBox Grid.Column="1"
+                                             Text="{x:Bind ViewModel.EditorSubPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             PlaceholderText="留空 = 同步根目录；例如 照片/2026" />
+                                </Grid>
+                            </StackPanel>
+
+                            <TextBlock Grid.Row="3" Text="方向 / 冲突" Style="{ThemeResource AppCaptionTextStyle}" VerticalAlignment="Center" />
+                            <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                <ComboBox x:Name="DirectionBox" MinWidth="120" SelectionChanged="Direction_Changed">
+                                    <ComboBoxItem Content="双向同步" Tag="bidirectional" />
+                                    <ComboBoxItem Content="仅上传" Tag="upload" />
+                                    <ComboBoxItem Content="仅下载" Tag="download" />
+                                </ComboBox>
+                                <ComboBox x:Name="ConflictBox" MinWidth="140" SelectionChanged="Conflict_Changed">
+                                    <ComboBoxItem Content="冲突：较新者胜" Tag="newer" />
+                                    <ComboBoxItem Content="冲突：本地优先" Tag="local" />
+                                    <ComboBoxItem Content="冲突：云端优先" Tag="remote" />
+                                    <ComboBoxItem Content="冲突：两边都保留" Tag="both" />
+                                </ComboBox>
+                                <ToggleSwitch Header="传输后核验" IsOn="{x:Bind ViewModel.EditorVerify, Mode=TwoWay}" MinWidth="0" />
+                            </StackPanel>
+
+                            <TextBlock Grid.Row="4" Text="自动同步" Style="{ThemeResource AppCaptionTextStyle}" VerticalAlignment="Center" />
+                            <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Spacing="12">
+                                <ToggleSwitch IsOn="{x:Bind ViewModel.EditorAutoSync, Mode=TwoWay}" MinWidth="0"
+                                              OnContent="开" OffContent="关" />
+                                <TextBlock Text="轮询间隔" Style="{ThemeResource AppCaptionTextStyle}" VerticalAlignment="Center" />
+                                <NumberBox Value="{x:Bind ViewModel.EditorPollMinutes, Mode=TwoWay}" Minimum="1" Maximum="1440"
+                                           SmallChange="1" SpinButtonPlacementMode="Compact" Width="120" />
+                                <TextBlock Text="分钟" Style="{ThemeResource AppCaptionTextStyle}" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- 错误提示 -->
+                        <Border Visibility="{x:Bind ViewModel.EditorErrorVisibility, Mode=OneWay}"
+                                Background="{ThemeResource DangerSubtleBrush}"
+                                CornerRadius="{ThemeResource AppRadiusSmall}" Padding="10,6">
+                            <TextBlock Text="{x:Bind ViewModel.EditorError, Mode=OneWay}"
+                                       Style="{ThemeResource AppCaptionTextStyle}"
+                                       Foreground="{ThemeResource DangerBrush}"
+                                       TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                        </Border>
+
+                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                            <Button Content="测试连接" Click="Test_Click" Style="{ThemeResource AppSubtleButtonStyle}" />
+                            <Button Content="保存" Click="Save_Click" Style="{StaticResource AccentButtonStyle}" />
+                            <Button Content="取消" Click="CancelEdit_Click" Style="{ThemeResource AppSubtleButtonStyle}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- ============ 进度 ============ -->
+                <Border Visibility="{x:Bind ViewModel.ProgressVisibility, Mode=OneWay}"
+                        Background="{ThemeResource AppSurfaceAltBrush}"
+                        CornerRadius="{ThemeResource AppCardRadius}" Padding="14,12">
+                    <StackPanel Spacing="8">
+                        <Grid>
+                            <TextBlock Text="{x:Bind ViewModel.ProgressPhase, Mode=OneWay}"
+                                       Style="{ThemeResource AppCaptionTextStyle}"
+                                       Foreground="{ThemeResource TextSecondaryBrush}" />
+                            <TextBlock Text="{x:Bind ViewModel.ProgressCounts, Mode=OneWay}"
+                                       Style="{ThemeResource AppMicroTextStyle}"
+                                       Foreground="{ThemeResource TextTertiaryBrush}"
+                                       HorizontalAlignment="Right" />
+                        </Grid>
+                        <ProgressBar Value="{x:Bind ViewModel.ProgressPercent, Mode=OneWay}" Maximum="100" />
+                        <TextBlock Text="{x:Bind ViewModel.ProgressFile, Mode=OneWay}"
+                                   Style="{ThemeResource AppMicroTextStyle}"
+                                   Foreground="{ThemeResource TextTertiaryBrush}"
+                                   TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Border>
+
+                <!-- ============ 差异预览 ============ -->
+                <Border Visibility="{x:Bind ViewModel.PlanVisibility, Mode=OneWay}"
+                        Background="{ThemeResource AppSurfaceBrush}"
+                        BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                        BorderThickness="{ThemeResource AppCardStrokeThickness}"
+                        CornerRadius="{ThemeResource AppCardRadius}"
+                        Padding="16,14">
+                    <StackPanel Spacing="10">
+                        <Grid>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="差异预览" Style="{ThemeResource AppSectionHeaderTextStyle}" />
+                                <TextBlock Text="{x:Bind ViewModel.PlanSummary, Mode=OneWay}"
+                                           Style="{ThemeResource AppCaptionTextStyle}"
+                                           Foreground="{ThemeResource TextSecondaryBrush}" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                                <Button Content="演练（不落盘）" Click="DryRun_Click" Style="{ThemeResource AppSubtleButtonStyle}" />
+                                <Button Content="执行同步" Click="ExecutePlan_Click" Style="{StaticResource AccentButtonStyle}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <ListView ItemsSource="{x:Bind ViewModel.PlanRows, Mode=OneWay}"
+                                  MaxHeight="320"
+                                  SelectionMode="None"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto">
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="vm:CloudPlanRow">
+                                    <Grid ColumnSpacing="12" Padding="2,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="110" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="90" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="{x:Bind Description}"
+                                                   Style="{ThemeResource AppMicroTextStyle}"
+                                                   Foreground="{ThemeResource AccentBrush}" />
+                                        <TextBlock Grid.Column="1" Text="{x:Bind Path}"
+                                                   Style="{ThemeResource AppCaptionTextStyle}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="2" Text="{x:Bind SizeText}"
+                                                   Style="{ThemeResource AppMicroTextStyle}"
+                                                   Foreground="{ThemeResource TextTertiaryBrush}"
+                                                   HorizontalAlignment="Right" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+                    </StackPanel>
+                </Border>
+
+                <!-- ============ 报告 ============ -->
+                <Border Visibility="{x:Bind ViewModel.ReportVisibility, Mode=OneWay}"
+                        Background="{ThemeResource AppSurfaceBrush}"
+                        BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                        BorderThickness="{ThemeResource AppCardStrokeThickness}"
+                        CornerRadius="{ThemeResource AppCardRadius}"
+                        Padding="16,14">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="同步结果" Style="{ThemeResource AppSectionHeaderTextStyle}" />
+                        <TextBlock Text="{x:Bind ViewModel.ReportSummary, Mode=OneWay}"
+                                   Style="{ThemeResource AppBodyTextStyle}" TextWrapping="Wrap" />
+                        <TextBlock Text="{x:Bind ViewModel.ReportDetail, Mode=OneWay}"
+                                   Style="{ThemeResource AppMicroTextStyle}"
+                                   Foreground="{ThemeResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                        <Expander Header="失败明细" Visibility="{x:Bind ViewModel.ReportIssuesVisibility, Mode=OneWay}"
+                                  HorizontalAlignment="Stretch">
+                            <ListView ItemsSource="{x:Bind ViewModel.ReportIssues, Mode=OneWay}" MaxHeight="220"
+                                      SelectionMode="None">
+                                <ListView.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:CloudIssueRow">
+                                        <StackPanel Padding="2,3">
+                                            <TextBlock Text="{x:Bind Path}" Style="{ThemeResource AppMicroTextStyle}"
+                                                       Foreground="{ThemeResource DangerBrush}"
+                                                       TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{x:Bind Error}" Style="{ThemeResource AppMicroTextStyle}"
+                                                       Foreground="{ThemeResource TextTertiaryBrush}"
+                                                       TextWrapping="Wrap" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </Expander>
+                    </StackPanel>
+                </Border>
+
+                <!-- ============ 说明 ============ -->
+                <TextBlock Style="{ThemeResource AppMicroTextStyle}"
+                           Foreground="{ThemeResource TextTertiaryBrush}"
+                           TextWrapping="Wrap"
+                           Text="自动同步：后台按轮询间隔检查，本地文件变化（5 秒抖动合并）也会触发一次；只传输有变化的文件，默认不会删除任何一端的文件。坚果云需在网页端「安全选项」里生成应用密码后填入；群晖/威联通请确认已开启 WebDAV 服务。" />
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Page>
