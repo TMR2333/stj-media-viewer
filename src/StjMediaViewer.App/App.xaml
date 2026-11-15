@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Application
+    x:Class="StjMediaViewer.App.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
+                <!-- 基础 token 层：任何设计语言词典都会覆盖同名键，这里只保证键永远存在。 -->
+                <ResourceDictionary Source="ms-appx:///Themes/Tokens.Base.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

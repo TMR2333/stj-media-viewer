@@ -1,0 +1,8 @@
+bin/
+obj/
+*.user
+.vs/
+tools/ffmpeg/
+*.zip
+*.log
+__pycache__/
