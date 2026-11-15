@@ -9,37 +9,37 @@
     <Grid HorizontalAlignment="Left" VerticalAlignment="Center">
         <Border x:Name="NeutralBadge" Visibility="Collapsed"
                 Background="{ThemeResource AppSurfaceAltBrush}" BorderBrush="{ThemeResource AppStrokeBrush}"
-                BorderThickness="1" CornerRadius="{ThemeResource AppRadiusPill}" Padding="8,2,10,2">
+                BorderThickness="1" CornerRadius="{ThemeResource AppRadiusPill}" Padding="7,2">
             <TextBlock x:Name="NeutralText" Style="{ThemeResource AppMicroTextStyle}" Foreground="{ThemeResource TextSecondaryBrush}" />
         </Border>
 
         <Border x:Name="RawBadge" Visibility="Collapsed"
-                Background="{ThemeResource BadgeRawBrush}" CornerRadius="{ThemeResource AppRadiusPill}" Padding="8,2,10,2">
+                Background="{ThemeResource BadgeRawBrush}" CornerRadius="{ThemeResource AppRadiusPill}" Padding="7,2">
             <TextBlock x:Name="RawText" Style="{ThemeResource AppMicroTextStyle}" Foreground="{ThemeResource BadgeRawTextBrush}" />
         </Border>
 
         <Border x:Name="LogBadge" Visibility="Collapsed"
-                Background="{ThemeResource BadgeLogBrush}" CornerRadius="{ThemeResource AppRadiusPill}" Padding="8,2,10,2">
+                Background="{ThemeResource BadgeLogBrush}" CornerRadius="{ThemeResource AppRadiusPill}" Padding="7,2">
             <TextBlock x:Name="LogText" Style="{ThemeResource AppMicroTextStyle}" Foreground="{ThemeResource BadgeLogTextBrush}" />
         </Border>
 
         <Border x:Name="VideoBadge" Visibility="Collapsed"
-                Background="{ThemeResource BadgeVideoBrush}" CornerRadius="{ThemeResource AppRadiusPill}" Padding="8,2,10,2">
+                Background="{ThemeResource BadgeVideoBrush}" CornerRadius="{ThemeResource AppRadiusPill}" Padding="7,2">
             <TextBlock x:Name="VideoText" Style="{ThemeResource AppMicroTextStyle}" Foreground="{ThemeResource BadgeVideoTextBrush}" />
         </Border>
 
         <Border x:Name="ImageBadge" Visibility="Collapsed"
-                Background="{ThemeResource BadgeImageBrush}" CornerRadius="{ThemeResource AppRadiusPill}" Padding="8,2,10,2">
+                Background="{ThemeResource BadgeImageBrush}" CornerRadius="{ThemeResource AppRadiusPill}" Padding="7,2">
             <TextBlock x:Name="ImageText" Style="{ThemeResource AppMicroTextStyle}" Foreground="{ThemeResource BadgeImageTextBrush}" />
         </Border>
 
         <Border x:Name="AudioBadge" Visibility="Collapsed"
-                Background="{ThemeResource BadgeAudioBrush}" CornerRadius="{ThemeResource AppRadiusPill}" Padding="8,2,10,2">
+                Background="{ThemeResource BadgeAudioBrush}" CornerRadius="{ThemeResource AppRadiusPill}" Padding="7,2">
             <TextBlock x:Name="AudioText" Style="{ThemeResource AppMicroTextStyle}" Foreground="{ThemeResource BadgeAudioTextBrush}" />
         </Border>
 
         <Border x:Name="AiBadge" Visibility="Collapsed"
-                Background="{ThemeResource BadgeAiBrush}" CornerRadius="{ThemeResource AppRadiusPill}" Padding="8,2,10,2">
+                Background="{ThemeResource BadgeAiBrush}" CornerRadius="{ThemeResource AppRadiusPill}" Padding="7,2">
             <TextBlock x:Name="AiText" Style="{ThemeResource AppMicroTextStyle}" Foreground="{ThemeResource BadgeAiTextBrush}" />
         </Border>
     </Grid>

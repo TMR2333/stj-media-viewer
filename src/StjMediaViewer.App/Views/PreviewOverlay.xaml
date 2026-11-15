@@ -192,16 +192,16 @@
                     <!-- 颜色标签 -->
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                         <Button Style="{ThemeResource AppIconButtonStyle}" Click="LabelRed_Click" ToolTipService.ToolTip="红标">
-                            <Border Width="14" Height="14" CornerRadius="{ThemeResource AppRadiusPill}" Background="{ThemeResource DangerBrush}" />
+                            <Border Width="14" Height="14" CornerRadius="{ThemeResource AppRadiusCircle}" Background="{ThemeResource DangerBrush}" />
                         </Button>
                         <Button Style="{ThemeResource AppIconButtonStyle}" Click="LabelYellow_Click" ToolTipService.ToolTip="黄标">
-                            <Border Width="14" Height="14" CornerRadius="{ThemeResource AppRadiusPill}" Background="{ThemeResource WarningBrush}" />
+                            <Border Width="14" Height="14" CornerRadius="{ThemeResource AppRadiusCircle}" Background="{ThemeResource WarningBrush}" />
                         </Button>
                         <Button Style="{ThemeResource AppIconButtonStyle}" Click="LabelGreen_Click" ToolTipService.ToolTip="绿标">
-                            <Border Width="14" Height="14" CornerRadius="{ThemeResource AppRadiusPill}" Background="{ThemeResource SuccessBrush}" />
+                            <Border Width="14" Height="14" CornerRadius="{ThemeResource AppRadiusCircle}" Background="{ThemeResource SuccessBrush}" />
                         </Button>
                         <Button Style="{ThemeResource AppIconButtonStyle}" Click="LabelBlue_Click" ToolTipService.ToolTip="蓝标">
-                            <Border Width="14" Height="14" CornerRadius="{ThemeResource AppRadiusPill}" Background="{ThemeResource InfoBrush}" />
+                            <Border Width="14" Height="14" CornerRadius="{ThemeResource AppRadiusCircle}" Background="{ThemeResource InfoBrush}" />
                         </Button>
                         <Button Style="{ThemeResource AppIconButtonStyle}" Click="LabelNone_Click" ToolTipService.ToolTip="清除色标">
                             <FontIcon Glyph="&#xE894;" FontSize="{ThemeResource AppFontCaptionSize}" />

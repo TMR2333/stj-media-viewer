@@ -44,7 +44,10 @@
 
 | 键 | 值 | 说明 |
 |---|---|---|
-| `AppRadiusSmall` / `Medium` / `Large` / `XLarge` / `Pill` | 4 / 8 / 12 / 20 / 999 | 小控件 → 大面板 |
+| `AppRadiusSmall` / `Medium` / `Large` / `XLarge` | 4 / 6 / 10 / 14 | 控件 → 面板的圆角阶梯（整体克制，避免"大圆角廉价感"） |
+| `AppRadiusPill` | **4** | 历史命名保留，语义已改为"小标签圆角"：徽标 / 计数 / 状态标签 / 快捷 chip 用它 |
+| `AppCardRadius` | 8 | 卡片与缩略图容器 |
+| `AppRadiusCircle` | 999 | **只**给真正的圆点用（颜色标签点 / 状态点），不要拿来做按钮或标签 |
 | `AppCardRadius` | 12 | 卡片 |
 | `AppControlHeight` / `Small` / `Large` | 36 / 28 / 44 | 控件高度 |
 | `AppCardStrokeThickness` | 1 | 卡片描边 |

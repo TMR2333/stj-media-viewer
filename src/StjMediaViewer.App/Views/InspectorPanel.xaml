@@ -214,23 +214,23 @@
                 <TextBlock Text="颜色标签" Style="{ThemeResource AppMicroTextStyle}" Margin="0,10,0,0" />
                 <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
                     <Button Style="{ThemeResource AppIconButtonStyle}" Click="LabelRed_Click" ToolTipService.ToolTip="红">
-                        <Border x:Name="DotRed" Width="16" Height="16" CornerRadius="{ThemeResource AppRadiusPill}"
+                        <Border x:Name="DotRed" Width="16" Height="16" CornerRadius="{ThemeResource AppRadiusCircle}"
                                 Background="{ThemeResource DangerBrush}" BorderBrush="{ThemeResource AppFocusRingBrush}" BorderThickness="0" />
                     </Button>
                     <Button Style="{ThemeResource AppIconButtonStyle}" Click="LabelYellow_Click" ToolTipService.ToolTip="黄">
-                        <Border x:Name="DotYellow" Width="16" Height="16" CornerRadius="{ThemeResource AppRadiusPill}"
+                        <Border x:Name="DotYellow" Width="16" Height="16" CornerRadius="{ThemeResource AppRadiusCircle}"
                                 Background="{ThemeResource WarningBrush}" BorderBrush="{ThemeResource AppFocusRingBrush}" BorderThickness="0" />
                     </Button>
                     <Button Style="{ThemeResource AppIconButtonStyle}" Click="LabelGreen_Click" ToolTipService.ToolTip="绿">
-                        <Border x:Name="DotGreen" Width="16" Height="16" CornerRadius="{ThemeResource AppRadiusPill}"
+                        <Border x:Name="DotGreen" Width="16" Height="16" CornerRadius="{ThemeResource AppRadiusCircle}"
                                 Background="{ThemeResource SuccessBrush}" BorderBrush="{ThemeResource AppFocusRingBrush}" BorderThickness="0" />
                     </Button>
                     <Button Style="{ThemeResource AppIconButtonStyle}" Click="LabelBlue_Click" ToolTipService.ToolTip="蓝">
-                        <Border x:Name="DotBlue" Width="16" Height="16" CornerRadius="{ThemeResource AppRadiusPill}"
+                        <Border x:Name="DotBlue" Width="16" Height="16" CornerRadius="{ThemeResource AppRadiusCircle}"
                                 Background="{ThemeResource InfoBrush}" BorderBrush="{ThemeResource AppFocusRingBrush}" BorderThickness="0" />
                     </Button>
                     <Button Style="{ThemeResource AppIconButtonStyle}" Click="LabelPurple_Click" ToolTipService.ToolTip="紫">
-                        <Border x:Name="DotPurple" Width="16" Height="16" CornerRadius="{ThemeResource AppRadiusPill}"
+                        <Border x:Name="DotPurple" Width="16" Height="16" CornerRadius="{ThemeResource AppRadiusCircle}"
                                 Background="{ThemeResource BadgeLogBrush}" BorderBrush="{ThemeResource AppFocusRingBrush}" BorderThickness="0" />
                     </Button>
                     <Button Style="{ThemeResource AppIconButtonStyle}" Click="LabelNone_Click" ToolTipService.ToolTip="无">

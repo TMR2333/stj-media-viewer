@@ -603,10 +603,12 @@
 
     <!-- ===================== 圆角 ===================== -->
     <CornerRadius x:Key="AppRadiusSmall">4</CornerRadius>
-    <CornerRadius x:Key="AppRadiusMedium">8</CornerRadius>
-    <CornerRadius x:Key="AppRadiusLarge">12</CornerRadius>
+    <CornerRadius x:Key="AppRadiusMedium">6</CornerRadius>
+    <CornerRadius x:Key="AppRadiusLarge">10</CornerRadius>
     <CornerRadius x:Key="AppRadiusXLarge">16</CornerRadius>
-    <CornerRadius x:Key="AppRadiusPill">999</CornerRadius>
+    <CornerRadius x:Key="AppRadiusPill">4</CornerRadius>
+    <!-- 仅用于真正的圆点（颜色标签点 / 状态点 / 评分点），不要拿来做胶囊按钮 -->
+    <CornerRadius x:Key="AppRadiusCircle">999</CornerRadius>
     <CornerRadius x:Key="AppCardRadius">8</CornerRadius>
     <CornerRadius x:Key="ControlCornerRadius">4</CornerRadius>
     <CornerRadius x:Key="OverlayCornerRadius">8</CornerRadius>
