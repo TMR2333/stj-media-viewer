@@ -214,6 +214,11 @@
                 <NavigationViewItem Content="AI 队列" Tag="aiqueue" Icon="Bullets" />
             </NavigationView.MenuItems>
             <NavigationView.FooterMenuItems>
+                <NavigationViewItem Content="关于" Tag="about">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE946;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
                 <NavigationViewItem Content="设置" Tag="settings" Icon="Setting" />
             </NavigationView.FooterMenuItems>
 

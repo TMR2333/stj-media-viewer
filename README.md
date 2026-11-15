@@ -1,5 +1,7 @@
 # stj-media-viewer
 
+> **Stjarna PERSPECTIVE 出品 · co-worked with DeepSeek Harness**
+
 面向专业创作者的 **Windows 原生素材整理软件**。选一个媒体库文件夹，它递归扫描、排除非媒体、解析元数据、自动分类，并给你一个能按 9 个维度检索的素材库。界面遵循**微软 Fluent 设计语言**（WinUI 3 原生、Mica 背板、Segoe UI Variable 字阶），支持跟随系统 / 浅色 / 深色。
 
 <p align="center">
@@ -15,6 +17,10 @@
 </p>
 
 > 截图由应用自身渲染导出（`STJ_CAPTURE=<png>` 环境变量），不依赖外部截屏工具。
+
+<p align="center">
+  <img src="shots/final-about.png" width="72%" alt="关于页：Stjarna PERSPECTIVE 出品" />
+</p>
 
 ---
 
@@ -123,6 +129,10 @@
 - **键盘流**：左右方向键翻页、Home/End 首尾、0–5 评分（0 清除）、6–9 色标（红/黄/绿/蓝）、P 选用、X 废片、I 元数据面板、T 胶片带 —— 全程不碰鼠标。
 - **复用现有能力**：数据源是素材库的**当前筛选条件**（搜索 / 分面 / 分组都继承），右侧内嵌同一个检视面板（元数据 + 手工分类 + 保存 / AI / XMP），视频可直接转码压缩，快速编辑立即落库。
 - 解码只取当前一张（2400px），切换时取消上一张请求；胶片带缩略图走同一套磁盘缓存，4000+ 张的库翻页也不掉帧。
+
+### 2.10 关于页
+
+品牌署名 **Stjarna PERSPECTIVE 出品 / co-worked with DeepSeek Harness**，含 logo、版本与环境信息（.NET / Windows 版本 / 构建日期）、技术栈与第三方许可清单，以及四张项目表情包（随仓库分发）。
 
 ### 2.10 界面
 

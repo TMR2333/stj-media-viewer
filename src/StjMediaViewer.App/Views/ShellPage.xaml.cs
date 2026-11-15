@@ -265,6 +265,7 @@ public sealed partial class ShellPage : Page
         "cloud" => typeof(CloudPage),
         "aiqueue" => typeof(AiQueuePage),
         "settings" => typeof(SettingsPage),
+        "about" => typeof(AboutPage),
         _ => null,
     };
 

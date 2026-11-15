@@ -6,7 +6,6 @@ using StjMediaViewer.App.Services;
 using StjMediaViewer.Core.Models;
 using StjMediaViewer.Core.Transcode;
 using StjMediaViewer.Core.Util;
-using StjMediaViewer.App.Services;
 using StjMediaViewer.App.ViewModels;
 
 namespace StjMediaViewer.App.Views;
