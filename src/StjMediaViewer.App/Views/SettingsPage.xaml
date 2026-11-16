@@ -548,6 +548,14 @@
                                 <TextBlock Text="打开日志目录" Style="{ThemeResource AppCaptionTextStyle}" />
                             </StackPanel>
                         </Button>
+                            <Button Style="{ThemeResource AppSubtleButtonStyle}"
+                                    Padding="12,2,12,2" MinHeight="30" Click="ReplayOnboarding_Click"
+                                    ToolTipService.ToolTip="重新看一遍功能演示，并可重设关键选项">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE81E;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                                    <TextBlock Text="重新播放新用户引导" Style="{ThemeResource AppCaptionTextStyle}" />
+                                </StackPanel>
+                            </Button>
                         <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="12,2,12,2" MinHeight="30"
                                 Click="OpenSettingsFolder_Click">
                             <StackPanel Orientation="Horizontal" Spacing="6">

@@ -190,6 +190,14 @@ public sealed partial class SettingsViewModel : ObservableObject
         ScheduleSave();
     }
 
+    /// <summary>重新播放新用户引导（设置里随时可回看）。</summary>
+    public void ReplayOnboarding()
+    {
+        AppServices.Settings.Current.OnboardingCompleted = false;
+        _ = AppServices.Settings.SaveAsync();
+        Views.ShellPage.Current?.ShowOnboarding(replay: true);
+    }
+
     public void SetApiKey(string? key)
     {
         ApiKey = key ?? "";

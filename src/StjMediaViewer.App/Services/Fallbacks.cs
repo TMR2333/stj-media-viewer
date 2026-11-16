@@ -135,6 +135,8 @@ internal sealed class FallbackWindowChromeService : IWindowChromeService
 {
     public void Configure(Window window) { }
     public Task RefreshBackdropAsync() => Task.CompletedTask;
+
+    public Task RestoreBackdropAsync() => Task.CompletedTask;
     public void SetTitleBarElement(UIElement? element) { }
 }
 

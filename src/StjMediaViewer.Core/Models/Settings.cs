@@ -78,6 +78,12 @@ public sealed class AppSettings
 
     /// <summary>自动同步总开关（单目标另有自己的 AutoSync）。</summary>
     public bool CloudAutoSyncEnabled { get; set; } = true;
+    /// <summary>新用户引导是否已完成（false → 启动时进入引导页）。</summary>
+    public bool OnboardingCompleted { get; set; }
+
+    /// <summary>进入引导前的主题（引导演示固定用浅色，结束后恢复/切深色用）。</summary>
+    public string? ThemeBeforeOnboarding { get; set; }
+
     public bool ShowGlassShowcase { get; set; }
     public string? LastViewId { get; set; }
 }

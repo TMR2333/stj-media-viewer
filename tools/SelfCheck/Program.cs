@@ -395,6 +395,21 @@ public static partial class Program
         settings.Current.DesignLanguage = original;
         await settings.SaveAsync();
 
+        // 新用户引导的标记也要能持久化：默认 false（首次启动进引导），保存后读回 true。
+        Check("引导默认未完成", new Core.Models.AppSettings().OnboardingCompleted == false);
+        var originalCompleted = settings.Current.OnboardingCompleted;
+        var originalAfter = settings.Current.ThemeBeforeOnboarding;
+        settings.Current.OnboardingCompleted = true;
+        settings.Current.ThemeBeforeOnboarding = "light";
+        await settings.SaveAsync();
+        await settings.LoadAsync();
+        Check("引导完成标记可持久化", settings.Current.OnboardingCompleted);
+        Check("引导前主题可持久化", settings.Current.ThemeBeforeOnboarding == "light",
+              settings.Current.ThemeBeforeOnboarding ?? "null");
+        settings.Current.OnboardingCompleted = originalCompleted;
+        settings.Current.ThemeBeforeOnboarding = originalAfter;
+        await settings.SaveAsync();
+
         var cipher = settings.ProtectSecret("sk-test-123456");
         Check("API Key 能被保护", cipher is not null);
         var plain = settings.UnprotectSecret(cipher);

@@ -71,6 +71,13 @@ public sealed class WindowChromeService : IWindowChromeService
     }
 
     /// <summary>换皮肤 / 换明暗模式后刷新背板与标题栏配色。幂等、可重复调用。</summary>
+    /// <summary>强制重设背板：清掉缓存 key 再应用（引导页关过 Mica 时要能恢复）。</summary>
+    public Task RestoreBackdropAsync()
+    {
+        _appliedBackdropKey = null;
+        return RefreshBackdropAsync();
+    }
+
     public Task RefreshBackdropAsync()
     {
         try

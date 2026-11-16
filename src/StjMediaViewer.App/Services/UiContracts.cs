@@ -34,6 +34,9 @@ public interface IWindowChromeService
 {
     void Configure(Window window);
     Task RefreshBackdropAsync();
+
+    /// <summary>强制重设背板（引导页临时关掉 Mica 后用）。</summary>
+    Task RestoreBackdropAsync();
     void SetTitleBarElement(UIElement? element);
 }
 

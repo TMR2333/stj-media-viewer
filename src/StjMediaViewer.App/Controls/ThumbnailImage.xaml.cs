@@ -152,6 +152,7 @@ public sealed partial class ThumbnailImage : UserControl
                     Thumb.Visibility = Visibility.Visible;
                     PlaceholderHost.Visibility = Visibility.Collapsed;
                     TypeGlyph.Visibility = Visibility.Collapsed;
+                    FadeInThumb();
                     return;
                 }
 
@@ -178,6 +179,34 @@ public sealed partial class ThumbnailImage : UserControl
             }
 
             cts.Dispose();
+        }
+    }
+
+    /// <summary>缩略图淡入：避免图片"啪"地出现（列表虚拟化反复重建时观感差别很大）。</summary>
+    private void FadeInThumb()
+    {
+        try
+        {
+            var animation = new Microsoft.UI.Xaml.Media.Animation.DoubleAnimation
+            {
+                From = 0,
+                To = 1,
+                Duration = new Duration(TimeSpan.FromMilliseconds(190)),
+                EasingFunction = new Microsoft.UI.Xaml.Media.Animation.CubicEase
+                {
+                    EasingMode = Microsoft.UI.Xaml.Media.Animation.EasingMode.EaseOut,
+                },
+            };
+            Microsoft.UI.Xaml.Media.Animation.Storyboard.SetTarget(animation, Thumb);
+            Microsoft.UI.Xaml.Media.Animation.Storyboard.SetTargetProperty(
+                animation, "Opacity");
+            var storyboard = new Microsoft.UI.Xaml.Media.Animation.Storyboard();
+            storyboard.Children.Add(animation);
+            storyboard.Begin();
+        }
+        catch
+        {
+            Thumb.Opacity = 1;   // 动画失败就直出，不影响可用性
         }
     }
 

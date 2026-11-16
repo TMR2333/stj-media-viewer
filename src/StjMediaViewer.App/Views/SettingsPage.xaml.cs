@@ -142,6 +142,8 @@ public sealed partial class SettingsPage : Page
 
     private async void ClearCache_Click(object sender, RoutedEventArgs e) => await ViewModel.ClearCacheAsync();
 
+    private void ReplayOnboarding_Click(object sender, RoutedEventArgs e) => ViewModel.ReplayOnboarding();
+
     private void Warmup_Click(object sender, RoutedEventArgs e)
     {
         try { ViewModel.ToggleWarmup(); }

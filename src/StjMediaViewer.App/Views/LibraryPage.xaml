@@ -677,7 +677,16 @@
                           RightTapped="AssetList_RightTapped"
                           KeyDown="AssetList_KeyDown"
                           ScrollViewer.HorizontalScrollMode="Disabled"
-                          ScrollViewer.VerticalScrollBarVisibility="Auto" />
+                          ScrollViewer.VerticalScrollBarVisibility="Auto">
+                        <!-- 筛选变化 / 增量加载时：新增、删除、重排都走主题过渡，不再硬切 -->
+                        <ListView.ItemContainerTransitions>
+                            <TransitionCollection>
+                                <AddDeleteThemeTransition />
+                                <RepositionThemeTransition />
+                                <ContentThemeTransition />
+                            </TransitionCollection>
+                        </ListView.ItemContainerTransitions>
+                    </ListView>
 
                 <!-- 加载中：顶部细进度条 -->
                 <ProgressBar Grid.Row="0"

@@ -67,6 +67,10 @@ public sealed partial class ShellPage : Page
         NavigateTo(initialView!);
         SyncNavSelection(initialView!);
 
+        // 首次启动：进新用户引导（可跳过；设置页可重新播放）
+        if (!AppServices.Settings.Current.OnboardingCompleted)
+            ShowOnboarding();
+
         // 调试用：STJ_DEMO_SEARCH=<词> 预设搜索词 / STJ_DEMO_SORT=<sortKey> 预设排序（截图验收用）
         var demoSearch = Environment.GetEnvironmentVariable("STJ_DEMO_SEARCH");
         if (!string.IsNullOrEmpty(demoSearch))
@@ -237,7 +241,8 @@ public sealed partial class ShellPage : Page
         {
             PlaceholderHost.Visibility = Visibility.Collapsed;
             if (ContentFrame.CurrentSourcePageType != pageType)
-                ContentFrame.Navigate(pageType, viewId);
+                ContentFrame.Navigate(pageType, viewId,
+                    new Microsoft.UI.Xaml.Media.Animation.EntranceNavigationTransitionInfo());
             return;
         }
 
@@ -285,8 +290,66 @@ public sealed partial class ShellPage : Page
 
     private void BackToLibrary_Click(object sender, RoutedEventArgs e) => SyncNavSelection("library");
 
+    /// <summary>
+    /// 引导期间关掉 Mica：Mica 跟随系统深色，导航栏与状态栏透过深色背板发黑，
+    /// 和浅色引导页割裂。切成纯色背板（用 RootGrid 的浅色主题底），结束后再恢复。
+    /// </summary>
+    private static void UseSolidBackdropForOnboarding(bool solid)
+    {
+        try
+        {
+            if (App.MainWindow is null) return;
+            if (solid) App.MainWindow.SystemBackdrop = null;
+            else _ = AppServices.WindowChrome.RestoreBackdropAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("切换引导页背板失败", ex);
+        }
+    }
+
     /// <summary>供子页面跳转（例如 AI 队列 → 设置）。</summary>
     public void NavigateToView(string viewId) => SyncNavSelection(viewId);
+
+    /// <summary>引导结束：回到素材库（选中项没变也要强制导航一次）。</summary>
+    public void LeaveOnboarding()
+    {
+        try
+        {
+            UseSolidBackdropForOnboarding(false);
+            PersistNavId("library");
+            SyncNavSelection("library");
+            NavigateTo("library");
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("引导结束后返回素材库失败", ex);
+        }
+    }
+
+    /// <summary>打开新用户引导（首次启动 / 设置里重新播放）。</summary>
+    /// <param name="replay">true = 用户主动重播（结束后恢复原主题）；false = 首次引导（结束切深色）。</param>
+    public void ShowOnboarding(bool replay = false)
+    {
+        try
+        {
+            OnboardingPage.EnterReplay = replay;
+
+            // 引导期间固定浅色：演示动画是浅色扁平风，右侧面板也跟着浅色才不割裂。
+            // persist:false —— 不覆盖用户已保存的主题，结束后再决定。
+            _ = AppServices.Design.SetThemeModeAsync("light", persist: false);
+
+            UseSolidBackdropForOnboarding(true);
+            Log.Info($"[onboarding] 打开引导页（{(replay ? "重播" : "首次启动")}）");
+            if (ContentFrame.CurrentSourcePageType != typeof(OnboardingPage))
+                ContentFrame.Navigate(typeof(OnboardingPage), null,
+                    new Microsoft.UI.Xaml.Media.Animation.EntranceNavigationTransitionInfo());
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("打开新用户引导失败", ex);
+        }
+    }
 
     private static readonly Dictionary<string, Func<UIElement>> ViewFactories = new();
 

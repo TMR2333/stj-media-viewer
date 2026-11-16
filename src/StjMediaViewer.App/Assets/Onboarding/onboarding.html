@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>STJ Media Viewer</title>
+<style>
+  /* 纯图形 / 扁平 / 浅色：没有文字、没有渐变、没有投影 */
+  :root {
+    --bg: #f7f7f9;
+    --surface: #ffffff;
+    --line: #e4e4ea;
+    --line2: #d2d2da;
+    --ink: #17171d;
+    --blue: #0078d4;
+    --blue-soft: #d3e6f8;
+    --blue-line: #bcd8f1;
+    --violet-soft: #e5dcf3;
+    --amber: #d67e1e;
+    --amber-soft: #f7e3cc;
+    --green: #107c42;
+    --green-soft: #d7ecdf;
+    --pink-soft: #f4dde0;
+    --gray-fill: #e7e8ec;
+    --gray-fill2: #dcdee4;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); }
+  body { font-family: "Segoe UI", system-ui, sans-serif; color: var(--ink); }
+  .stage { position: relative; width: 100%; height: 100%; }
+  .scene {
+    position: absolute; inset: 0;
+    display: grid; place-items: center;
+    opacity: 0; visibility: hidden;
+    transition: opacity .28s ease, visibility .28s;
+  }
+  .scene.on { opacity: 1; visibility: visible; }
+  .frame {
+    width: min(80%, 500px);
+    display: grid; place-items: center;
+  }
+
+  /* ───────────── 0 · 徽记 ───────────── */
+  .mark { position: relative; display: grid; place-items: center; height: 236px; width: 236px; }
+  .mark .plate {
+    position: absolute; border-radius: 20px;
+    border: 1.5px solid var(--line2);
+    background: var(--surface);
+    animation: platePulse 4.4s ease-in-out infinite;
+  }
+  .mark .plate:nth-child(1) { width: 150px; height: 150px; }
+  .mark .plate:nth-child(2) { width: 186px; height: 186px; opacity: .6; animation-delay: .45s; }
+  .mark .plate:nth-child(3) { width: 222px; height: 222px; opacity: .32; animation-delay: .9s; }
+  @keyframes platePulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.035); }
+  }
+  .mark .core {
+    position: relative; z-index: 2;
+    width: 150px; height: 150px; border-radius: 20px;
+    background: var(--blue);
+    animation: coreFloat 5.6s ease-in-out infinite;
+  }
+  .mark .core::before,
+  .mark .core::after {
+    content: ""; position: absolute; width: 52px; height: 52px; border-radius: 9px; background: #fff;
+  }
+  .mark .core::before { left: 40px; top: 40px; }
+  .mark .core::after { left: 64px; top: 64px; opacity: .5; }
+  @keyframes coreFloat {
+    0%, 100% { transform: translateY(-4px); }
+    50% { transform: translateY(4px); }
+  }
+  .dotgrid { display: grid; grid-template-columns: repeat(7, 9px); gap: 11px; margin-top: 44px; }
+  .dotgrid i { width: 9px; height: 9px; border-radius: 2px; background: var(--line2); animation: dotOn 3.8s ease-in-out infinite; }
+  @keyframes dotOn {
+    0%, 100% { background: var(--line2); }
+    7% { background: var(--blue); }
+    20% { background: var(--line2); }
+  }
+
+  /* ───────────── 通用卡片 ───────────── */
+  .tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 100%; }
+  .tile {
+    aspect-ratio: 4 / 3; border-radius: 10px;
+    background: var(--surface); border: 1.5px solid var(--line);
+    position: relative; overflow: hidden;
+    animation: tileIn .5s cubic-bezier(.2,.7,.3,1) both;
+  }
+  .tile::after {
+    content: ""; position: absolute; left: 10px; right: 10px; bottom: 9px;
+    height: 4px; border-radius: 2px; background: var(--line);
+  }
+  .tile .fill { position: absolute; inset: 0; }
+  @keyframes tileIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+  /* ───────────── 1 · 收进网格 ───────────── */
+  .lib { display: grid; grid-template-columns: 132px 1fr; gap: 24px; align-items: start; width: 100%; }
+  .folder {
+    width: 132px; height: 100px; border-radius: 12px;
+    background: var(--surface); border: 1.5px solid var(--line2);
+    position: relative; margin-top: 6px;
+    animation: folderDrop .85s cubic-bezier(.2,.8,.3,1) both;
+  }
+  .folder::before {
+    content: ""; position: absolute; top: -10px; left: 12px; width: 48px; height: 12px;
+    border-radius: 5px 5px 0 0; background: var(--surface);
+    border: 1.5px solid var(--line2); border-bottom: 0;
+  }
+  .folder::after {
+    content: ""; position: absolute; left: 16px; right: 16px; bottom: 18px; height: 36px;
+    border-radius: 8px; background: var(--blue-soft); border: 1px solid var(--blue-line);
+  }
+  @keyframes folderDrop {
+    from { opacity: 0; transform: translateY(-26px); }
+    to { opacity: 1; transform: none; }
+  }
+  .gridbox { position: relative; }
+  .scan {
+    position: absolute; left: -4px; right: -4px; top: 0; height: 2px;
+    background: var(--blue); opacity: .85;
+    animation: scanMove 3.2s cubic-bezier(.42,0,.58,1) infinite .9s;
+  }
+  @keyframes scanMove {
+    0% { transform: translateY(0); opacity: 0; }
+    10% { opacity: .9; }
+    80% { opacity: .9; }
+    100% { transform: translateY(196px); opacity: 0; }
+  }
+  .rows { display: grid; gap: 8px; margin-top: 20px; }
+  .rows i { height: 6px; border-radius: 3px; background: var(--line); animation: rowGrow .6s cubic-bezier(.2,.7,.3,1) both; }
+  .rows i:nth-child(1) { width: 82%; }
+  .rows i:nth-child(2) { width: 64%; }
+  .rows i:nth-child(3) { width: 74%; }
+  @keyframes rowGrow { from { opacity: 0; transform: scaleX(.2); transform-origin: left; } to { opacity: 1; transform: none; } }
+
+  /* ───────────── 2 · 扫描识别 ───────────── */
+  .ai { position: relative; width: 100%; }
+  .ai .tiles { grid-template-columns: repeat(3, 1fr); }
+  .ai .tile { aspect-ratio: 1 / 1; }
+  .beam {
+    position: absolute; left: -4px; right: -4px; height: 54px; top: 0;
+    border-top: 2px solid var(--blue); border-bottom: 2px solid var(--blue);
+    background: rgba(0, 120, 212, .06);
+    animation: beamMove 3.6s cubic-bezier(.42,0,.58,1) infinite;
+  }
+  @keyframes beamMove {
+    0% { transform: translateY(-6px); opacity: 0; }
+    9% { opacity: 1; }
+    88% { opacity: 1; }
+    100% { transform: translateY(300px); opacity: 0; }
+  }
+  .pills { position: absolute; inset: 0; pointer-events: none; }
+  .pill {
+    position: absolute; height: 18px; border-radius: 4px;
+    background: var(--surface); border: 1.5px solid var(--blue);
+    animation: pillPop .45s cubic-bezier(.2,.9,.3,1.2) both;
+  }
+  .pill::after {
+    content: ""; position: absolute; left: 6px; right: 6px; top: 6px; height: 3px;
+    border-radius: 2px; background: var(--blue); opacity: .8;
+  }
+  @keyframes pillPop { from { opacity: 0; transform: scale(.72); } to { opacity: 1; transform: none; } }
+  .ticks { display: flex; gap: 6px; margin-top: 20px; }
+  .ticks i { height: 5px; flex: 1; border-radius: 3px; background: var(--line); animation: tickOn 2.8s ease-in-out infinite; }
+  @keyframes tickOn { 0%, 100% { background: var(--line); } 45% { background: var(--blue); } }
+
+  /* ───────────── 3 · 还原前后 ───────────── */
+  .lut { width: 100%; }
+  .compare {
+    position: relative; width: 100%; aspect-ratio: 16 / 10;
+    border-radius: 14px; overflow: hidden;
+    border: 1.5px solid var(--line2); background: var(--surface);
+  }
+  .shot { position: absolute; inset: 0; }
+  .shot .sky { position: absolute; inset: 0; }
+  .shot .sun { position: absolute; width: 78px; height: 78px; border-radius: 50%; right: 74px; top: 44px; }
+  .shot .hillA, .shot .hillB { position: absolute; left: -8%; right: -8%; border-radius: 46% 46% 0 0; }
+  .shot .hillA { height: 46%; bottom: 0; }
+  .shot .hillB { height: 30%; bottom: 0; left: 26%; right: -18%; border-radius: 40% 46% 0 0; }
+  .shot .b1, .shot .b2, .shot .b3 { position: absolute; bottom: 0; border-radius: 4px 4px 0 0; }
+  .shot .b1 { width: 26px; height: 62px; left: 26px; }
+  .shot .b2 { width: 18px; height: 44px; left: 58px; }
+  .shot .b3 { width: 34px; height: 78px; left: 84px; }
+
+  .shot.cold .sky { background: #eef0f4; }
+  .shot.cold .sun { background: #d9dce2; }
+  .shot.cold .hillA { background: #e3e6eb; }
+  .shot.cold .hillB { background: #d6dae1; }
+  .shot.cold .b1, .shot.cold .b2, .shot.cold .b3 { background: #cfd4dc; }
+
+  .shot.warm .sky { background: #cfe4f5; }
+  .shot.warm .sun { background: #f2a63f; }
+  .shot.warm .hillA { background: #4d9370; }
+  .shot.warm .hillB { background: #2f7557; }
+  .shot.warm .b1, .shot.warm .b2, .shot.warm .b3 { background: #c9743f; }
+
+  .reveal { position: absolute; inset: 0; overflow: hidden; animation: reveal 5.6s cubic-bezier(.45,0,.55,1) infinite; }
+  @keyframes reveal {
+    0%, 10% { clip-path: inset(0 100% 0 0); }
+    46%, 56% { clip-path: inset(0 0 0 0); }
+    92%, 100% { clip-path: inset(0 0 0 100%); }
+  }
+  .bar {
+    position: absolute; top: 0; bottom: 0; width: 2px; background: var(--ink);
+    animation: barMove 5.6s cubic-bezier(.45,0,.55,1) infinite;
+  }
+  @keyframes barMove {
+    0%, 10% { left: 0; opacity: 0; }
+    16% { opacity: 1; }
+    46%, 56% { left: calc(100% - 2px); opacity: 1; }
+    92%, 100% { left: 0; opacity: 0; }
+  }
+  .curve { margin-top: 20px; }
+  .curve path {
+    fill: none; stroke: var(--blue); stroke-width: 2.5; stroke-linecap: round;
+    stroke-dasharray: 300; stroke-dashoffset: 300;
+    animation: drawCurve 1.8s ease-out forwards .2s;
+  }
+  @keyframes drawCurve { to { stroke-dashoffset: 0; } }
+
+  /* ───────────── 4 · 完成 ───────────── */
+  .done { display: grid; place-items: center; gap: 34px; }
+  .done svg circle {
+    fill: none; stroke: var(--line2); stroke-width: 3;
+    stroke-dasharray: 300; stroke-dashoffset: 300;
+    animation: drawOnce .9s ease forwards;
+  }
+  .done svg path {
+    fill: none; stroke: var(--green); stroke-width: 6; stroke-linecap: round; stroke-linejoin: round;
+    stroke-dasharray: 110; stroke-dashoffset: 110;
+    animation: drawOnce .65s ease forwards .4s;
+  }
+  @keyframes drawOnce { to { stroke-dashoffset: 0; } }
+  .done .marks { display: flex; gap: 10px; }
+  .done .marks i {
+    width: 46px; height: 16px; border-radius: 5px;
+    background: var(--surface); border: 1.5px solid var(--line2);
+    animation: markIn .5s cubic-bezier(.2,.9,.3,1.2) both;
+  }
+  .done .marks i:nth-child(1) { animation-delay: .65s; }
+  .done .marks i:nth-child(2) { animation-delay: .8s; }
+  .done .marks i:nth-child(3) { animation-delay: .95s; }
+  @keyframes markIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+<div class="stage">
+
+  <!-- 0 · 徽记 -->
+  <section class="scene on" data-i="0">
+    <div class="frame" style="display:grid;place-items:center">
+      <div class="mark">
+        <div class="plate"></div>
+        <div class="plate"></div>
+        <div class="plate"></div>
+        <div class="core"></div>
+      </div>
+      <div class="dotgrid">
+        <i></i><i style="animation-delay:.1s"></i><i style="animation-delay:.2s"></i><i style="animation-delay:.3s"></i>
+        <i style="animation-delay:.4s"></i><i style="animation-delay:.5s"></i><i style="animation-delay:.6s"></i>
+        <i style="animation-delay:.15s"></i><i style="animation-delay:.25s"></i><i style="animation-delay:.35s"></i>
+        <i style="animation-delay:.45s"></i><i style="animation-delay:.55s"></i><i style="animation-delay:.65s"></i>
+        <i style="animation-delay:.75s"></i>
+        <i style="animation-delay:.3s"></i><i style="animation-delay:.4s"></i><i style="animation-delay:.5s"></i>
+        <i style="animation-delay:.6s"></i><i style="animation-delay:.7s"></i><i style="animation-delay:.8s"></i>
+        <i style="animation-delay:.9s"></i>
+      </div>
+    </div>
+  </section>
+
+  <!-- 1 · 收进网格 -->
+  <section class="scene" data-i="1">
+    <div class="frame">
+      <div class="lib">
+        <div class="folder"></div>
+        <div class="gridbox">
+          <div class="tiles">
+            <div class="tile"><div class="fill" style="background:var(--blue-soft)"></div></div>
+            <div class="tile"><div class="fill" style="background:var(--violet-soft)"></div></div>
+            <div class="tile"><div class="fill" style="background:var(--amber-soft)"></div></div>
+            <div class="tile"><div class="fill" style="background:var(--green-soft)"></div></div>
+            <div class="tile"><div class="fill" style="background:var(--pink-soft)"></div></div>
+            <div class="tile"><div class="fill" style="background:var(--blue-soft)"></div></div>
+            <div class="tile"><div class="fill" style="background:var(--green-soft)"></div></div>
+            <div class="tile"><div class="fill" style="background:var(--amber-soft)"></div></div>
+          </div>
+          <div class="scan"></div>
+          <div class="rows"><i></i><i></i><i></i></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2 · 扫描识别 -->
+  <section class="scene" data-i="2">
+    <div class="frame">
+      <div class="ai">
+        <div class="tiles">
+          <div class="tile"><div class="fill" style="background:var(--blue-soft)"></div></div>
+          <div class="tile"><div class="fill" style="background:var(--violet-soft)"></div></div>
+          <div class="tile"><div class="fill" style="background:var(--amber-soft)"></div></div>
+          <div class="tile"><div class="fill" style="background:var(--green-soft)"></div></div>
+          <div class="tile"><div class="fill" style="background:var(--pink-soft)"></div></div>
+          <div class="tile"><div class="fill" style="background:var(--blue-soft)"></div></div>
+          <div class="tile"><div class="fill" style="background:var(--amber-soft)"></div></div>
+          <div class="tile"><div class="fill" style="background:var(--green-soft)"></div></div>
+          <div class="tile"><div class="fill" style="background:var(--violet-soft)"></div></div>
+        </div>
+        <div class="beam"></div>
+        <div class="pills">
+          <div class="pill" style="left:6%;top:14%;width:54px;animation-delay:1.1s"></div>
+          <div class="pill" style="left:56%;top:10%;width:66px;animation-delay:1.7s"></div>
+          <div class="pill" style="left:24%;top:58%;width:58px;animation-delay:2.3s"></div>
+          <div class="pill" style="left:62%;top:64%;width:48px;animation-delay:2.9s"></div>
+        </div>
+        <div class="ticks"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3 · 还原前后 -->
+  <section class="scene" data-i="3">
+    <div class="frame">
+      <div class="lut">
+        <div class="compare">
+          <div class="shot cold">
+            <div class="sky"></div>
+            <div class="sun"></div>
+            <div class="hillA"></div>
+            <div class="hillB"></div>
+            <div class="b1"></div><div class="b2"></div><div class="b3"></div>
+          </div>
+          <div class="reveal">
+            <div class="shot warm">
+              <div class="sky"></div>
+              <div class="sun"></div>
+              <div class="hillA"></div>
+              <div class="hillB"></div>
+              <div class="b1"></div><div class="b2"></div><div class="b3"></div>
+            </div>
+          </div>
+          <div class="bar"></div>
+        </div>
+        <svg class="curve" width="100%" height="56" viewBox="0 0 260 56">
+          <rect x="0.75" y="0.75" width="258.5" height="54.5" rx="10" fill="none" stroke="#e4e4ea"/>
+          <path d="M12 48 C 66 44, 96 36, 132 24 S 208 8, 248 6"/>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 · 完成 -->
+  <section class="scene" data-i="4">
+    <div class="frame">
+      <div class="done">
+        <svg width="112" height="112" viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="44"/>
+          <path d="M30 52 L44 66 L71 36"/>
+        </svg>
+        <div class="marks"><i></i><i></i><i></i></div>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+  const scenes = [...document.querySelectorAll('.scene')];
+  let current = 0;
+
+  /** 让场景内的 CSS 动画从头播放（不能用 cancel，否则 forwards 的终态会丢）。 */
+  function replay(root) {
+    const nodes = [root, ...root.querySelectorAll('*')];
+    for (const n of nodes) {
+      const cs = getComputedStyle(n);
+      if (cs.animationName === 'none') continue;
+      const prev = n.style.animation;
+      n.style.animation = 'none';
+      void n.offsetWidth;
+      n.style.animation = prev || '';
+    }
+  }
+
+  window.showScene = function (i) {
+    i = Math.max(0, Math.min(scenes.length - 1, i | 0));
+    if (i !== current) {
+      scenes.forEach((s, k) => s.classList.toggle('on', k === i));
+      current = i;
+    }
+    replay(scenes[i]);
+  };
+
+  if (window.chrome && window.chrome.webview) {
+    window.chrome.webview.addEventListener('message', e => {
+      const d = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+      if (d && d.command === 'scene') window.showScene(d.value);
+    });
+  }
+</script>
+</body>
+</html>
