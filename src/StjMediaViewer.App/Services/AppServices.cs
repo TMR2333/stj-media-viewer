@@ -1,6 +1,5 @@
 using StjMediaViewer.Core.Color;
 using StjMediaViewer.Core.Abstractions;
-using StjMediaViewer.Core.Cloud;
 using StjMediaViewer.Core.Devices;
 using StjMediaViewer.Core.Import;
 using StjMediaViewer.Core.Supply;
@@ -50,10 +49,6 @@ public static class AppServices
     public static IStorageDeviceService Devices { get; private set; } = null!;
     public static IImportService Import { get; private set; } = null!;
     public static IVerificationService Verify { get; private set; } = null!;
-
-    // ---- 云同步 ----
-    public static ICloudSyncService Cloud { get; private set; } = null!;
-    public static CloudAutoSyncService CloudAuto { get; private set; } = null!;
 
     // ---- 转码 / 压缩 ----
     public static ITranscodeService Transcode { get; private set; } = null!;
@@ -160,8 +155,6 @@ public static class AppServices
         Transcode = new TranscodeService(Ffmpeg);
         Luts = new LutService(Settings, Decoder, Encoder);
         Warmup = new ThumbnailWarmup(Store, Thumbnails, Luts);
-        Cloud = new CloudSyncService();
-        CloudAuto = new CloudAutoSyncService(Settings, Cloud);
 
         AiClient = new OpenAiCompatibleClient(Settings);
         Ai = new AiClassificationService(AiClient, Decoder, Encoder, Settings);
@@ -199,8 +192,6 @@ public static class AppServices
         Transcode = new FallbackTranscodeService();
         Luts = new FallbackLutService();
         Warmup = new ThumbnailWarmup(Store, Thumbnails, Luts);
-        Cloud = new FallbackCloudSyncService();
-        CloudAuto = new CloudAutoSyncService(Settings, Cloud);
         return Task.CompletedTask;
     }
 

@@ -4,7 +4,7 @@ using StjMediaViewer.Core.Models;
 namespace StjMediaViewer.App.Services;
 
 /// <summary>
-/// 演示素材库：还没接入真实扫描时，让界面有内容可看、可点、可筛选。
+/// 演示素材库：还没接入真实扫描时，给界面留一张示例图片（1 条），不做批量假数据。
 /// 这些记录走与真实素材完全相同的模型，所以界面代码不需要任何特判。
 /// </summary>
 public static class DemoLibrary
@@ -39,10 +39,10 @@ public static class DemoLibrary
     public static List<MediaAsset> Build()
     {
         var rnd = new Random(20261115);
-        var list = new List<MediaAsset>(72);
+        var list = new List<MediaAsset>(1);
         var root = Path.Combine(AppContext.BaseDirectory, "DemoLibrary");
 
-        for (int i = 0; i < 72; i++)
+        for (int i = 0; i < 1; i++)
         {
             var kind = i % 12 == 11 ? MediaKind.Audio : (i % 5 == 4 ? MediaKind.Video : MediaKind.Image);
             var dev = Devices[rnd.Next(Devices.Length)];

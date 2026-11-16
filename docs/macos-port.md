@@ -24,7 +24,7 @@ macOS 能执行的 `.app`（arm64/x86_64 Mach-O、ad-hoc 或 Developer ID 签名
 C#/.NET 同一套语言、同一个 Core，Windows 与 macOS 共用一份业务代码。
 
 - **复用**：Core 全部业务（索引库 SQLite、九维分类、XMP、LUT 引擎、导入/导出/核验、
-  AI 客户端、云同步、批量填写……）。
+  AI 客户端、批量填写……）。
 - **重写**：UI 层（101k 行 WinUI XAML → Avalonia XAML，约 60–70% 可机械迁移，
   其余为 Fluent 风格与 Windows 专有控件替换）。
 - **替换 7 个 Windows 后端文件**：
@@ -43,7 +43,7 @@ C#/.NET 同一套语言、同一个 Core，Windows 与 macOS 共用一份业务�
   - 阶段 1（3–4 天）：Core 多目标化（`net10.0` + `#if WINDOWS`），平台抽象接口
     （`IImageBackend`、`ISecretStore`、`IDeviceEnumerator`），Windows 端回归自检 244 项全绿。
   - 阶段 2（1–2 周）：Avalonia 头，先做"素材库网格 + 筛选 + 检视面板 + 导入"，再补
-    AI/LUT/批量填写/云同步。
+    AI/LUT/批量填写。
   - 阶段 3（2–3 天）：打包 `.app` + `.dmg`，签名/公证，写 CI。
 - **产出**：`STJMediaViewer-1.0.0-macos-arm64.dmg`（Apple Silicon；Intel 可出 universal）。
 
