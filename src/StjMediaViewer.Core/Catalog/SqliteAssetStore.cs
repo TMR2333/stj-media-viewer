@@ -295,6 +295,19 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
         }
     }
 
+    public Task SetAssetLutAsync(string assetId, string? lutId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrEmpty(assetId)) return Task.CompletedTask;
+        return RunAsync(() =>
+        {
+            using var cmd = _conn!.CreateCommand();
+            cmd.CommandText = "UPDATE assets SET lut_id = $lut WHERE id = $id";
+            cmd.Parameters.AddWithValue("$lut", (object?)lutId ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("$id", assetId);
+            cmd.ExecuteNonQuery();
+        }, ct);
+    }
+
     public Task DeleteAsync(IEnumerable<string> ids, CancellationToken ct = default)
     {
         var list = Clean(ids);

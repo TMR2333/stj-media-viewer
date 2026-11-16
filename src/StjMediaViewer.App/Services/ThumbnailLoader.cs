@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
 using StjMediaViewer.Core.Abstractions;
+using StjMediaViewer.Core.Color;
 using StjMediaViewer.Core.Models;
 using StjMediaViewer.Core.Util;
 
@@ -35,7 +36,9 @@ public sealed class ThumbnailLoader : IThumbnailLoader
         if (asset is null || string.IsNullOrEmpty(asset.Id)) return null;
         // 诊断开关：STJ_DISABLE_THUMBS=1 时完全不解码缩略图（定位崩溃用）
         if (DisableThumbs) return null;
-        var key = $"{asset.Id}@{size}";
+        // LUT 参与缓存键：同一素材换 LUT 是另一张图
+        var lutEntry = ResolveLut(asset);
+        var key = $"{asset.Id}@{size}@{lutEntry?.Id ?? "-"}";
         if (_cache.TryGetValue(key, out var cached)) return cached;
         if (asset.IsAudio) return null;
 
@@ -44,7 +47,7 @@ public sealed class ThumbnailLoader : IThumbnailLoader
             try { return await running.ConfigureAwait(true); } catch { return null; }
         }
 
-        var work = LoadCoreAsync(asset, key, size);
+        var work = LoadCoreAsync(asset, key, size, lutEntry);
         _inflight[key] = work;
         try
         {
@@ -63,7 +66,13 @@ public sealed class ThumbnailLoader : IThumbnailLoader
         }
     }
 
-    private async Task<ImageSource?> LoadCoreAsync(MediaAsset asset, string key, int size)
+    private static LutEntry? ResolveLut(MediaAsset asset)
+    {
+        try { return AppServices.Luts?.ResolveForAsset(asset); }
+        catch { return null; }
+    }
+
+    private async Task<ImageSource?> LoadCoreAsync(MediaAsset asset, string key, int size, LutEntry? lutEntry)
     {
         // 关键：传 CancellationToken.None —— 让缩略图真正生成并落盘
         await _gate.WaitAsync().ConfigureAwait(true);
@@ -74,7 +83,8 @@ public sealed class ThumbnailLoader : IThumbnailLoader
             // 让 Core 生成（或命中）磁盘缓存，然后按"文件"加载：
             // 不要用 InMemoryRandomAccessStream + SetSourceAsync 再立刻释放流 ——
             // BitmapImage 是延迟解码的，流被释放后渲染线程读已释放内存会直接原生崩溃。
-            var path = await _service.GetThumbnailPathAsync(asset, size, CancellationToken.None).ConfigureAwait(true);
+            var lut = lutEntry is null ? null : await AppServices.Luts.LoadCubeAsync(lutEntry).ConfigureAwait(true);
+            var path = await _service.GetThumbnailPathAsync(asset, size, lut, lutEntry?.Id, CancellationToken.None).ConfigureAwait(true);
             if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return null;
 
             var image = new BitmapImage

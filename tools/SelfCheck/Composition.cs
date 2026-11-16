@@ -1,3 +1,4 @@
+using StjMediaViewer.Core.Color;
 using StjMediaViewer.Core.Abstractions;
 using StjMediaViewer.Core.Ai;
 using StjMediaViewer.Core.Catalog;
@@ -57,6 +58,7 @@ public static class Composition
         var import = new ImportService(metadata, geocoder, library);
         var verify = new FileVerificationService();
         var transcode = new TranscodeService(ffmpeg);
+        var lutService = new LutService(settings, decoder, encoder);
 
         await geocoder.EnsureLoadedAsync();
 
@@ -81,6 +83,7 @@ public static class Composition
             Devices: devices,
             Import: import,
             Verify: verify,
-            Transcode: transcode);
+            Transcode: transcode,
+            Luts: lutService);
     }
 }

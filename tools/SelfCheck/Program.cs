@@ -77,6 +77,7 @@ public static partial class Program
             await Section("云同步（本地挂载目录）", async () => await CheckCloudLocalSync(s, tempData));
             await Section("WebDAV 云同步", async () => await CheckWebDav(s));
             await Section("视频编码与转码", async () => await CheckTranscode(s, libraryPath, tempData));
+            await Section("LUT 调色", async () => await CheckLuts(s, tempData));
             if (!quick) await Section("性能: 1000 条 upsert", async () => await CheckPerf(s));
         }
         catch (Exception ex)
@@ -603,4 +604,5 @@ public sealed record Services(
     IStorageDeviceService Devices,
     IImportService Import,
     IVerificationService Verify,
-    ITranscodeService Transcode);
+    ITranscodeService Transcode,
+    ILutService Luts);

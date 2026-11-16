@@ -121,6 +121,19 @@
 - **执行与校验**：实时进度（已处理时长、倍速、剩余 ETA）、完成后**重新解析输出**确认编码/分辨率正确，并给出"体积从 x 到 y、减少 z%"；输出文件名自动带 `_hevc1080p` 之类的后缀，避免覆盖原件。
 - **批处理**：`ITranscodeService.TranscodeManyAsync` 支持批量（进度按文件数加权），供后续"选中多个视频一起压"使用。
 
+### 2.8.1 视频 LUT 与自动调色
+
+![视频 LUT](shots/final-lut.png)
+
+- **内置 LUT 不用打包任何厂商私有资产**：按 Sony 公开的 S-Log3 / S-Log2 白皮书与 ITU-R BT.709 / BT.2100 公式**现场生成** 33³ 的 `.cube`（首次打开自动落盘到 `%LOCALAPPDATA%\StjMediaViewer\luts\builtin`）：
+  `S-Log3 · S-Gamut3.Cine → Rec.709`、`S-Log3 · S-Gamut3 → Rec.709`、`S-Log2 · S-Gamut → Rec.709`、`HLG · BT.2020 → Rec.709`。
+  18% 灰校验：S-Log3 编码值 0.4105 → 输出 0.409（709 中灰附近），黑白端点不塌。
+- **自动导入与匹配**：扫描到 `CameraMake/DeviceKey` 含 Sony 且 `IsLog`（S-Log2 / S-Log3 / HLG）的素材，自动套用对应内置基准 LUT —— 图库缩略图、画廊大图、LUT 页预览都会按它重新渲染。开关在 LUT 页底部（默认开）。
+- **用户自己的风格化 LUT**：把 `.cube` 丢进用户目录，或点「导入 LUT…」多选导入（同名自动加序号）。文件名/目录名会被分类：`SLog3SGamut3.CineToLC-709TypeA` 这类认作**官方风格**（Sony / S-Log3），其余算**创意风格**；列表里按「内置 → 官方 → 创意」排序。
+- **预览即所得**：选中任一 LUT，右侧用当前图库选中素材（没有就自动挑一条 Sony Log 样片）实时调色预览；「应用到选中素材」把选择写回索引库（`assets.lut_id`），「恢复自动匹配」清掉显式选择。
+- **缓存按 LUT 分桶**：缩略图缓存键带 LUT 哈希（`..._320_lut1e38023.jpg`），切换 LUT 不会互相覆盖，也不会重复解码。
+- 实现：`Core/Color/` 下 `CubeLut`（解析 + 三线性插值）、`LutApplier`（BGRA 帧调色）、`BuiltInLuts`（公式生成）、`LutCatalog`（分类 / Sony 自动匹配）、`LutService`（目录扫描、导入、预渲染）。自检 19 项覆盖生成、解析、应用、分类与自动匹配。
+
 ### 2.9 画廊视图（Apple Photos / Camera Raw 风格）
 
 ![画廊视图](shots/final-gallery.png)

@@ -194,6 +194,13 @@ internal sealed class FallbackAssetStore : IAssetStore
         return Task.CompletedTask;
     }
 
+    public Task SetAssetLutAsync(string assetId, string? lutId, CancellationToken ct = default)
+    {
+        var asset = _assets.FirstOrDefault(a => a.Id == assetId);
+        if (asset is not null) asset.LutId = lutId;
+        return Task.CompletedTask;
+    }
+
     public Task DeleteAsync(IEnumerable<string> ids, CancellationToken ct = default)
     {
         var set = new HashSet<string>(ids);

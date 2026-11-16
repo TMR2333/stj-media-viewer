@@ -202,6 +202,11 @@
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItem Content="时间线" Tag="timeline" Icon="Calendar" />
+                <NavigationViewItem Content="LUT" Tag="lut">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE790;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
                 <NavigationViewItem Content="地图" Tag="map" Icon="Map" />
                 <NavigationViewItem Content="重复项" Tag="duplicates" Icon="Copy" />
                 <NavigationViewItem Content="云同步" Tag="cloud">

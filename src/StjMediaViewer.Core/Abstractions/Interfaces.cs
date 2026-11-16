@@ -1,3 +1,4 @@
+using StjMediaViewer.Core.Color;
 using StjMediaViewer.Core.Models;
 
 namespace StjMediaViewer.Core.Abstractions;
@@ -30,6 +31,8 @@ public interface IAssetStore
 
     Task UpsertAsync(MediaAsset asset, CancellationToken ct = default);
     Task UpsertManyAsync(IEnumerable<MediaAsset> assets, CancellationToken ct = default);
+    /// <summary>只更新某条素材选用的 LUT（null = 恢复自动匹配）。</summary>
+    Task SetAssetLutAsync(string assetId, string? lutId, CancellationToken ct = default);
     Task DeleteAsync(IEnumerable<string> ids, CancellationToken ct = default);
     Task DeleteByLibraryAsync(string libraryId, CancellationToken ct = default);
 
@@ -44,6 +47,45 @@ public interface IAssetStore
     Task<int> CountAllAsync(CancellationToken ct = default);
     Task SaveLibraryRootsAsync(IEnumerable<LibraryRoot> roots, CancellationToken ct = default);
     Task<IReadOnlyList<LibraryRoot>> LoadLibraryRootsAsync(CancellationToken ct = default);
+}
+
+// ---------------------------- LUT 调色 ----------------------------
+
+/// <summary>
+/// LUT 管理：内置 LUT 生成、用户 LUT 目录扫描、按素材自动匹配（Sony + Log → 官方基准转换）、
+/// 加载与预渲染。文件格式支持 Adobe .cube（3D / 1D）。
+/// </summary>
+public interface ILutService
+{
+    /// <summary>内置 LUT 目录（按公开公式生成，随首次使用落盘）。</summary>
+    string BuiltInFolder { get; }
+
+    /// <summary>用户 LUT 目录（.cube 文件放这里；可在设置里改）。</summary>
+    string UserFolder { get; }
+
+    /// <summary>列出全部 LUT（内置在前，官方风格其次，创意风格最后）。</summary>
+    Task<IReadOnlyList<LutEntry>> ListAsync(bool forceRefresh = false, CancellationToken ct = default);
+
+    /// <summary>导入一个或多个 .cube 文件到用户目录（同名自动加序号）。</summary>
+    Task<IReadOnlyList<LutEntry>> ImportAsync(IEnumerable<string> filePaths, CancellationToken ct = default);
+
+    /// <summary>删除用户 LUT（内置 LUT 只是禁止删除，返回 false）。</summary>
+    Task<bool> DeleteAsync(LutEntry entry, CancellationToken ct = default);
+
+    /// <summary>解析并缓存 LUT 数据。</summary>
+    Task<CubeLut?> LoadCubeAsync(LutEntry entry, CancellationToken ct = default);
+
+    /// <summary>按 id 找一条 LUT（找不到返回 null）。</summary>
+    Task<LutEntry?> GetAsync(string? id, CancellationToken ct = default);
+
+    /// <summary>
+    /// 素材当前应使用的 LUT：显式指定（asset.LutId）优先；
+    /// 否则识别到 Sony 相机 + Log 素材时自动给内置基准 LUT（可在设置里关闭）。
+    /// </summary>
+    LutEntry? ResolveForAsset(MediaAsset asset);
+
+    /// <summary>把 LUT 应用到一条素材的静帧上，返回缓存里的 JPEG 路径（供预览/缩略图加载）。</summary>
+    Task<string?> RenderPreviewAsync(MediaAsset asset, LutEntry lut, int maxSize, CancellationToken ct = default);
 }
 
 // ---------------------------- 扫描 ----------------------------
@@ -86,8 +128,11 @@ public interface IMediaDecoder
 /// <summary>缩略图服务：磁盘缓存 + 异步生成。</summary>
 public interface IThumbnailService
 {
-    Task<byte[]?> GetThumbnailJpegAsync(MediaAsset asset, int maxSize, CancellationToken ct = default);
-    Task<string?> GetThumbnailPathAsync(MediaAsset asset, int maxSize, CancellationToken ct = default);
+    /// <param name="lut">可选的 LUT：给了就先调色再编码（缓存键含 lutKey，互不覆盖）。</param>
+    Task<byte[]?> GetThumbnailJpegAsync(MediaAsset asset, int maxSize, CubeLut? lut = null,
+        string? lutKey = null, CancellationToken ct = default);
+    Task<string?> GetThumbnailPathAsync(MediaAsset asset, int maxSize, CubeLut? lut = null,
+        string? lutKey = null, CancellationToken ct = default);
     Task InvalidateAsync(MediaAsset asset);
     Task<long> GetCacheSizeBytesAsync(CancellationToken ct = default);
     Task ClearCacheAsync(CancellationToken ct = default);

@@ -1,3 +1,4 @@
+using StjMediaViewer.Core.Color;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using StjMediaViewer.Core.Abstractions;
@@ -179,8 +180,10 @@ internal sealed class FallbackSettingsService : ISettingsService
 
 internal sealed class FallbackThumbnailService : IThumbnailService
 {
-    public Task<byte[]?> GetThumbnailJpegAsync(MediaAsset asset, int maxSize, CancellationToken ct = default) => Task.FromResult<byte[]?>(null);
-    public Task<string?> GetThumbnailPathAsync(MediaAsset asset, int maxSize, CancellationToken ct = default) => Task.FromResult<string?>(null);
+    public Task<byte[]?> GetThumbnailJpegAsync(MediaAsset asset, int maxSize, CubeLut? lut = null,
+        string? lutKey = null, CancellationToken ct = default) => Task.FromResult<byte[]?>(null);
+    public Task<string?> GetThumbnailPathAsync(MediaAsset asset, int maxSize, CubeLut? lut = null,
+        string? lutKey = null, CancellationToken ct = default) => Task.FromResult<string?>(null);
     public Task InvalidateAsync(MediaAsset asset) => Task.CompletedTask;
     public Task<long> GetCacheSizeBytesAsync(CancellationToken ct = default) => Task.FromResult(0L);
     public Task ClearCacheAsync(CancellationToken ct = default) => Task.CompletedTask;
@@ -478,4 +481,29 @@ internal sealed class FallbackTranscodeService : ITranscodeService
         => Path.ChangeExtension(sourcePath, "." + profile.Container);
 
     public long EstimateOutputBytes(VideoProbe probe, TranscodeProfile profile) => 0;
+}
+
+
+/// <summary>演示模式下的 LUT 服务：没有解码器与磁盘，返回空集合。</summary>
+public sealed class FallbackLutService : ILutService
+{
+    public string BuiltInFolder => Path.Combine(Path.GetTempPath(), "stj-lut-demo", "builtin");
+    public string UserFolder => Path.Combine(Path.GetTempPath(), "stj-lut-demo", "user");
+
+    public Task<IReadOnlyList<LutEntry>> ListAsync(bool forceRefresh = false, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<LutEntry>>(Array.Empty<LutEntry>());
+
+    public Task<IReadOnlyList<LutEntry>> ImportAsync(IEnumerable<string> filePaths, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<LutEntry>>(Array.Empty<LutEntry>());
+
+    public Task<bool> DeleteAsync(LutEntry entry, CancellationToken ct = default) => Task.FromResult(false);
+
+    public Task<CubeLut?> LoadCubeAsync(LutEntry entry, CancellationToken ct = default) => Task.FromResult<CubeLut?>(null);
+
+    public Task<LutEntry?> GetAsync(string? id, CancellationToken ct = default) => Task.FromResult<LutEntry?>(null);
+
+    public LutEntry? ResolveForAsset(MediaAsset asset) => null;
+
+    public Task<string?> RenderPreviewAsync(MediaAsset asset, LutEntry lut, int maxSize, CancellationToken ct = default)
+        => Task.FromResult<string?>(null);
 }

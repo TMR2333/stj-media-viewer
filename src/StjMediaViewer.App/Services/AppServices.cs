@@ -1,3 +1,4 @@
+using StjMediaViewer.Core.Color;
 using StjMediaViewer.Core.Abstractions;
 using StjMediaViewer.Core.Cloud;
 using StjMediaViewer.Core.Devices;
@@ -57,6 +58,9 @@ public static class AppServices
     // ---- 转码 / 压缩 ----
     public static ITranscodeService Transcode { get; private set; } = null!;
 
+    // ---- LUT 调色 ----
+    public static ILutService Luts { get; private set; } = null!;
+
     /// <summary>密码加解密（DPAPI）：UI 只碰明文，落盘一律密文。</summary>
     public static class Secrets
     {
@@ -114,6 +118,13 @@ public static class AppServices
         Design = new DesignLanguageService();
         WindowChrome = new WindowChromeService();
 
+        // LUT：后台生成内置 LUT + 扫描用户目录，避免首帧缩略图错过自动调色
+        _ = Task.Run(async () =>
+        {
+            try { await Luts.ListAsync().ConfigureAwait(false); }
+            catch (Exception ex) { Log.Warn("LUT 预热失败", ex); }
+        });
+
         IsReady = true;
         ServicesReplaced?.Invoke(null, EventArgs.Empty);
         Ready?.Invoke(null, EventArgs.Empty);
@@ -144,6 +155,7 @@ public static class AppServices
         Import = new ImportService(Metadata, Geocoder, Library);
         Verify = new FileVerificationService();
         Transcode = new TranscodeService(Ffmpeg);
+        Luts = new LutService(Settings, Decoder, Encoder);
         Cloud = new CloudSyncService();
         CloudAuto = new CloudAutoSyncService(Settings, Cloud);
 
@@ -181,6 +193,7 @@ public static class AppServices
         Import = new FallbackImportService();
         Verify = new FallbackVerificationService();
         Transcode = new FallbackTranscodeService();
+        Luts = new FallbackLutService();
         Cloud = new FallbackCloudSyncService();
         CloudAuto = new CloudAutoSyncService(Settings, Cloud);
         return Task.CompletedTask;

@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="StjMediaViewer.App.Views.LutPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:StjMediaViewer.App.ViewModels"
+    Background="{ThemeResource AppTransparentBrush}">
+
+    <Grid Background="{ThemeResource AppSurfaceBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- ============ 页头 ============ -->
+        <Grid Grid.Row="0" Padding="24,18,24,12" ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Spacing="2">
+                <TextBlock Text="视频 LUT" Style="{ThemeResource AppTitleTextStyle}" />
+                <TextBlock Style="{ThemeResource AppCaptionTextStyle}"
+                           TextWrapping="Wrap"
+                           Text="内置 LUT 由公开色彩科学公式（S-Log3 / S-Log2 / HLG → Rec.709）现场生成；识别到 Sony 相机的 Log 素材会自动套用官方基准转换，也可以换上自己的风格化 LUT。" />
+                <TextBlock Text="{x:Bind ViewModel.SummaryText, Mode=OneWay}"
+                           Style="{ThemeResource AppMicroTextStyle}"
+                           Foreground="{ThemeResource TextTertiaryBrush}" />
+            </StackPanel>
+
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="12,2,12,2" MinHeight="30"
+                        Click="Import_Click" ToolTipService.ToolTip="导入 .cube 文件到用户 LUT 目录">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE8B5;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                        <TextBlock Text="导入 LUT…" Style="{ThemeResource AppCaptionTextStyle}" />
+                    </StackPanel>
+                </Button>
+                <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="12,2,12,2" MinHeight="30"
+                        Click="OpenFolder_Click" ToolTipService.ToolTip="在资源管理器里打开用户 LUT 目录">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE838;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                        <TextBlock Text="打开目录" Style="{ThemeResource AppCaptionTextStyle}" />
+                    </StackPanel>
+                </Button>
+                <Button Style="{ThemeResource AppIconButtonStyle}" Click="Refresh_Click"
+                        ToolTipService.ToolTip="重新扫描 LUT 目录">
+                    <FontIcon Glyph="&#xE72C;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <!-- ============ 主体：左列表 + 右预览 ============ -->
+        <Grid Grid.Row="1" Padding="24,0,24,8" ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="420" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- 列表 -->
+            <Border Background="{ThemeResource AppSurfaceAltBrush}"
+                    BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                    BorderThickness="{ThemeResource AppCardStrokeThickness}"
+                    CornerRadius="{ThemeResource AppCardRadius}">
+                <Grid>
+                    <ListView x:Name="LutList"
+                              ItemsSource="{x:Bind ViewModel.Items, Mode=OneWay}"
+                              SelectedItem="{x:Bind ViewModel.Selected, Mode=TwoWay}"
+                              SelectionMode="Single"
+                              Padding="6"
+                              Visibility="{x:Bind ViewModel.ContentVisibility, Mode=OneWay}">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Padding" Value="0" />
+                                <Setter Property="MinHeight" Value="0" />
+                                <Setter Property="CornerRadius" Value="{ThemeResource AppRadiusSmall}" />
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="vm:LutCardItem">
+                                <Grid Padding="10,7" ColumnSpacing="8" RowSpacing="2">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <TextBlock Grid.Row="0" Grid.Column="0"
+                                               Text="{x:Bind Name}"
+                                               Style="{ThemeResource AppCaptionTextStyle}"
+                                               Foreground="{ThemeResource TextPrimaryBrush}"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <Border Grid.Row="0" Grid.Column="1"
+                                            Background="{ThemeResource AccentSubtleBrush}"
+                                            CornerRadius="{ThemeResource AppRadiusPill}"
+                                            Padding="6,0"
+                                            VerticalAlignment="Center"
+                                            Visibility="{x:Bind CategoryVisibility}">
+                                        <TextBlock Text="{x:Bind CategoryText}"
+                                                   Style="{ThemeResource AppMicroTextStyle}"
+                                                   Foreground="{ThemeResource AccentBrush}" />
+                                    </Border>
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                                               Text="{x:Bind DetailText}"
+                                               Style="{ThemeResource AppMicroTextStyle}"
+                                               Foreground="{ThemeResource TextTertiaryBrush}"
+                                               TextTrimming="CharacterEllipsis" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+
+                    <TextBlock Text="还没有可用的 LUT。点右上角「导入 LUT…」把 .cube 放进来；内置 LUT 会在首次打开时自动生成。"
+                               Style="{ThemeResource AppCaptionTextStyle}"
+                               Foreground="{ThemeResource TextSecondaryBrush}"
+                               TextWrapping="Wrap"
+                               Margin="16"
+                               VerticalAlignment="Center"
+                               Visibility="{x:Bind ViewModel.EmptyVisibility, Mode=OneWay}" />
+                </Grid>
+            </Border>
+
+            <!-- 预览 -->
+            <Border Grid.Column="1"
+                    Background="{ThemeResource AppSurfaceAltBrush}"
+                    BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                    BorderThickness="{ThemeResource AppCardStrokeThickness}"
+                    CornerRadius="{ThemeResource AppCardRadius}">
+                <Grid Padding="16" RowSpacing="10">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Grid>
+                        <Border Background="{ThemeResource AppWindowBackgroundBrush}"
+                                CornerRadius="{ThemeResource AppRadiusSmall}">
+                            <Image Source="{x:Bind ViewModel.PreviewSource, Mode=OneWay}"
+                                   Stretch="Uniform"
+                                   Margin="8" />
+                        </Border>
+                        <TextBlock Text="选择左侧任意 LUT 查看套用效果"
+                                   Style="{ThemeResource AppCaptionTextStyle}"
+                                   Foreground="{ThemeResource TextTertiaryBrush}"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Visibility="{x:Bind ViewModel.HintVisibility, Mode=OneWay}" />
+                        <ProgressRing Width="28" Height="28"
+                                      IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}"
+                                      Visibility="{x:Bind ViewModel.BusyVisibility, Mode=OneWay}"
+                                      Foreground="{ThemeResource AccentBrush}" />
+                    </Grid>
+
+                    <StackPanel Grid.Row="1" Spacing="8">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="{x:Bind ViewModel.PreviewTitle, Mode=OneWay}"
+                                       Style="{ThemeResource AppSectionHeaderTextStyle}"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{x:Bind ViewModel.PreviewSubtitle, Mode=OneWay}"
+                                       Style="{ThemeResource AppMicroTextStyle}"
+                                       Foreground="{ThemeResource TextTertiaryBrush}" />
+                            <TextBlock Text="{x:Bind ViewModel.SampleText, Mode=OneWay}"
+                                       Style="{ThemeResource AppMicroTextStyle}"
+                                       Foreground="{ThemeResource TextTertiaryBrush}" />
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="12,2,12,2" MinHeight="30"
+                                    Click="Apply_Click"
+                                    Visibility="{x:Bind ViewModel.ApplyVisibility, Mode=OneWay}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE73E;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                                    <TextBlock Text="应用到选中素材" Style="{ThemeResource AppCaptionTextStyle}" />
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="12,2,12,2" MinHeight="30"
+                                    Click="Auto_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE777;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                                    <TextBlock Text="恢复自动匹配" Style="{ThemeResource AppCaptionTextStyle}" />
+                                </StackPanel>
+                            </Button>
+                            <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="12,2,12,2" MinHeight="30"
+                                    Click="Delete_Click"
+                                    Visibility="{x:Bind ViewModel.DeleteVisibility, Mode=OneWay}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE74D;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                                    <TextBlock Text="删除这条 LUT" Style="{ThemeResource AppCaptionTextStyle}" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- ============ 底部：自动匹配 + 目录 ============ -->
+        <Border Grid.Row="2"
+                Background="{ThemeResource AppSurfaceAltBrush}"
+                BorderBrush="{ThemeResource AppDividerBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="24,10">
+            <Grid ColumnSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <ToggleSwitch IsOn="{x:Bind ViewModel.AutoAssignForSony, Mode=TwoWay}"
+                                  Toggled="AutoAssign_Toggled"
+                                  OnContent="关" OffContent="关"
+                                  MinWidth="0" />
+                    <TextBlock Text="Sony Log 素材自动套用内置基准 LUT"
+                               Style="{ThemeResource AppCaptionTextStyle}"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                    <TextBlock Text="{x:Bind ViewModel.UserFolderText, Mode=OneWay}"
+                               Style="{ThemeResource AppMicroTextStyle}"
+                               Foreground="{ThemeResource TextTertiaryBrush}"
+                               TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{x:Bind ViewModel.DetectText, Mode=OneWay}"
+                               Style="{ThemeResource AppMicroTextStyle}"
+                               Foreground="{ThemeResource TextSecondaryBrush}"
+                               TextWrapping="Wrap"
+                               Visibility="{x:Bind ViewModel.DetectVisibility, Mode=OneWay}" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Page>

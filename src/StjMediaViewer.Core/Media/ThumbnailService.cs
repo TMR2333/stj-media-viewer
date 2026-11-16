@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using StjMediaViewer.Core.Abstractions;
+using StjMediaViewer.Core.Color;
 using StjMediaViewer.Core.Models;
 using StjMediaViewer.Core.Util;
 
@@ -44,13 +45,14 @@ public sealed class ThumbnailService : IThumbnailService
 
     // ==================================================================== 生成 / 命中
 
-    public async Task<byte[]?> GetThumbnailJpegAsync(MediaAsset asset, int maxSize, CancellationToken ct = default)
+    public async Task<byte[]?> GetThumbnailJpegAsync(MediaAsset asset, int maxSize, CubeLut? lut = null,
+        string? lutKey = null, CancellationToken ct = default)
     {
         if (asset is null || string.IsNullOrWhiteSpace(asset.FullPath)) return null;
         int size = ClampSize(maxSize);
         try
         {
-            var path = CachePath(asset, size);
+            var path = CachePath(asset, size, lutKey);
             var cached = TryReadCached(path);
             if (cached is not null) return cached;
             if (IsRecentlyFailed(path)) return null;
@@ -68,6 +70,10 @@ public sealed class ThumbnailService : IThumbnailService
                     MarkFailed(path);
                     return null;
                 }
+
+                // LUT 调色在编码之前做（同一帧缓存里保留"已调色"结果，切换 LUT 走不同缓存键）
+                if (lut is not null && !lut.IsIdentity)
+                    image = LutApplier.Apply(image, lut);
 
                 var jpeg = await _encoder.EncodeJpegAsync(image, DefaultQuality, ct).ConfigureAwait(false);
                 if (jpeg is null || jpeg.Length == 0)
@@ -87,25 +93,27 @@ public sealed class ThumbnailService : IThumbnailService
         catch (Exception ex)
         {
             Log.Warn($"[thumb] generate failed {asset.FullPath}: {ex.GetType().Name}: {ex.Message}");
-            var failedPath = SafeCachePath(asset, size);
+            var failedPath = SafeCachePath(asset, size, lutKey);
             if (failedPath is not null) MarkFailed(failedPath);
             return null;
         }
         finally
         {
             // 防止字典无限增长：请求完成且无人等待时移除
-            var key = SafeCachePath(asset, size);
+            var key = SafeCachePath(asset, size, lutKey);
             if (key is not null && _gates.TryGetValue(key, out var g) && g.CurrentCount == 1)
                 _gates.TryRemove(key, out _);
         }
     }
 
-    public async Task<string?> GetThumbnailPathAsync(MediaAsset asset, int maxSize, CancellationToken ct = default)
+    public async Task<string?> GetThumbnailPathAsync(MediaAsset asset, int maxSize, CubeLut? lut = null,
+        string? lutKey = null, CancellationToken ct = default)
     {
         if (asset is null || string.IsNullOrWhiteSpace(asset.FullPath)) return null;
-        var path = CachePath(asset, ClampSize(maxSize));
+        int size = ClampSize(maxSize);
+        var path = CachePath(asset, size, lutKey);
         if (File.Exists(path)) return path;
-        var bytes = await GetThumbnailJpegAsync(asset, maxSize, ct).ConfigureAwait(false);
+        var bytes = await GetThumbnailJpegAsync(asset, maxSize, lut, lutKey, ct).ConfigureAwait(false);
         return bytes is null ? null : path;
     }
 
@@ -206,15 +214,23 @@ public sealed class ThumbnailService : IThumbnailService
         return Convert.ToHexString(hash).ToLowerInvariant();
     }
 
-    private string CachePath(MediaAsset asset, int size)
+    /// <summary>同一张素材的不同 LUT 各自一份缓存（文件名后缀），切换 LUT 不覆盖彼此的成品。</summary>
+    private static string LutSuffix(string? lutKey)
     {
-        TryPrepareDirectory();
-        return Path.Combine(_cacheDir, $"{KeyBase(asset)}_{CacheRevision}_{size}.jpg");
+        if (string.IsNullOrWhiteSpace(lutKey)) return "";
+        var hash = System.Security.Cryptography.SHA1.HashData(System.Text.Encoding.UTF8.GetBytes(lutKey));
+        return "_lut" + Convert.ToHexString(hash)[..8].ToLowerInvariant();
     }
 
-    private string? SafeCachePath(MediaAsset asset, int size)
+    private string CachePath(MediaAsset asset, int size, string? lutKey = null)
     {
-        try { return Path.Combine(_cacheDir, $"{KeyBase(asset)}_{CacheRevision}_{size}.jpg"); }
+        TryPrepareDirectory();
+        return Path.Combine(_cacheDir, $"{KeyBase(asset)}_{CacheRevision}_{size}{LutSuffix(lutKey)}.jpg");
+    }
+
+    private string? SafeCachePath(MediaAsset asset, int size, string? lutKey = null)
+    {
+        try { return Path.Combine(_cacheDir, $"{KeyBase(asset)}_{CacheRevision}_{size}{LutSuffix(lutKey)}.jpg"); }
         catch { return null; }
     }
 

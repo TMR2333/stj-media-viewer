@@ -51,7 +51,9 @@ public sealed class MediaAsset
     // ---- 拍摄设备 ----
     public string? CameraMake { get; set; }
     public string? CameraModel { get; set; }
-    public string? DeviceKey { get; set; }                  // 归一化设备键，如 "Sony ILCE-7M4"
+    public string? DeviceKey { get; set; }
+    /// <summary>该素材选用的 LUT id（空 = 按相机/Log 自动匹配内置基准 LUT）。</summary>
+    public string? LutId { get; set; }                  // 归一化设备键，如 "Sony ILCE-7M4"
     public string? LensModel { get; set; }
     public double? FocalLengthMm { get; set; }
     public double? ApertureF { get; set; }
@@ -173,6 +175,7 @@ public sealed class MediaAsset
         CameraMake = CameraMake,
         CameraModel = CameraModel,
         DeviceKey = DeviceKey,
+        LutId = LutId,
         LensModel = LensModel,
         FocalLengthMm = FocalLengthMm,
         ApertureF = ApertureF,

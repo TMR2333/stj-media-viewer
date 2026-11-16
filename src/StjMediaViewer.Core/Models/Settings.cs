@@ -68,6 +68,11 @@ public sealed class AppSettings
     public int ScanParallelism { get; set; } = 4;
     public bool WatchLibraries { get; set; } = true;
 
+    /// <summary>用户 LUT 目录（放 .cube 文件的文件夹；为空时用默认目录）。</summary>
+    public string? LutFolderPath { get; set; }
+    /// <summary>识别到 Sony 相机 + Log 素材时自动套用内置基准 LUT。</summary>
+    public bool AutoAssignLutForSony { get; set; } = true;
+
     /// <summary>云同步目标（坚果云 WebDAV / Nextcloud / 群晖 NAS / 本地挂载目录）。</summary>
     public List<CloudTarget> CloudTargets { get; set; } = new();
 
