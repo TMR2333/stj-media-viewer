@@ -297,6 +297,51 @@ ffmpeg 是可选的：把 `ffmpeg.exe` 放到 `tools/ffmpeg/bin/`（或 PATH）�
 
 想现场量化：设 `STJ_TRACE_THUMB=1` 启动，日志里会有 `[thumb] gen/hit/path-hit` 每张的耗时；`STJ_TRACE_DECODE=1` 还能看到 WIC 分段耗时。
 
+## 3.2 安装包与便携版
+
+![安装界面](shots/final-setup-ui.png)
+
+两个交付物（`dist/`，`tools/Installer/build-installer.ps1` 一键重出）：
+
+| 产物 | 大小 | 说明 |
+| --- | --- | --- |
+| `STJMediaViewer-Setup.exe` | ≈143 MB | **安装包**，带图形界面：可**自定义安装目录**、可选创建桌面快捷方式；装到用户目录，不需要管理员权限 |
+| `STJMediaViewer-1.0.0-portable.exe` | ≈143 MB | **便携版**：单文件，双击后解压到 `%LOCALAPPDATA%\StjMediaViewerPortable` 并直接启动；不写注册表、不建快捷方式 |
+
+> 旧的 `*-portable-win-x64.zip` 已废弃：压缩包里的 exe 直接双击容易踩「没解压就在压缩包里运行 / SmartScreen 拦截」，
+> 现在改成**单文件便携 exe**，双击即用。
+
+**安装界面**（双击 `Setup.exe`）：
+
+- 「安装位置」默认 `%LOCALAPPDATA%\Programs\StjMediaViewer`，可手改或点「浏览…」选任意目录；
+- 「创建桌面快捷方式」可选（默认不勾），开始菜单快捷方式总会创建；
+- 目录非空时二次确认；安装前自动结束正在运行的旧实例。
+
+**命令行（可脚本化）**：
+
+```
+STJMediaViewer-Setup.exe                      交互式安装（选目录）
+STJMediaViewer-Setup.exe /S                   静默安装到默认目录
+STJMediaViewer-Setup.exe /S /D=D:\Apps\STJ  静默安装到指定目录
+STJMediaViewer-Setup.exe /uninstall           卸载（/S 静默；/D= 指定安装目录）
+STJMediaViewer-1.0.0-portable.exe            便携版：解压 + 启动
+STJMediaViewer-1.0.0-portable.exe /D=D:\STJ 便携版解压到指定目录
+```
+
+**卸载**：Windows 设置 → 应用 → 已安装的应用（或 `Setup.exe /uninstall`）。
+只删程序文件，**索引库 / 缩略图缓存 / 设置保留在** `%LOCALAPPDATA%\StjMediaViewer`（卸载提示里会说明）。
+
+**首次启动被拦？** 未签名 exe 可能被 SmartScreen 提示：点「更多信息 → 仍要运行」，
+或右键 exe → 属性 → 勾选「解除锁定」后确定。企业环境请让 IT 放行。
+
+**技术要点**：
+
+- WinUI 3 `dotnet publish` 不会自动带走根目录的 `App.xbf` / `MainWindow.xbf`，缺了发布版启动即崩（`0xC00000FD`）→ csproj 里 `CopyXbfToPublish` 目标补齐；
+- 安装器自研单文件 exe（内嵌 zip 载荷）：WinForms 选目录界面 + `IShellLink` 快捷方式 + HKCU 卸载项，全程无管理员权限；
+- 受限环境里 `EnableVisualStyles` 可能因临时目录不可写而失败 → 自动降级（界面无主题样式但功能正常）；
+- 快捷方式 / 卸载项写入失败不影响安装完成，只记日志（安装包同目录 `stj-setup.log`）；
+- 发布只保留 `zh-Hans` / `en` 框架资源，日期选择器等系统控件保持中文。
+
 ## 3.3 macOS 版（SwiftUI 原生）
 
 Windows 主版本用 WinUI 3；macOS 版是独立的 SwiftUI 原生应用，见 [`macos/README.md`](macos/README.md)。
@@ -313,32 +358,6 @@ Windows 主版本用 WinUI 3；macOS 版是独立的 SwiftUI 原生应用，见 
   不设置则 ad-hoc 签名（用户首次打开需右键 → 打开）。
 - 可行性盘点与取舍（Core 可复用 ~90%、三条路线对比）见 [`docs/macos-port.md`](docs/macos-port.md)。
 
-## 3.2 安装包与绿色版
-
-![安装后运行](shots/final-packaged.png)
-
-两个交付物（`dist/` 目录，构建脚本 `tools/Installer/build-installer.ps1` 一键重出）：
-
-| 产物 | 大小 | 说明 |
-| --- | --- | --- |
-| `STJMediaViewer-Setup.exe` | ≈132 MB | 安装包（单文件，**不需要管理员权限**）。双击 → 确认 → 安装 → 可直接启动；也可 `Setup.exe /S` 静默安装 |
-| `STJMediaViewer-1.0.0-portable-win-x64.zip` | ≈96 MB | 绿色版：解压到任意目录，双击 `StjMediaViewer.exe` 即用（自包含 .NET 10 + Windows App SDK 运行时，目标机不用装任何依赖） |
-
-**安装包做什么**：
-
-1. 释放 441 个文件到 `%LOCALAPPDATA%\Programs\StjMediaViewer`（用户目录，不走 UAC）；
-2. 创建开始菜单快捷方式 `STJ Media Viewer`；
-3. 注册 HKCU 卸载项 → Windows「应用和功能」里可直接卸载（`Setup.exe /uninstall`）；
-4. 安装前自动结束正在运行的旧实例；覆盖安装不会残留旧 DLL。
-
-**卸载**：开始菜单右键卸载，或 `Setup.exe /uninstall`（`/S /uninstall` 静默）。只删程序文件，**索引库 / 缩略图缓存 / 设置保留在** `%LOCALAPPDATA%\StjMediaViewer`（卸载时会提示，需彻底清理可手动删除该目录）。
-
-**技术要点（踩过的坑）**：
-
-- WinUI 3 `dotnet publish` 不会自动带走根目录的 `App.xbf` / `MainWindow.xbf`，缺了它们发布版启动即崩（`0xC00000FD`）→ 在 `StjMediaViewer.App.csproj` 里加了 `CopyXbfToPublish` 目标补上；
-- 安装器是自研单文件 exe（内嵌 96 MB zip 载荷），用 `HKCU` 卸载项 + `IShellLink` 建快捷方式，全程无管理员权限、无外部安装框架依赖；
-- 快捷方式 / 卸载项写入失败（组策略或受限环境）不影响安装完成，只记日志；安装日志写在安装包同目录的 `stj-setup.log`；
-- 发布只保留 `zh-Hans` / `en` 框架资源，日期选择器等系统控件保持中文。
 
 ## 4. 工程与验证
 

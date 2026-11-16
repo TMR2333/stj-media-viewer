@@ -8,16 +8,18 @@ using Microsoft.Win32;
 namespace StjMediaViewer.Installer;
 
 /// <summary>
-/// STJ Media Viewer 安装包（单文件 exe，无需管理员权限）。
+/// STJ Media Viewer 分发包（一个 exe，两种用法）：
 ///
-/// 用法：
-///   STJMediaViewer-Setup.exe              交互式安装（确认 → 安装 → 完成）
-///   STJMediaViewer-Setup.exe /S           静默安装
-///   STJMediaViewer-Setup.exe /uninstall   交互式卸载
-///   STJMediaViewer-Setup.exe /S /uninstall 静默卸载
+///   1) 安装包（默认）：带界面，可选择安装目录、是否建桌面快捷方式
+///        STJMediaViewer-Setup.exe               交互式安装
+///        STJMediaViewer-Setup.exe /S            静默安装到默认目录
+///        STJMediaViewer-Setup.exe /S /D=D:\App  静默安装到指定目录
+///        STJMediaViewer-Setup.exe /uninstall    卸载（加 /S 静默）
 ///
-/// 安装位置：%LOCALAPPDATA%\Programs\StjMediaViewer（用户目录，不用 UAC）
-/// 附带：开始菜单快捷方式 + 系统「应用和功能」卸载项（HKCU）
+///   2) 便携版：解压到用户目录并直接启动，不写注册表、不建快捷方式
+///        STJMediaViewer-Portable.exe            解压到 %LOCALAPPDATA%\StjMediaViewerPortable 并启动
+///        STJMediaViewer-Portable.exe /S         同上（无提示）
+///        STJMediaViewer-Portable.exe /D=<dir>   解压到指定目录并启动
 /// </summary>
 internal static class Program
 {
@@ -27,17 +29,20 @@ internal static class Program
     private const string Publisher = "Stjarna Perspective";
     private const string ExeName = "StjMediaViewer.exe";
 
-    // 测试/绿色部署可用 STJ_SETUP_DIR 覆盖安装目录
-    private static string InstallDir =>
-        Environment.GetEnvironmentVariable("STJ_SETUP_DIR") is { Length: > 0 } custom
-            ? custom
-            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "Programs", AppId);
+    private static string DefaultInstallDir =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "Programs", AppId);
 
-    private static string TargetExe => Path.Combine(InstallDir, ExeName);
+    private static string DefaultPortableDir =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "StjMediaViewerPortable");
 
     private static string StartMenuLink =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs),
+            $"{AppName}.lnk");
+
+    private static string DesktopLink =>
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
             $"{AppName}.lnk");
 
     private const string UninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\" + AppId;
@@ -45,42 +50,58 @@ internal static class Program
     private static readonly string[] LogPaths =
     {
         Path.Combine(AppContext.BaseDirectory, "stj-setup.log"),
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "StjMediaViewerSetup.log"),
         Path.Combine(Path.GetTempPath(), "stj-setup.log"),
     };
-
-    private static void Log(string message)
-    {
-        var line = $"{DateTime.Now:HH:mm:ss.fff} {message}{Environment.NewLine}";
-        foreach (var path in LogPaths)
-        {
-            try
-            {
-                File.AppendAllText(path, line);
-                return;
-            }
-            catch { /* 换下一个位置 */ }
-        }
-    }
 
     [STAThread]
     private static int Main(string[] args)
     {
-        Log($"start args=[{string.Join(" | ", args)}]");
+        Log($"start args=[{string.Join(" | ", args)}] exe={Environment.ProcessPath}");
 
-        var silent = args.Any(a => a.Equals("/S", StringComparison.OrdinalIgnoreCase)
-                                   || a.Equals("/silent", StringComparison.OrdinalIgnoreCase));
-        var uninstall = args.Any(a => a.Equals("/uninstall", StringComparison.OrdinalIgnoreCase));
+        var silent = HasArg(args, "/S") || HasArg(args, "/silent");
+        var uninstall = HasArg(args, "/uninstall");
+        var explicitDir = ArgValue(args, "/D");
+        // 便携版 = 文件名里带 portable 的那个 exe（同一个二进制，改名即换模式）
+        var portable = HasArg(args, "/portable") ||
+                       (Environment.ProcessPath?.Contains("portable", StringComparison.OrdinalIgnoreCase) ?? false);
 
         try
         {
-            if (uninstall) return Uninstall(silent);
-            return Install(silent);
+            if (portable)
+                return RunPortable(silent, explicitDir ?? DefaultPortableDir);
+
+            if (uninstall)
+                return Uninstall(silent, explicitDir);
+
+            if (silent)
+                return Install(silent, explicitDir ?? DefaultInstallDir, desktopShortcut: false);
+
+            // 交互式：WinForms 小窗口，可选择安装目录。
+            // 受限环境（组策略/沙箱）里 EnableVisualStyles 可能因临时目录不可写而抛异常 —— 降级继续，
+            // 界面只是没有视觉样式，功能不受影响。
+            try
+            {
+                ApplicationConfiguration.Initialize();
+            }
+            catch (Exception ex)
+            {
+                Log($"EnableVisualStyles skipped: {ex.GetType().Name}: {ex.Message}");
+                try { Application.SetCompatibleTextRenderingDefault(false); } catch { }
+            }
+            using var form = new InstallerForm(explicitDir ?? DefaultInstallDir);
+            if (form.ShowDialog() != DialogResult.OK) return 0;
+
+            var dir = form.SelectedDirectory;
+            if (Directory.Exists(dir) && Directory.EnumerateFileSystemEntries(dir).Any() &&
+                !Question($"目录已存在且不为空：\n{dir}\n\n继续会覆盖同名文件，确定吗？"))
+                return 0;
+
+            return Install(silent: false, dir, form.CreateDesktopShortcut);
         }
         catch (Exception ex)
         {
             Log($"ERROR {ex}");
-            if (!silent) Msg($"安装失败：{ex.Message}", "STJ Media Viewer", 0x10);
+            if (!silent) Error($"安装失败：{ex.Message}");
             return 1;
         }
     }
@@ -89,38 +110,126 @@ internal static class Program
     //  安装
     // =====================================================================
 
-    private static int Install(bool silent)
+    private static int Install(bool silent, string targetDir, bool desktopShortcut)
     {
-        var existing = File.Exists(TargetExe);
-        if (!silent)
-        {
-            var prompt = existing
-                ? $"已检测到旧版本。\n\n将覆盖安装到：\n{InstallDir}\n\n继续吗？"
-                : $"将安装 {AppName} {Version}\n\n安装位置：\n{InstallDir}\n\n" +
-                  "安装到当前用户目录，不需要管理员权限。安装后可从开始菜单启动。\n\n继续吗？";
-            if (Msg(prompt, $"{AppName} 安装程序", 0x04) != 6 /* IDYES */) return 0;
-        }
-
-        Log($"install -> {InstallDir} (silent={silent}, existing={existing})");
+        Log($"install -> {targetDir} (silent={silent}, desktop={desktopShortcut})");
 
         StopRunningApp();
-
-        if (!silent) WriteProgress("正在释放文件…");
-        Directory.CreateDirectory(InstallDir);
-        ExtractPayload(InstallDir, silent);
+        Directory.CreateDirectory(targetDir);
+        ExtractPayload(targetDir, silent);
         Log("payload extracted");
 
-        // 快捷方式与卸载项属于"锦上添花"：受限环境（组策略/沙箱）里失败不应让安装失败
-        TryStep("start menu shortcut", CreateStartMenuShortcut);
-        TryStep("uninstall registry entry", RegisterUninstallEntry);
+        TryStep("start menu shortcut", () => CreateShortcut(StartMenuLink, TargetExeIn(targetDir)));
+        if (desktopShortcut)
+            TryStep("desktop shortcut", () => CreateShortcut(DesktopLink, TargetExeIn(targetDir)));
+        TryStep("uninstall registry entry", () => RegisterUninstallEntry(targetDir));
 
-        if (!silent)
-        {
-            if (Msg($"安装完成。\n\n现在启动 {AppName} 吗？", $"{AppName} 安装程序", 0x04) == 6)
-                StartApp();
-        }
+        if (!silent && Question($"安装完成：{targetDir}\n\n现在启动 {AppName} 吗？"))
+            StartApp(targetDir);
 
         return 0;
+    }
+
+    private static string TargetExeIn(string dir) => Path.Combine(dir, ExeName);
+
+    // =====================================================================
+    //  便携版：解压到用户目录 + 启动
+    // =====================================================================
+
+    private static int RunPortable(bool silent, string targetDir)
+    {
+        Log($"portable -> {targetDir}");
+        var exe = TargetExeIn(targetDir);
+        var marker = Path.Combine(targetDir, ".portable-version");
+
+        var upToDate = File.Exists(exe) && File.Exists(marker) &&
+                       File.ReadAllText(marker).Trim() == Version;
+
+        if (!upToDate)
+        {
+            StopRunningApp();
+            Directory.CreateDirectory(targetDir);
+            ExtractPayload(targetDir, silent);
+            try { File.WriteAllText(marker, Version); } catch { }
+            Log("portable payload extracted");
+        }
+
+        if (!File.Exists(exe))
+        {
+            if (!silent) Error("便携版解压失败，找不到主程序。");
+            return 1;
+        }
+
+        StartApp(targetDir);
+        return 0;
+    }
+
+    // =====================================================================
+    //  载荷
+    // =====================================================================
+
+    private static void ExtractPayload(string targetDir, bool silent)
+    {
+        var assembly = Assembly.GetExecutingAssembly();
+        var resource = assembly.GetManifestResourceNames()
+            .FirstOrDefault(n => n.EndsWith("payload.zip", StringComparison.OrdinalIgnoreCase))
+            ?? throw new InvalidOperationException("安装包损坏：缺少内嵌文件（payload.zip）");
+
+        using var stream = assembly.GetManifestResourceStream(resource)
+            ?? throw new InvalidOperationException("无法读取内嵌安装文件");
+
+        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+        int total = Math.Max(archive.Entries.Count, 1), done = 0;
+        var root = Path.GetFullPath(targetDir);
+
+        foreach (var entry in archive.Entries)
+        {
+            var destination = Path.GetFullPath(Path.Combine(root, entry.FullName));
+            if (!destination.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                continue;   // 防 zip slip
+
+            if (string.IsNullOrEmpty(entry.Name))
+            {
+                Directory.CreateDirectory(destination);
+                continue;
+            }
+
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            entry.ExtractToFile(destination, overwrite: true);
+
+            done++;
+            if (!silent && done % 60 == 0) Log($"释放文件… {done * 100 / total}%");
+        }
+    }
+
+    // =====================================================================
+    //  快捷方式 / 卸载项
+    // =====================================================================
+
+    private static void CreateShortcut(string linkPath, string targetExe)
+    {
+        var link = (IShellLinkW)new ShellLink();
+        link.SetPath(targetExe);
+        link.SetWorkingDirectory(Path.GetDirectoryName(targetExe) ?? "");
+        link.SetDescription("素材管理与 AI 分类工作台");
+        link.SetIconLocation(targetExe, 0);
+
+        var file = (IPersistFile)link;
+        file.Save(linkPath, true);
+    }
+
+    private static void RegisterUninstallEntry(string installDir)
+    {
+        using var key = Registry.CurrentUser.CreateSubKey(UninstallKey);
+        key.SetValue("DisplayName", AppName);
+        key.SetValue("DisplayVersion", Version);
+        key.SetValue("Publisher", Publisher);
+        key.SetValue("DisplayIcon", TargetExeIn(installDir));
+        key.SetValue("InstallLocation", installDir);
+        key.SetValue("NoModify", 1, RegistryValueKind.DWord);
+        key.SetValue("NoRepair", 1, RegistryValueKind.DWord);
+        key.SetValue("UninstallString", $"\"{Environment.ProcessPath}\" /uninstall");
+        key.SetValue("QuietUninstallString", $"\"{Environment.ProcessPath}\" /S /uninstall");
     }
 
     private static void TryStep(string name, Action action)
@@ -136,154 +245,127 @@ internal static class Program
         }
     }
 
-    private static void ExtractPayload(string targetDir, bool silent)
-    {
-        var assembly = Assembly.GetExecutingAssembly();
-        var resource = assembly.GetManifestResourceNames()
-            .FirstOrDefault(n => n.EndsWith("payload.zip", StringComparison.OrdinalIgnoreCase))
-            ?? throw new InvalidOperationException("安装包损坏：缺少内嵌文件（payload.zip）");
-
-        using var stream = assembly.GetManifestResourceStream(resource)
-            ?? throw new InvalidOperationException("无法读取内嵌安装文件");
-
-        using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
-        int total = archive.Entries.Count, done = 0;
-        foreach (var entry in archive.Entries)
-        {
-            var destination = Path.GetFullPath(Path.Combine(targetDir, entry.FullName));
-            if (!destination.StartsWith(Path.GetFullPath(targetDir) + Path.DirectorySeparatorChar,
-                    StringComparison.OrdinalIgnoreCase))
-                continue;   // 防 zip slip
-
-            if (string.IsNullOrEmpty(entry.Name))
-            {
-                Directory.CreateDirectory(destination);
-                continue;
-            }
-
-            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
-            entry.ExtractToFile(destination, overwrite: true);
-
-            if (!silent && ++done % 40 == 0) WriteProgress($"正在释放文件… {done * 100 / Math.Max(total, 1)}%");
-        }
-    }
-
-    private static void CreateStartMenuShortcut()
-    {
-        try
-        {
-            var link = (IShellLinkW)new ShellLink();
-            link.SetPath(TargetExe);
-            link.SetWorkingDirectory(InstallDir);
-            link.SetDescription("素材管理与 AI 分类工作台");
-            link.SetIconLocation(TargetExe, 0);
-
-            var file = (IPersistFile)link;
-            file.Save(StartMenuLink, true);
-        }
-        catch
-        {
-            // 快捷方式失败不影响安装（用户仍可从安装目录启动）
-        }
-    }
-
-    private static void RegisterUninstallEntry()
-    {
-        using var key = Registry.CurrentUser.CreateSubKey(UninstallKey);
-        key.SetValue("DisplayName", AppName);
-        key.SetValue("DisplayVersion", Version);
-        key.SetValue("Publisher", Publisher);
-        key.SetValue("DisplayIcon", TargetExe);
-        key.SetValue("InstallLocation", InstallDir);
-        key.SetValue("NoModify", 1, RegistryValueKind.DWord);
-        key.SetValue("NoRepair", 1, RegistryValueKind.DWord);
-        key.SetValue("EstimatedSize", GetDirectorySizeKb(InstallDir), RegistryValueKind.DWord);
-        key.SetValue("UninstallString", $"\"{Environment.ProcessPath}\" /uninstall");
-        key.SetValue("QuietUninstallString", $"\"{Environment.ProcessPath}\" /S /uninstall");
-    }
-
-    private static int GetDirectorySizeKb(string dir)
-    {
-        try
-        {
-            var bytes = Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories)
-                .Sum(f => new FileInfo(f).Length);
-            return (int)Math.Min(bytes / 1024, int.MaxValue);
-        }
-        catch
-        {
-            return 0;
-        }
-    }
-
-    private static void StartApp()
-    {
-        try
-        {
-            Process.Start(new ProcessStartInfo(TargetExe) { WorkingDirectory = InstallDir, UseShellExecute = true });
-        }
-        catch { /* 启动失败时用户可手动点快捷方式 */ }
-    }
-
     // =====================================================================
     //  卸载
     // =====================================================================
 
-    private static int Uninstall(bool silent)
+    private static int Uninstall(bool silent, string? explicitDir)
     {
-        if (!Directory.Exists(InstallDir))
+        var installDir = explicitDir ?? DefaultInstallDir;
+        try
         {
-            if (!silent) Msg("没有找到已安装的 STJ Media Viewer。", AppName, 0x40);
+            using var key = Registry.CurrentUser.OpenSubKey(UninstallKey);
+            if (explicitDir is null && key?.GetValue("InstallLocation") is string location && location.Length > 0)
+                installDir = location;
+        }
+        catch { }
+
+        if (!Directory.Exists(installDir))
+        {
+            if (!silent) Info("没有找到已安装的 STJ Media Viewer。");
             return 0;
         }
 
-        if (!silent && Msg($"确定卸载 {AppName} 吗？\n\n用户数据（索引库、缩略图缓存、设置）会保留在：\n" +
-                           $"%LOCALAPPDATA%\\{AppId}\n\n如需彻底清除请手动删除该目录。",
-                $"{AppName} 卸载程序", 0x04) != 6) return 0;
+        if (!silent && !Question($"确定卸载 {AppName} 吗？\n\n安装位置：{installDir}\n\n" +
+                                 "用户数据（索引库、缩略图缓存、设置）会保留在 %LOCALAPPDATA%\\StjMediaViewer。"))
+            return 0;
 
         StopRunningApp();
 
         try { File.Delete(StartMenuLink); } catch { }
+        try { File.Delete(DesktopLink); } catch { }
         try { Registry.CurrentUser.DeleteSubKeyTree(UninstallKey, throwOnMissingSubKey: false); } catch { }
 
         try
         {
-            Directory.Delete(InstallDir, recursive: true);
+            Directory.Delete(installDir, recursive: true);
         }
         catch (Exception ex)
         {
-            if (!silent) Msg($"删除安装目录失败：{ex.Message}\n请手动删除：{InstallDir}", AppName, 0x10);
+            Log($"uninstall failed: {ex.Message}");
+            if (!silent) Error($"删除安装目录失败：{ex.Message}\n请手动删除：{installDir}");
             return 1;
         }
 
-        if (!silent) Msg("已卸载。感谢使用。", AppName, 0x40);
+        if (!silent) Info("已卸载。感谢使用。");
         return 0;
     }
 
     // =====================================================================
-    //  公共
+    //  进程
     // =====================================================================
 
     private static void StopRunningApp()
     {
-        foreach (var process in Process.GetProcessesByName(AppId).Concat(Process.GetProcessesByName("StjMediaViewer")))
+        foreach (var name in new[] { AppId, "StjMediaViewer" })
         {
-            try
+            foreach (var process in Process.GetProcessesByName(name))
             {
-                process.CloseMainWindow();
-                if (!process.WaitForExit(3000)) process.Kill(entireProcessTree: true);
+                try
+                {
+                    process.CloseMainWindow();
+                    if (!process.WaitForExit(3000)) process.Kill(entireProcessTree: true);
+                }
+                catch { }
             }
-            catch { /* 进程可能已退出 */ }
         }
     }
 
-    private static void WriteProgress(string text) => Console.WriteLine(text);
+    private static void StartApp(string dir)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(TargetExeIn(dir))
+            {
+                WorkingDirectory = dir,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            Log($"start app failed: {ex.Message}");
+            if (Environment.UserInteractive) Error($"启动失败：{ex.Message}");
+        }
+    }
+
+    // =====================================================================
+    //  参数与提示
+    // =====================================================================
+
+    private static bool HasArg(string[] args, string flag) =>
+        args.Any(a => a.Equals(flag, StringComparison.OrdinalIgnoreCase));
+
+    private static string? ArgValue(string[] args, string name)
+    {
+        foreach (var arg in args)
+        {
+            if (arg.StartsWith(name + "=", StringComparison.OrdinalIgnoreCase))
+                return arg[(name.Length + 1)..].Trim('"');
+            if (arg.StartsWith(name + ":", StringComparison.OrdinalIgnoreCase))
+                return arg[(name.Length + 1)..].Trim('"');
+        }
+        return null;
+    }
+
+    private static void Log(string message)
+    {
+        var line = $"{DateTime.Now:HH:mm:ss.fff} {message}{Environment.NewLine}";
+        foreach (var path in LogPaths)
+        {
+            try { File.AppendAllText(path, line); return; }
+            catch { }
+        }
+    }
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern int MessageBoxW(IntPtr hWnd, string text, string caption, uint type);
 
-    private static int Msg(string text, string caption, uint type) =>
-        MessageBoxW(IntPtr.Zero, text, caption, type | 0x40000 /* MB_TOPMOST */);
+    private static void Info(string text) => MessageBoxW(IntPtr.Zero, text, AppName, 0x40 | 0x40000);
+
+    private static void Error(string text) => MessageBoxW(IntPtr.Zero, text, AppName, 0x10 | 0x40000);
+
+    private static bool Question(string text) =>
+        MessageBoxW(IntPtr.Zero, text, AppName, 0x04 | 0x40000) == 6;
 
     // ---- 开始菜单快捷方式（COM） ----
 
