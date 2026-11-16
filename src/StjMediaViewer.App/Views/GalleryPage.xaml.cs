@@ -350,4 +350,12 @@ public sealed partial class GalleryPage : Page
             Log.Warn("画廊打开转码失败", ex);
         }
     }
+
+    private void GalleryBack_Click(object sender, RoutedEventArgs e) => GoBack();
+
+    private void GoBack()
+    {
+        if (Frame.CanGoBack) Frame.GoBack();
+        else Frame.Navigate(typeof(LibraryPage));
+    }
 }

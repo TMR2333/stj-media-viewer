@@ -25,10 +25,19 @@
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <StackPanel Spacing="1">
-                        <TextBlock Text="重复项" Style="{ThemeResource AppSubtitleTextStyle}" />
-                        <TextBlock Text="{x:Bind ViewModel.SummaryText, Mode=OneWay}"
-                                   Style="{ThemeResource AppMicroTextStyle}" TextWrapping="Wrap" />
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="10,2,10,2" MinHeight="28"
+                                Click="DuplicatesBack_Click" ToolTipService.ToolTip="返回素材库（Esc）">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <FontIcon Glyph="&#xE72B;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                                <TextBlock Text="素材库" Style="{ThemeResource AppCaptionTextStyle}" />
+                            </StackPanel>
+                        </Button>
+                        <StackPanel Spacing="1" VerticalAlignment="Center">
+                            <TextBlock Text="重复项" Style="{ThemeResource AppSubtitleTextStyle}" />
+                            <TextBlock Text="{x:Bind ViewModel.SummaryText, Mode=OneWay}"
+                                       Style="{ThemeResource AppMicroTextStyle}" TextWrapping="Wrap" />
+                        </StackPanel>
                     </StackPanel>
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
                         <ToggleSwitch Header="包含近重复" IsOn="{x:Bind ViewModel.IncludeNearDuplicates, Mode=TwoWay}"

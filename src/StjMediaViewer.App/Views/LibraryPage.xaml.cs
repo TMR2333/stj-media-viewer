@@ -299,6 +299,10 @@ public sealed partial class LibraryPage : Page
         });
     }
 
+    private void Gallery_Click(object sender, RoutedEventArgs e) => Frame.Navigate(typeof(GalleryPage));
+
+    private void Duplicates_Click(object sender, RoutedEventArgs e) => Frame.Navigate(typeof(DuplicatesPage));
+
     private void BatchEdit_Click(object sender, RoutedEventArgs e)
     {
         if (ViewModel.SelectedItems.Count == 0)

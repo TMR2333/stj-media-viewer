@@ -516,6 +516,22 @@
                                   Click="FilterToggle_Click"
                                   VerticalAlignment="Center" />
                     <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="12,2,12,2" MinHeight="30"
+                            Click="Gallery_Click"
+                            ToolTipService.ToolTip="全屏画廊（大图 + 胶片带，方向键翻页）">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE8A9;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                            <TextBlock Text="画廊" Style="{ThemeResource AppCaptionTextStyle}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="12,2,12,2" MinHeight="30"
+                            Click="Duplicates_Click"
+                            ToolTipService.ToolTip="查重（重复 / 近重复图片）">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE8C8;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                            <TextBlock Text="查重" Style="{ThemeResource AppCaptionTextStyle}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="12,2,12,2" MinHeight="30"
                             Click="BatchEdit_Click"
                             ToolTipService.ToolTip="给选中的素材批量填日期 / 城市 / 分类等信息">
                         <StackPanel Orientation="Horizontal" Spacing="6">

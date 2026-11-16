@@ -159,7 +159,7 @@
 - 网格：小/中/大/列表四种密度、RAW/LOG/AI/时长徽标、颜色标签条、5 星评分、多选（Ctrl/Shift）、方向键导航、右键菜单、200 条/页滚动加载。
 - 检视面板：大图预览、8 组元数据（带来源徽标）、手动分类（主题/影调/后期三态/城市/评分/色标/选用废片）、保存 / AI 分类此条 / 写入 XMP。
 - 全屏预览：滚轮指针锚点缩放 0.1–8x、拖拽平移、双击 1:1、左右切图、视频/音频播放。
-- 时间线（年/月/天）、地图（城市分布）、重复项（精确 + 近重复 aHash）、AI 队列。
+- 时间线（年/月/天）、地图（城市分布）、AI 队列；画廊与查重已合并进素材库工具条（不再是独立导航页）。
 - 批量导出（按 `{yyyy}/{city}/{device}` 模板分目录，可移动或复制，边车一起带走）、批量重命名（模板变量）、回收站删除。
 - 重复检测：`size + 快速 FNV 指纹` 粗筛 → `SHA-256` 精确 → `8x8 aHash` 近重复。
 - 缩略图磁盘缓存 + 内存 LRU；缓存大小可见、可清理。
@@ -223,10 +223,11 @@
 - **缓存按 LUT 分桶**：缩略图缓存键带 LUT 哈希（`..._320_lut1e38023.jpg`），切换 LUT 不会互相覆盖，也不会重复解码。
 - 实现：`Core/Color/` 下 `CubeLut`（解析 + 三线性插值）、`LutApplier`（BGRA 帧调色）、`BuiltInLuts`（公式生成）、`LutCatalog`（分类 / Sony 自动匹配）、`LutService`（目录扫描、导入、预渲染）。自检 19 项覆盖生成、解析、应用、分类与自动匹配。
 
-### 2.9 画廊视图（Apple Photos / Camera Raw 风格）
+### 2.9 画廊视图（素材库工具条「画廊」进入）
 
 ![画廊视图](shots/final-gallery.png)
 
+- **入口**：素材库工具条「画廊」按钮（或键盘 `G`）；顶部「← 素材库」/ Esc 返回。
 - **大画布 + 底部胶片带**：上方信息条（文件名、设备、时间、真实分辨率、体积、视频编码、评分/色标/选用状态、序号），中间画布只给照片让路（深色 scrim），底部横向胶片带显示当前项强调描边、评分与编码角标。
 - **缩放与平移**：滚轮以鼠标位置为锚点缩放（5%–800%）、双击在「适应窗口 / 100% 实际像素」之间切换、按住左键拖拽平移；窗口、胶片带、面板尺寸变化时自动重新适应。
 - **键盘流**：左右方向键翻页、Home/End 首尾、0–5 评分（0 清除）、6–9 色标（红/黄/绿/蓝）、P 选用、X 废片、I 元数据面板、T 胶片带 —— 全程不碰鼠标。
@@ -386,7 +387,7 @@ ffmpeg 是可选的：把 `ffmpeg.exe` 放到 `tools/ffmpeg/bin/`（或 PATH）�
 | 产物 | 大小 | 说明 |
 | --- | --- | --- |
 | `STJMediaViewer-Setup.exe` | ≈143 MB | **安装包**，带图形界面：可**自定义安装目录**、可选创建桌面快捷方式；装到用户目录，不需要管理员权限 |
-| `STJMediaViewer-1.2.0-portable.exe` | ≈143 MB | **便携版**：单文件，双击后解压到 `%LOCALAPPDATA%\StjMediaViewerPortable` 并直接启动；不写注册表、不建快捷方式 |
+| `STJMediaViewer-1.3.0-portable.exe` | ≈143 MB | **便携版**：单文件，双击后解压到 `%LOCALAPPDATA%\StjMediaViewerPortable` 并直接启动；不写注册表、不建快捷方式 |
 
 > 旧的 `*-portable-win-x64.zip` 已废弃：压缩包里的 exe 直接双击容易踩「没解压就在压缩包里运行 / SmartScreen 拦截」，
 > 现在改成**单文件便携 exe**，双击即用。
@@ -417,8 +418,8 @@ STJMediaViewer-Setup.exe                      交互式安装（选目录）
 STJMediaViewer-Setup.exe /S                   静默安装到默认目录
 STJMediaViewer-Setup.exe /S /D=D:\Apps\STJ  静默安装到指定目录
 STJMediaViewer-Setup.exe /uninstall           卸载（/S 静默；/D= 指定安装目录）
-STJMediaViewer-1.2.0-portable.exe            便携版：解压 + 启动
-STJMediaViewer-1.2.0-portable.exe /D=D:\STJ 便携版解压到指定目录
+STJMediaViewer-1.3.0-portable.exe            便携版：解压 + 启动
+STJMediaViewer-1.3.0-portable.exe /D=D:\STJ 便携版解压到指定目录
 ```
 
 **卸载**：Windows 设置 → 应用 → 已安装的应用（或 `Setup.exe /uninstall`）。
@@ -541,9 +542,9 @@ dotnet build tools/SelfCheck/StjMediaViewer.SelfCheck.csproj
 
 ### 3.5 版本号与发行流程
 
-当前版本 **v1.2.0**，历史见 [CHANGELOG.md](CHANGELOG.md)。
+当前版本 **v1.3.0**，历史见 [CHANGELOG.md](CHANGELOG.md)。
 
-- 规则：每次对外更新都 **+1 版本号**（`1.1.0` → `1.2.0` → `1.2.1` → …），同步改应用/安装器/便携版/macOS Info.plist；
+- 规则：每次对外更新都 **+1 版本号**（`1.2.0` → `1.3.0` → `1.3.1` → …），同步改应用/安装器/便携版/macOS Info.plist；
 - 每次发版：`git tag v<版本>` + 推送到 GitCode + 创建发行版（Release）；
 - 一键脚本（版本、构建、提交、打标签、推送、创建发行版）：
 
@@ -554,7 +555,7 @@ powershell -ExecutionPolicy Bypass -File tools/release.ps1 -Version 1.0.4 -Notes
 
 - 仓库：<https://gitcode.com/TMR2333/stj-media-viewer>
 - 发行版：<https://gitcode.com/TMR2333/stj-media-viewer/releases>
-  - v1.2.0：安装包 + 便携版（Release 附件直下）
+  - v1.3.0：安装包 + 便携版（Release 附件直下）
 
 **每次更新都会：**改版本号 → 构建 → 提交 → 打 tag → 推送 → 建发行版并上传安装包/便携版。
 

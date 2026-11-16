@@ -32,14 +32,23 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Spacing="1" VerticalAlignment="Center">
-                    <TextBlock Text="{x:Bind ViewModel.InfoTitle, Mode=OneWay}"
-                               Style="{ThemeResource AppSubtitleTextStyle}"
-                               TextTrimming="CharacterEllipsis" />
-                    <TextBlock Text="{x:Bind ViewModel.InfoSubtitle, Mode=OneWay}"
-                               Style="{ThemeResource AppMicroTextStyle}"
-                               Foreground="{ThemeResource TextSecondaryBrush}"
-                               TextTrimming="CharacterEllipsis" />
+                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="10,2,10,2" MinHeight="28"
+                            Click="GalleryBack_Click" ToolTipService.ToolTip="返回素材库（Esc）">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <FontIcon Glyph="&#xE72B;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                            <TextBlock Text="素材库" Style="{ThemeResource AppCaptionTextStyle}" />
+                        </StackPanel>
+                    </Button>
+                    <StackPanel Spacing="1" VerticalAlignment="Center">
+                        <TextBlock Text="{x:Bind ViewModel.InfoTitle, Mode=OneWay}"
+                                   Style="{ThemeResource AppSubtitleTextStyle}"
+                                   TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{x:Bind ViewModel.InfoSubtitle, Mode=OneWay}"
+                                   Style="{ThemeResource AppMicroTextStyle}"
+                                   Foreground="{ThemeResource TextSecondaryBrush}"
+                                   TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">

@@ -11,6 +11,15 @@ public sealed partial class DuplicatesPage : Page
     public DuplicatesPage()
     {
         InitializeComponent();
+        AddHandler(UIElement.KeyDownEvent, new Microsoft.UI.Xaml.Input.KeyEventHandler(OnPageKeyDown), true);
+    }
+
+    private void OnPageKeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
+    {
+        if (e.Key != Windows.System.VirtualKey.Escape) return;
+        e.Handled = true;
+        if (Frame.CanGoBack) Frame.GoBack();
+        else Frame.Navigate(typeof(LibraryPage));
     }
 
     public DuplicatesViewModel ViewModel => DuplicatesViewModel.Shared;
@@ -53,5 +62,11 @@ public sealed partial class DuplicatesPage : Page
             Log.Warn("删除重复项失败", ex);
             AppEvents.SetError($"删除失败：{ex.Message}");
         }
+    }
+
+    private void DuplicatesBack_Click(object sender, RoutedEventArgs e)
+    {
+        if (Frame.CanGoBack) Frame.GoBack();
+        else Frame.Navigate(typeof(LibraryPage));
     }
 }
