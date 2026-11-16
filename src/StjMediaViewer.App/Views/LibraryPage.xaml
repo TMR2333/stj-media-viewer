@@ -568,6 +568,7 @@
                     </Grid>
 
                     <ScrollViewer Grid.Row="1"
+                                  x:Name="FilterScroll"
                                   VerticalScrollMode="Enabled"
                                   VerticalScrollBarVisibility="Auto"
                                   Padding="8,0,8,16">
@@ -576,7 +577,8 @@
                                 <DataTemplate x:DataType="vm:FilterGroupViewModel">
                                     <Expander HorizontalAlignment="Stretch"
                                               HorizontalContentAlignment="Stretch"
-                                              IsExpanded="{x:Bind IsExpanded}">
+                                              Visibility="{x:Bind GroupVisibility, Mode=OneWay}"
+                                              IsExpanded="{x:Bind IsExpanded, Mode=TwoWay}">
                                         <Expander.Header>
                                             <Grid ColumnSpacing="8">
                                                 <Grid.ColumnDefinitions>

@@ -556,6 +556,11 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
             f.LogCount = (int)Scalar1("SELECT COUNT(*) FROM assets" + w.Sql + AndWhere(w, "is_log=1"), w);
             f.GpsCount = (int)Scalar1("SELECT COUNT(*) FROM assets" + w.Sql +
                                       AndWhere(w, "latitude IS NOT NULL AND longitude IS NOT NULL"), w);
+            f.ThemeUnsetCount = (int)Scalar1(
+                "SELECT COUNT(*) FROM assets" + w.Sql + AndWhere(w, "(theme IS NULL OR theme='')"), w);
+            f.ToneUnsetCount = (int)Scalar1(
+                "SELECT COUNT(*) FROM assets" + w.Sql + AndWhere(w, "(tone IS NULL OR tone='')"), w);
+
             f.UnclassifiedCount = (int)Scalar1(
                 "SELECT COUNT(*) FROM assets" + w.Sql +
                 AndWhere(w, "(theme IS NULL OR theme='') AND (tone IS NULL OR tone='')"), w);
@@ -839,8 +844,9 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
         if (q.Formats.Count > 0) AddIn(w, "format_code", q.Formats.Cast<object?>().ToList());
         if (q.Devices.Count > 0) AddIn(w, "device_key", q.Devices.Cast<object?>().ToList());
         if (q.Cities.Count > 0) AddIn(w, "city", q.Cities.Cast<object?>().ToList());
-        if (q.Themes.Count > 0) AddIn(w, "theme", q.Themes.Cast<object?>().ToList());
-        if (q.Tones.Count > 0) AddIn(w, "tone", q.Tones.Cast<object?>().ToList());
+        // 主题/影调支持"未填写"（__unset__）伪选项：选它 = 只要还没分类的素材
+        AddInOrUnset(w, "theme", q.Themes);
+        AddInOrUnset(w, "tone", q.Tones);
         if (q.ColorLabels.Count > 0) AddIn(w, "color_label", q.ColorLabels.Cast<object?>().ToList());
         if (q.RawFormats.Count > 0) AddIn(w, "raw_format", q.RawFormats.Cast<object?>().ToList());
 
@@ -879,6 +885,37 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
         // JPG+RAW 分组折叠：网格里一张照片只出现一次（取组代表）
         if (q.CollapseGroups) w.And("is_group_cover = 1");
         return w;
+    }
+
+    /// <summary>IN (...) 之外再并入"该列为空"，用于"未填写"伪选项。</summary>
+    private static void AddInOrUnset(Where w, string column, List<string> selected)
+    {
+        if (selected.Count == 0) return;
+
+        var values = selected.Where(v => v != "__unset__").Cast<object?>().ToList();
+        bool withUnset = values.Count != selected.Count;
+
+        if (values.Count == 0)
+        {
+            if (withUnset)
+                w.And("(" + column + " IS NULL OR " + column + "='')");
+            return;
+        }
+
+        var prefix = w.NextInPrefix();
+        var sb = new StringBuilder();
+        if (withUnset) sb.Append('(');
+        sb.Append(column).Append(" IN (");
+        for (int i = 0; i < values.Count; i++)
+        {
+            if (i > 0) sb.Append(',');
+            var name = prefix + "_" + i;
+            sb.Append(name);
+            w.Args.Add(new KeyValuePair<string, object?>(name, values[i]));
+        }
+        sb.Append(')');
+        if (withUnset) sb.Append(" OR ").Append(column).Append(" IS NULL OR ").Append(column).Append("='')");
+        w.And(sb.ToString());
     }
 
     private static void AddIn(Where w, string column, List<object?> values)

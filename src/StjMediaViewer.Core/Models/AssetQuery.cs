@@ -82,6 +82,10 @@ public sealed class FacetCounts
     public int LogCount { get; set; }
     public int GpsCount { get; set; }
     public int UnclassifiedCount { get; set; }
+
+    /// <summary>主题/影调为空的素材数（"未填写"伪选项用）。</summary>
+    public int ThemeUnsetCount { get; set; }
+    public int ToneUnsetCount { get; set; }
     public long TotalBytes { get; set; }
 }
 

@@ -21,7 +21,6 @@ public sealed partial class LibraryViewModel : ObservableObject
 
     private CancellationTokenSource? _refreshCts;
     private int _refreshVersion;
-    private bool _facetsBuilt;
     private bool _suppressRefresh;
 
     /// <summary>单例：换设计语言会重建页面，筛选条件与已加载的结果必须保留。</summary>
@@ -400,6 +399,38 @@ public sealed partial class LibraryViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// 按最新分面计数同步一个筛选组的可选值：集合变了就重建（保留已选状态），
+    /// 只是计数变了就原地更新。空的组会由 <c>GroupVisibility</c> 隐藏。
+    /// </summary>
+    private static void SyncOptions(
+        FilterGroupViewModel group,
+        IReadOnlyDictionary<string, int> counts,
+        Func<string, string> display,
+        int unsetCount = 0,
+        bool descendingKeys = false)
+    {
+        var ordered = counts.Where(kv => kv.Value > 0)
+            .OrderByDescending(kv => kv.Value);
+        if (descendingKeys) ordered = counts.Where(kv => kv.Value > 0).OrderByDescending(kv => kv.Key, StringComparer.Ordinal);
+
+        var target = ordered
+            .Select(kv => (Id: kv.Key, Display: display(kv.Key), Count: kv.Value))
+            .ToList();
+
+        if (unsetCount > 0)
+            target.Add((Id: "__unset__", Display: "未填写", Count: unsetCount));
+
+        var currentIds = group.Options.Select(o => o.Id).OrderBy(id => id, StringComparer.Ordinal).ToList();
+        var targetIds = target.Select(t => t.Id).OrderBy(id => id, StringComparer.Ordinal).ToList();
+        bool sameSet = currentIds.SequenceEqual(targetIds, StringComparer.Ordinal);
+
+        if (!sameSet)
+            group.ResetOptions(target.Select(t => (t.Id, t.Display, t.Count)));
+        else
+            group.UpdateCounts(target.ToDictionary(t => t.Id, t => t.Count, StringComparer.OrdinalIgnoreCase));
+    }
+
     private void ApplyFacets(FacetCounts facets)
     {
         _suppressRefresh = true;
@@ -407,43 +438,17 @@ public sealed partial class LibraryViewModel : ObservableObject
         {
             KindGroup.UpdateCounts(facets.ByKind);
 
-            if (!_facetsBuilt || FormatGroup.Options.Count == 0)
-            {
-                FormatGroup.ResetOptions(facets.ByFormat
-                    .Where(kv => kv.Value > 0)
-                    .OrderByDescending(kv => kv.Value)
-                    .Select(kv => (kv.Key, kv.Key, kv.Value)));
-                DeviceGroup.ResetOptions(facets.ByDevice
-                    .Where(kv => kv.Value > 0)
-                    .OrderByDescending(kv => kv.Value)
-                    .Select(kv => (kv.Key, kv.Key, kv.Value)));
-                CityGroup.ResetOptions(facets.ByCity
-                    .Where(kv => kv.Value > 0)
-                    .OrderByDescending(kv => kv.Value)
-                    .Select(kv => (kv.Key, kv.Key, kv.Value)));
-                YearGroup.ResetOptions(facets.ByYear
-                    .Where(kv => kv.Value > 0)
-                    .OrderByDescending(kv => kv.Key)
-                    .Select(kv => (kv.Key, kv.Key, kv.Value)));
-                ThemeGroup.ResetOptions(facets.ByTheme
-                    .Where(kv => kv.Value > 0)
-                    .OrderByDescending(kv => kv.Value)
-                    .Select(kv => (kv.Key, Vocabularies.ThemeDisplay(kv.Key, "zh-CN"), kv.Value)));
-                ToneGroup.ResetOptions(facets.ByTone
-                    .Where(kv => kv.Value > 0)
-                    .OrderByDescending(kv => kv.Value)
-                    .Select(kv => (kv.Key, Vocabularies.ToneDisplay(kv.Key, "zh-CN"), kv.Value)));
-            }
-            else
-            {
-                FormatGroup.UpdateCounts(facets.ByFormat);
-                DeviceGroup.UpdateCounts(facets.ByDevice);
-                CityGroup.UpdateCounts(facets.ByCity);
-                YearGroup.UpdateCounts(facets.ByYear);
-                ThemeGroup.UpdateCounts(facets.ByTheme);
-                ToneGroup.UpdateCounts(facets.ByTone);
-            }
-            _facetsBuilt = true;
+            // 关键：可选值不是"只建一次"，而是每次按最新计数同步 ——
+            // 否则启动时库还是空的（或还没跑 AI 分类），之后新出现的主题/城市/设备
+            // 永远不会进到筛选面板里（表现为"拍摄主题不能筛选"）。
+            SyncOptions(FormatGroup, facets.ByFormat, static key => key);
+            SyncOptions(DeviceGroup, facets.ByDevice, static key => key);
+            SyncOptions(CityGroup, facets.ByCity, static key => key);
+            SyncOptions(YearGroup, facets.ByYear, static key => key, descendingKeys: true);
+            SyncOptions(ThemeGroup, facets.ByTheme, key => Vocabularies.ThemeDisplay(key, "zh-CN"),
+                unsetCount: facets.ThemeUnsetCount);
+            SyncOptions(ToneGroup, facets.ByTone, key => Vocabularies.ToneDisplay(key, "zh-CN"),
+                unsetCount: facets.ToneUnsetCount);
 
             PostProcessGroup.UpdateCounts(facets.ByPostProcess);
 

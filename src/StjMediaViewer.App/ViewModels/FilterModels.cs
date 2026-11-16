@@ -121,6 +121,9 @@ public sealed partial class FilterGroupViewModel : ObservableObject
         SelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 
+    /// <summary>没有可选值时整组隐藏（避免出现空荡荡的"拍摄主题"）。</summary>
+    public Visibility GroupVisibility => Options.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+
     internal void NotifyOptionChanged(FilterOptionViewModel changed)
     {
         if (_suppress) return;
@@ -154,6 +157,7 @@ public sealed partial class FilterGroupViewModel : ObservableObject
             Options.Add(opt);
         }
         UpdateSummary();
+        OnPropertyChanged(nameof(GroupVisibility));
     }
 
     /// <summary>整组启用/禁用（例如月份依赖年份）。</summary>

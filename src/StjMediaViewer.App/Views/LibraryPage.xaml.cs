@@ -34,6 +34,7 @@ public sealed partial class LibraryPage : Page
         InitializeComponent();
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
+        ApplyDemoFilterFocus();
         // 首屏加载完成后再预取：此时 Items 才是完整的一页
     }
 
@@ -270,6 +271,27 @@ public sealed partial class LibraryPage : Page
         }];
         AssetList.ItemTemplate = (DataTemplate)Resources[isList ? "RowTemplate" : "CardTemplate"];
         TryHookScrollViewer();
+    }
+
+    /// <summary>截图/验收用：STJ_DEMO_FOCUS_FILTERS=theme 时只展开主题/影调两组。</summary>
+    private void ApplyDemoFilterFocus()
+    {
+        var focus = Environment.GetEnvironmentVariable("STJ_DEMO_FOCUS_FILTERS");
+        if (string.IsNullOrEmpty(focus)) return;
+
+        foreach (var group in ViewModel.Groups)
+        {
+            bool want = focus.Contains("theme", StringComparison.OrdinalIgnoreCase) &&
+                        group.Kind is FilterGroupKind.Theme or FilterGroupKind.Tone;
+            group.IsExpanded = want;
+        }
+
+        // 等筛选计数建好后再滚到底，方便截图验收
+        DispatcherQueue.TryEnqueue(async () =>
+        {
+            await Task.Delay(1500);
+            try { FilterScroll.ChangeView(null, FilterScroll.ScrollableHeight, null); } catch { }
+        });
     }
 
     private void BatchEdit_Click(object sender, RoutedEventArgs e)
