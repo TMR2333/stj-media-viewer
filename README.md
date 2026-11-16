@@ -135,11 +135,23 @@
 
 品牌署名 **Stjarna PERSPECTIVE 出品 / co-worked with DeepSeek Harness**，含 logo、版本与环境信息（.NET / Windows 版本 / 构建日期）、技术栈与第三方许可清单，以及四张项目表情包（随仓库分发）。
 
-### 2.10 界面
+### 2.11 界面
 
 - 微软 Fluent 设计语言：Mica 窗口背板、Segoe UI Variable 字阶、细描边、键盘友好的焦点视觉；标准控件（NavigationView / TextBox / ComboBox / Button…）由 ~140 个框架资源键统一覆盖。
 - 明暗模式：跟随系统 / 浅色 / 深色，切换只重解析 token，不重建界面。
 - 全部界面只用语义 token（`{ThemeResource ...}`），页面里没有一处硬编码颜色/字号/圆角。
+
+### 2.10 崩溃诊断（0xC000027B / 闪退）
+
+WinUI 的 **stowed exception**（退出码 `0xC000027B`）不会走 `UnhandledException`，日志里看不到"未处理异常"。为此内置三层留痕：
+
+1. `AppDomain.FirstChanceException`：记录每次"首次异常"的完整堆栈（自动过滤取消异常、以及 WinUI 探测 `ApplicationData.Current` 的正常噪声）；
+2. `AppDomain.UnhandledException` / `TaskScheduler.UnobservedTaskException`：后台线程的致命异常先写日志再终止；
+3. 日志：`%LOCALAPPDATA%\StjMediaViewer\stj-media-viewer.log`。
+
+已知并已修复的一类：缩略图曾经用 `InMemoryRandomAccessStream` + `BitmapImage.SetSourceAsync` 后立刻 `Dispose()` 流。`SetSourceAsync` 返回时解码尚未结束，渲染线程随后读到已释放的流 → 原生崩溃（只在视频这种"冷缓存 + 多路并发"场景触发）。现在统一**按磁盘缓存文件的 URI 加载**，缓存文件做 SOI/EOI 完整性校验（半截 JPEG 直接删除重生成），Shell 缩略图调用串行化。
+
+复现脚本：`tools/diagnostics/repro-video-crash-click.ps1`（UI 自动化真点一次"视频"筛选）、`tools/diagnostics/stress-grid-scroll.ps1`（清空缩略图缓存 + 滚动网格压测）。
 
 ## 3. 快速开始
 
