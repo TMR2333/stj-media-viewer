@@ -16,6 +16,7 @@ internal static class CatalogSchema
     public const string TableAssets = "assets";
     public const string TableLibraries = "libraries";
     public const string TableMeta = "meta";
+    public const string TableAssetCustom = "asset_custom";
 
     /// <summary>建表 + 索引 + PRAGMA。可重复执行（幂等）。</summary>
     public static void Apply(SqliteConnection conn)
@@ -31,6 +32,7 @@ internal static class CatalogSchema
         Execute(conn, DdlAssets);
         Execute(conn, DdlLibraries);
         Execute(conn, DdlMeta);
+        Execute(conn, DdlAssetCustom);
 
         // 迁移：v1 老库补 JPG/RAW 分组列（幂等）
         EnsureColumn(conn, TableAssets, "group_id", "TEXT");
@@ -200,6 +202,17 @@ internal static class CatalogSchema
         reader.Close();
         Execute(conn, "ALTER TABLE " + table + " ADD COLUMN " + column + " " + ddlType + ";");
     }
+
+    /// <summary>用户自定义类别：维度名 + 值都是自由文本（一个素材在一个维度下只有一个值）。</summary>
+    private const string DdlAssetCustom = """
+        CREATE TABLE IF NOT EXISTS asset_custom (
+            asset_id   TEXT NOT NULL,
+            dimension  TEXT NOT NULL,
+            value      TEXT NOT NULL,
+            PRIMARY KEY (asset_id, dimension)
+        );
+        CREATE INDEX IF NOT EXISTS ix_asset_custom_dim ON asset_custom(dimension, value);
+        """;
 
     private static void Execute(SqliteConnection conn, string sql)
     {

@@ -132,6 +132,71 @@ public sealed partial class InspectorViewModel : ObservableObject
     [ObservableProperty]
     private Visibility _statusErrorVisibility = Visibility.Collapsed;
 
+    // ---------------- 自定义类别 ----------------
+    public ObservableCollection<CustomFieldItem> CustomFields { get; } = new();
+    public ObservableCollection<string> CustomDimensions { get; } = new();
+
+    [ObservableProperty] private string _customDimension = "";
+    [ObservableProperty] private string _customValueText = "";
+
+    /// <summary>读取当前素材的自定义类别。</summary>
+    public async Task LoadCustomFieldsAsync(MediaAsset asset)
+    {
+        try
+        {
+            var fields = await AppServices.Store.GetCustomFieldsAsync(asset.Id);
+            CustomFields.Clear();
+            foreach (var (dimension, value) in fields.OrderBy(kv => kv.Key, StringComparer.Ordinal))
+                CustomFields.Add(new CustomFieldItem(dimension, value));
+
+            var dims = await AppServices.Store.ListCustomDimensionsAsync();
+            CustomDimensions.Clear();
+            foreach (var d in dims) CustomDimensions.Add(d);
+        }
+        catch (Exception ex)
+        {
+            Core.Util.Log.Warn("读取自定义类别失败", ex);
+        }
+    }
+
+    /// <summary>加一条自定义类别（同一维度覆盖）。</summary>
+    public async Task AddCustomFieldAsync()
+    {
+        if (CurrentAsset is null) return;
+        var dimension = CustomDimension.Trim();
+        var value = CustomValueText.Trim();
+        if (dimension.Length == 0 || value.Length == 0) return;
+
+        try
+        {
+            await AppServices.Store.SetCustomFieldAsync(CurrentAsset.Id, dimension, value);
+            CustomValueText = "";
+            await LoadCustomFieldsAsync(CurrentAsset);
+            AppEvents.RaiseAssetUpdated(CurrentAsset);
+            SetStatus($"已设置 {dimension}：{value}", false);
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"保存自定义类别失败：{ex.Message}", true);
+        }
+    }
+
+    /// <summary>删除某个维度的类别值。</summary>
+    public async Task RemoveCustomFieldAsync(string dimension)
+    {
+        if (CurrentAsset is null || string.IsNullOrWhiteSpace(dimension)) return;
+        try
+        {
+            await AppServices.Store.SetCustomFieldAsync(CurrentAsset.Id, dimension, null);
+            await LoadCustomFieldsAsync(CurrentAsset);
+            AppEvents.RaiseAssetUpdated(CurrentAsset);
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"删除自定义类别失败：{ex.Message}", true);
+        }
+    }
+
     /// <summary>保存 / AI / XMP 写入后通知外部刷新卡片。</summary>
     public event EventHandler<MediaAsset>? AssetChanged;
 
@@ -176,6 +241,7 @@ public sealed partial class InspectorViewModel : ObservableObject
             SelectedTheme = ThemeOptions.FirstOrDefault(o => string.Equals(o.Id, asset.Theme, StringComparison.OrdinalIgnoreCase));
             SelectedTone = ToneOptions.FirstOrDefault(o => string.Equals(o.Id, asset.Tone, StringComparison.OrdinalIgnoreCase));
             BuildGroups(asset);
+            _ = LoadCustomFieldsAsync(asset);
             _ = LoadPreviewAsync(asset);
         }
         finally
@@ -637,3 +703,6 @@ public sealed partial class InspectorViewModel : ObservableObject
         }
     }
 }
+
+/// <summary>检视面板里的一行自定义类别。</summary>
+public sealed record CustomFieldItem(string Dimension, string Value);

@@ -67,6 +67,7 @@ public static partial class Program
             await Section("批量填写信息", async () => await CheckBatchEdit(s));
             await Section("调色筛选", async () => await CheckColorFilter(s));
             await Section("分类筛选与选项刷新", async () => await CheckFacetRefresh(s));
+            await Section("自定义类别", async () => await CheckCustomCategories(s));
             await Section("设置持久化", async () => await CheckSettings(s, tempData));
             await Section("AI 客户端(dry-run)", async () => await CheckAi(s));
             var aiUrl = ArgValue(args, "--ai-url");

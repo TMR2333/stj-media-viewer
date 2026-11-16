@@ -44,6 +44,12 @@ public sealed partial class BatchEditViewModel : ObservableObject
     [ObservableProperty] private string _deviceKeyText = "";
 
     [ObservableProperty] private bool _useTheme;
+
+    // ---------------- 自定义类别 ----------------
+    [ObservableProperty] private bool _useCustomCategory;
+    [ObservableProperty] private string _customDimension = "";
+    [ObservableProperty] private string _customValueText = "";
+    public ObservableCollection<string> CustomDimensions { get; } = new();
     [ObservableProperty] private string _themeText = "";
     [ObservableProperty] private string _toneText = "";
 
@@ -94,6 +100,17 @@ public sealed partial class BatchEditViewModel : ObservableObject
         }
     }
 
+    private async Task LoadCustomDimensionsAsync()
+    {
+        try
+        {
+            var dims = await AppServices.Store.ListCustomDimensionsAsync();
+            CustomDimensions.Clear();
+            foreach (var d in dims) CustomDimensions.Add(d);
+        }
+        catch { }
+    }
+
     public async Task LoadAsync(IReadOnlyList<MediaAsset> assets)
     {
         Items.Clear();
@@ -101,6 +118,7 @@ public sealed partial class BatchEditViewModel : ObservableObject
         AllChecked = Items.Count > 0;
         RefreshSummary();
         await Task.CompletedTask;
+        _ = LoadCustomDimensionsAsync();
     }
 
     partial void OnIsBusyChanged(bool value)
@@ -147,6 +165,13 @@ public sealed partial class BatchEditViewModel : ObservableObject
         {
             patch.Theme = ThemeText.Trim();
             patch.Tone = ToneText.Trim();
+        }
+        if (UseCustomCategory && !string.IsNullOrWhiteSpace(CustomDimension))
+        {
+            patch.CustomFields = new Dictionary<string, string>(StringComparer.Ordinal)
+            {
+                [CustomDimension.Trim()] = CustomValueText.Trim(),
+            };
         }
         // UI 顺序：0 未后期 / 1 已后期 / 2 未知；枚举顺序：Unknown=0 / Unprocessed=1 / Processed=2
         if (UsePostProcess) patch.PostProcess = PostProcessIndex switch { 0 => 1, 1 => 2, _ => 0 };

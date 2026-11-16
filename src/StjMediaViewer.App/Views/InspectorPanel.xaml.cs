@@ -109,6 +109,22 @@ public sealed partial class InspectorPanel : UserControl
 
     private void CityBox_LostFocus(object sender, RoutedEventArgs e) => ViewModel.SetCity(CityBox.Text);
 
+    private async void AddCustomField_Click(object sender, RoutedEventArgs e)
+    {
+        try { await ViewModel.AddCustomFieldAsync(); }
+        catch (Exception ex) { Core.Util.Log.Warn("添加自定义类别失败", ex); }
+    }
+
+    private async void RemoveCustomField_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if ((sender as FrameworkElement)?.Tag is string dimension)
+                await ViewModel.RemoveCustomFieldAsync(dimension);
+        }
+        catch (Exception ex) { Core.Util.Log.Warn("删除自定义类别失败", ex); }
+    }
+
     private void CityBox_KeyDown(object sender, KeyRoutedEventArgs e)
     {
         if (e.Key != VirtualKey.Enter) return;

@@ -21,6 +21,9 @@ public sealed class AssetQuery
     public bool? IsLog { get; set; }
     /// <summary>调色状态：true = 已调色（已后期或套了 LUT），false = 未调色，null = 不限。</summary>
     public bool? Colored { get; set; }
+
+    /// <summary>自定义类别筛选：维度名 → 允许的值（同一维度内 OR，不同维度之间 AND）。</summary>
+    public Dictionary<string, List<string>> CustomFilters { get; set; } = new(StringComparer.Ordinal);
     public bool? HasGps { get; set; }
     public bool? IsPick { get; set; }
     public PostProcessState? PostProcess { get; set; }
@@ -84,6 +87,9 @@ public sealed class FacetCounts
     public int UnclassifiedCount { get; set; }
 
     /// <summary>主题/影调为空的素材数（"未填写"伪选项用）。</summary>
+    /// <summary>自定义类别分面：维度 → (值 → 计数)。</summary>
+    public Dictionary<string, Dictionary<string, int>> ByCustom { get; set; } = new(StringComparer.Ordinal);
+
     public int ThemeUnsetCount { get; set; }
     public int ToneUnsetCount { get; set; }
     public long TotalBytes { get; set; }

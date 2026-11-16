@@ -37,6 +37,9 @@ public sealed class BatchEditPatch
     public string? Title { get; set; }
     public string? Caption { get; set; }
 
+    /// <summary>自定义类别：维度名 → 值（空字符串 = 删除该维度的值）。null = 不改动。</summary>
+    public Dictionary<string, string>? CustomFields { get; set; }
+
     /// <summary>追加关键词（去重后合并进 keywords_json / keywords_flat）。</summary>
     public List<string>? AddKeywords { get; set; }
     /// <summary>整体替换关键词（null = 不改，空列表 = 清空）。</summary>
@@ -49,7 +52,8 @@ public sealed class BatchEditPatch
         IsLog is not null || LogProfile is not null || Theme is not null || Tone is not null ||
         Rating is not null || ColorLabel is not null || IsPick is not null ||
         Title is not null || Caption is not null ||
-        AddKeywords is { Count: > 0 } || ReplaceKeywords is not null;
+        AddKeywords is { Count: > 0 } || ReplaceKeywords is not null ||
+        CustomFields is { Count: > 0 };
 
     /// <summary>人类可读的"将要写入"摘要（界面提示用）。</summary>
     public string Describe()

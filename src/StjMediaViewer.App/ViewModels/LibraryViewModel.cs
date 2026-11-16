@@ -317,6 +317,11 @@ public sealed partial class LibraryViewModel : ObservableObject
         foreach (var id in DeviceGroup.SelectedIds) q.Devices.Add(id);
         foreach (var id in CityGroup.SelectedIds) q.Cities.Add(id);
         foreach (var id in ThemeGroup.SelectedIds) q.Themes.Add(id);
+        foreach (var group in Groups.Where(g => g.Kind == FilterGroupKind.Custom))
+        {
+            var ids = group.SelectedIds.ToList();
+            if (ids.Count > 0) q.CustomFilters[group.Title] = ids;
+        }
         foreach (var id in ToneGroup.SelectedIds) q.Tones.Add(id);
 
         var yearId = YearGroup.SelectedIds.FirstOrDefault();
@@ -399,6 +404,31 @@ public sealed partial class LibraryViewModel : ObservableObject
         }
     }
 
+    /// <summary>每个自定义类别维度生成一个筛选分组；维度消失（值全清空）时移除分组。</summary>
+    private void SyncCustomGroups(IReadOnlyDictionary<string, Dictionary<string, int>> byCustom)
+    {
+        var existing = Groups.Where(g => g.Kind == FilterGroupKind.Custom).ToList();
+
+        // 移除已经没有数据的维度
+        foreach (var group in existing)
+        {
+            if (byCustom.ContainsKey(group.Title)) continue;
+            Groups.Remove(group);
+        }
+
+        foreach (var (dimension, values) in byCustom.OrderBy(kv => kv.Key, StringComparer.Ordinal))
+        {
+            var group = Groups.FirstOrDefault(g => g.Kind == FilterGroupKind.Custom && g.Title == dimension);
+            if (group is null)
+            {
+                group = new FilterGroupViewModel(FilterGroupKind.Custom, dimension, true);
+                group.SelectionChanged += OnGroupSelectionChanged;
+                Groups.Add(group);
+            }
+            SyncOptions(group, values, static key => key);
+        }
+    }
+
     /// <summary>
     /// 按最新分面计数同步一个筛选组的可选值：集合变了就重建（保留已选状态），
     /// 只是计数变了就原地更新。空的组会由 <c>GroupVisibility</c> 隐藏。
@@ -449,6 +479,8 @@ public sealed partial class LibraryViewModel : ObservableObject
                 unsetCount: facets.ThemeUnsetCount);
             SyncOptions(ToneGroup, facets.ByTone, key => Vocabularies.ToneDisplay(key, "zh-CN"),
                 unsetCount: facets.ToneUnsetCount);
+
+            SyncCustomGroups(facets.ByCustom);
 
             PostProcessGroup.UpdateCounts(facets.ByPostProcess);
 

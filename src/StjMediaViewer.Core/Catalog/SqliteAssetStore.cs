@@ -376,6 +376,12 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
                 if (patch.Title is not null) Set("title", NullIfEmpty(patch.Title));
                 if (patch.Caption is not null) Set("caption", NullIfEmpty(patch.Caption));
 
+                if (sets.Count == 0)
+                {
+                    ApplyCustomFields(tx, chunk, patch);
+                    continue;
+                }
+
                 var sb = new StringBuilder("UPDATE assets SET ");
                 sb.Append(string.Join(", ", sets));
 
@@ -427,10 +433,59 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
 
                 cmd.CommandText = sb.ToString();
                 affected += cmd.ExecuteNonQuery();
+
+                ApplyCustomFields(tx, chunk, patch);
             }
 
             tx.Commit();
         }, ct).ContinueWith(t => affected, ct);
+    }
+
+    /// <summary>写入自定义类别：先删该维度旧值，再按需插入新值（空串 = 只删不插）。</summary>
+    private void ApplyCustomFields(Microsoft.Data.Sqlite.SqliteTransaction tx, List<string> assetIds, BatchEditPatch patch)
+    {
+        if (patch.CustomFields is not { Count: > 0 }) return;
+
+        foreach (var (rawDimension, rawValue) in patch.CustomFields)
+        {
+            if (string.IsNullOrWhiteSpace(rawDimension)) continue;
+            var dimension = rawDimension.Trim();
+            var value = (rawValue ?? "").Trim();
+
+            using (var delete = _conn!.CreateCommand())
+            {
+                delete.Transaction = tx;
+                var sbDel = new StringBuilder("DELETE FROM asset_custom WHERE dimension = @dim AND asset_id IN (");
+                delete.Parameters.AddWithValue("@dim", dimension);
+                for (int i = 0; i < assetIds.Count; i++)
+                {
+                    if (i > 0) sbDel.Append(',');
+                    sbDel.Append("@a").Append(i);
+                    delete.Parameters.AddWithValue("@a" + i, assetIds[i]);
+                }
+                sbDel.Append(')');
+                delete.CommandText = sbDel.ToString();
+                delete.ExecuteNonQuery();
+            }
+
+            if (value.Length == 0) continue;
+
+            using var insert = _conn!.CreateCommand();
+            insert.Transaction = tx;
+            insert.CommandText =
+                "INSERT INTO asset_custom (asset_id, dimension, value) VALUES (@a, @dim, @val) " +
+                "ON CONFLICT(asset_id, dimension) DO UPDATE SET value = excluded.value";
+            insert.Parameters.AddWithValue("@dim", dimension);
+            insert.Parameters.AddWithValue("@val", value);
+            for (int i = 0; i < assetIds.Count; i++)
+            {
+                insert.Parameters.Clear();
+                insert.Parameters.AddWithValue("@a", assetIds[i]);
+                insert.Parameters.AddWithValue("@dim", dimension);
+                insert.Parameters.AddWithValue("@val", value);
+                insert.ExecuteNonQuery();
+            }
+        }
     }
 
     private static object? NullIfEmpty(string value) => value.Length == 0 ? null : value;
@@ -442,6 +497,78 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
             return System.Text.Json.JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>();
         }
         catch { return new List<string>(); }
+    }
+
+    public Task<IReadOnlyDictionary<string, string>> GetCustomFieldsAsync(string assetId,
+        CancellationToken ct = default)
+    {
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        if (string.IsNullOrEmpty(assetId)) return Task.FromResult<IReadOnlyDictionary<string, string>>(result);
+
+        return RunAsync(() =>
+        {
+            using var cmd = _conn!.CreateCommand();
+            cmd.CommandText = "SELECT dimension, value FROM asset_custom WHERE asset_id = @id ORDER BY dimension";
+            cmd.Parameters.AddWithValue("@id", assetId);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                if (reader.IsDBNull(0) || reader.IsDBNull(1)) continue;
+                result[reader.GetString(0)] = reader.GetString(1);
+            }
+        }, ct).ContinueWith(_ => (IReadOnlyDictionary<string, string>)result, ct);
+    }
+
+    public Task<IReadOnlyList<string>> ListCustomDimensionsAsync(CancellationToken ct = default)
+    {
+        var result = new List<string>();
+        return RunAsync(() =>
+        {
+            using var cmd = _conn!.CreateCommand();
+            cmd.CommandText = "SELECT DISTINCT dimension FROM asset_custom ORDER BY dimension";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                if (reader.IsDBNull(0)) continue;
+                result.Add(reader.GetString(0));
+            }
+        }, ct).ContinueWith(_ => (IReadOnlyList<string>)result, ct);
+    }
+
+    public Task SetCustomFieldAsync(string assetId, string dimension, string? value,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(assetId) || string.IsNullOrWhiteSpace(dimension))
+            return Task.CompletedTask;
+
+        var dim = dimension.Trim();
+        var val = (value ?? "").Trim();
+        return RunAsync(() =>
+        {
+            using var tx = _conn!.BeginTransaction();
+
+            using (var del = _conn.CreateCommand())
+            {
+                del.Transaction = tx;
+                del.CommandText = "DELETE FROM asset_custom WHERE asset_id = @id AND dimension = @dim";
+                del.Parameters.AddWithValue("@id", assetId);
+                del.Parameters.AddWithValue("@dim", dim);
+                del.ExecuteNonQuery();
+            }
+
+            if (val.Length > 0)
+            {
+                using var ins = _conn.CreateCommand();
+                ins.Transaction = tx;
+                ins.CommandText = "INSERT INTO asset_custom (asset_id, dimension, value) VALUES (@id, @dim, @val)";
+                ins.Parameters.AddWithValue("@id", assetId);
+                ins.Parameters.AddWithValue("@dim", dim);
+                ins.Parameters.AddWithValue("@val", val);
+                ins.ExecuteNonQuery();
+            }
+
+            tx.Commit();
+        }, ct);
     }
 
     public Task SetAssetLutAsync(string assetId, string? lutId, CancellationToken ct = default)
@@ -479,6 +606,20 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
                 sb.Append(')');
                 cmd.CommandText = sb.ToString();
                 cmd.ExecuteNonQuery();
+
+                // 顺带清掉这些素材的自定义类别
+                using var cmdCustom = _conn.CreateCommand();
+                cmdCustom.Transaction = tx;
+                var sbCustom = new StringBuilder("DELETE FROM asset_custom WHERE asset_id IN (");
+                for (int i = 0; i < chunk.Count; i++)
+                {
+                    if (i > 0) sbCustom.Append(',');
+                    sbCustom.Append("@c").Append(i);
+                    cmdCustom.Parameters.AddWithValue("@c" + i, chunk[i]);
+                }
+                sbCustom.Append(')');
+                cmdCustom.CommandText = sbCustom.ToString();
+                cmdCustom.ExecuteNonQuery();
             }
             tx.Commit();
         }, ct);
@@ -589,6 +730,12 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
             f.ByPostProcess = GroupText("post_process",
                 "SELECT post_process, COUNT(*) FROM assets" + w.Sql + " GROUP BY post_process", w,
                 v => Vocabularies.PostProcessId((PostProcessState)int.Parse(v)));
+            // 自定义类别分面：维度 → 值 → 计数（只统计当前筛选条件内的素材）
+            var customSql = "SELECT acv.dimension, acv.value, COUNT(*) FROM asset_custom acv " +
+                            "WHERE acv.asset_id IN (SELECT assets.id FROM assets" + w.Sql + ") " +
+                            "GROUP BY acv.dimension, acv.value";
+            f.ByCustom = GroupText2(customSql, w);
+
             f.ByPick = GroupText("is_pick",
                 "SELECT is_pick, COUNT(*) FROM assets" + w.Sql + " GROUP BY is_pick", w,
                 v => v switch { "1" => "picked", "0" => "rejected", _ => "unset" });
@@ -859,6 +1006,28 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
             kwIndex++;
         }
 
+        // 自定义类别：同一维度内 OR，不同维度之间 AND
+        foreach (var (dimension, values) in q.CustomFilters)
+        {
+            if (string.IsNullOrWhiteSpace(dimension) || values is null || values.Count == 0) continue;
+
+            var dimParam = "@w_cdim" + w.NextInPrefix().TrimStart('@');
+            w.Args.Add(new KeyValuePair<string, object?>(dimParam, dimension));
+
+            var sbCustom = new StringBuilder();
+            sbCustom.Append("EXISTS (SELECT 1 FROM asset_custom acv WHERE acv.asset_id = assets.id AND acv.dimension = ")
+                     .Append(dimParam).Append(" AND acv.value IN (");
+            for (int i = 0; i < values.Count; i++)
+            {
+                if (i > 0) sbCustom.Append(',');
+                var pv = "@w_cv" + w.NextInPrefix().TrimStart('@') + "_" + i;
+                sbCustom.Append(pv);
+                w.Args.Add(new KeyValuePair<string, object?>(pv, values[i]));
+            }
+            sbCustom.Append("))");
+            w.And(sbCustom.ToString());
+        }
+
         if (q.IsRaw is { } isRaw) w.And(isRaw ? "raw_format <> 0" : "raw_format = 0");
         if (q.Colored is { } colored)
         {
@@ -985,6 +1154,30 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
     };
 
     // ==================================================================== 分面辅助
+
+    /// <summary>三维分组：dimension → value → count（自定义类别分面用）。</summary>
+    private Dictionary<string, Dictionary<string, int>> GroupText2(string sql, Where w)
+    {
+        var dict = new Dictionary<string, Dictionary<string, int>>(StringComparer.Ordinal);
+        using var cmd = _conn!.CreateCommand();
+        cmd.CommandText = sql;
+        BindArgs(cmd, w);
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
+        {
+            if (r.IsDBNull(0) || r.IsDBNull(1)) continue;
+            var dimension = r.GetString(0);
+            var value = r.GetString(1);
+            if (string.IsNullOrWhiteSpace(dimension) || string.IsNullOrWhiteSpace(value)) continue;
+            int count = r.IsDBNull(2) ? 0 : Convert.ToInt32(r.GetValue(2));
+
+            if (!dict.TryGetValue(dimension, out var values))
+                dict[dimension] = values = new Dictionary<string, int>(StringComparer.Ordinal);
+            values.TryGetValue(value, out int prev);
+            values[value] = prev + count;
+        }
+        return dict;
+    }
 
     private Dictionary<string, int> GroupText(string keyName, string sql, Where w, Func<string, string>? mapKey = null)
     {

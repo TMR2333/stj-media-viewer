@@ -32,6 +32,17 @@ public interface IAssetStore
     Task UpsertAsync(MediaAsset asset, CancellationToken ct = default);
     Task UpsertManyAsync(IEnumerable<MediaAsset> assets, CancellationToken ct = default);
     /// <summary>批量填写分类 / 日期 / 城市等字段（null 字段不改动）。返回受影响的行数。</summary>
+    /// <summary>某个素材的自定义类别：维度名 → 值。</summary>
+    Task<IReadOnlyDictionary<string, string>> GetCustomFieldsAsync(string assetId,
+        CancellationToken ct = default);
+
+    /// <summary>所有已用过的自定义类别维度名（按字典序）。</summary>
+    Task<IReadOnlyList<string>> ListCustomDimensionsAsync(CancellationToken ct = default);
+
+    /// <summary>设置/删除某个素材的一个自定义类别（value 为空 = 删除该维度）。</summary>
+    Task SetCustomFieldAsync(string assetId, string dimension, string? value,
+        CancellationToken ct = default);
+
     Task<int> ApplyBatchEditAsync(IReadOnlyList<string> assetIds, BatchEditPatch patch, CancellationToken ct = default);
 
     /// <summary>只更新某条素材选用的 LUT（null = 恢复自动匹配）。</summary>

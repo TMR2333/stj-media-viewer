@@ -279,17 +279,21 @@ public sealed partial class LibraryPage : Page
         var focus = Environment.GetEnvironmentVariable("STJ_DEMO_FOCUS_FILTERS");
         if (string.IsNullOrEmpty(focus)) return;
 
-        foreach (var group in ViewModel.Groups)
-        {
-            bool want = focus.Contains("theme", StringComparison.OrdinalIgnoreCase) &&
-                        group.Kind is FilterGroupKind.Theme or FilterGroupKind.Tone;
-            group.IsExpanded = want;
-        }
-
-        // 等筛选计数建好后再滚到底，方便截图验收
+        // 等分面数据把分组建好（自定义类别是动态生成的），再统一展开 + 滚到底
         DispatcherQueue.TryEnqueue(async () =>
         {
-            await Task.Delay(1500);
+            await Task.Delay(1800);
+
+            foreach (var group in ViewModel.Groups)
+            {
+                bool want = focus.Contains("custom", StringComparison.OrdinalIgnoreCase)
+                    ? group.Kind == FilterGroupKind.Custom
+                    : focus.Contains("theme", StringComparison.OrdinalIgnoreCase) &&
+                      group.Kind is FilterGroupKind.Theme or FilterGroupKind.Tone;
+                group.IsExpanded = want;
+            }
+
+            await Task.Delay(300);
             try { FilterScroll.ChangeView(null, FilterScroll.ScrollableHeight, null); } catch { }
         });
     }

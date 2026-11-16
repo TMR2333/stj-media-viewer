@@ -219,9 +219,47 @@ internal sealed class FallbackAssetStore : IAssetStore
             if (patch.IsPick is { } pick) asset.IsPick = pick;
             if (patch.Title is not null) asset.Title = patch.Title.Length == 0 ? null : patch.Title;
             if (patch.Caption is not null) asset.Caption = patch.Caption.Length == 0 ? null : patch.Caption;
+            if (patch.CustomFields is not null)
+            {
+                foreach (var (dim, val) in patch.CustomFields)
+                {
+                    if (string.IsNullOrWhiteSpace(dim)) continue;
+                    SetCustomFieldAsync(asset.Id, dim, val, ct);
+                }
+            }
             n++;
         }
         return Task.FromResult(n);
+    }
+
+    private readonly Dictionary<string, Dictionary<string, string>> _customFields =
+        new(StringComparer.Ordinal);
+
+    public Task<IReadOnlyDictionary<string, string>> GetCustomFieldsAsync(string assetId,
+        CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyDictionary<string, string>>(
+            _customFields.TryGetValue(assetId, out var fields)
+                ? new Dictionary<string, string>(fields, StringComparer.Ordinal)
+                : new Dictionary<string, string>(StringComparer.Ordinal));
+
+    public Task<IReadOnlyList<string>> ListCustomDimensionsAsync(CancellationToken ct = default) =>
+        Task.FromResult<IReadOnlyList<string>>(
+            _customFields.Values.SelectMany(v => v.Keys).Distinct(StringComparer.Ordinal).OrderBy(x => x).ToList());
+
+    public Task SetCustomFieldAsync(string assetId, string dimension, string? value,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(assetId) || string.IsNullOrWhiteSpace(dimension))
+            return Task.CompletedTask;
+
+        if (!_customFields.TryGetValue(assetId, out var fields))
+            _customFields[assetId] = fields = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        var dim = dimension.Trim();
+        var val = (value ?? "").Trim();
+        if (val.Length == 0) fields.Remove(dim);
+        else fields[dim] = val;
+        return Task.CompletedTask;
     }
 
     public Task SetAssetLutAsync(string assetId, string? lutId, CancellationToken ct = default)

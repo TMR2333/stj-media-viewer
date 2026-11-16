@@ -198,12 +198,56 @@
                            Style="{ThemeResource AppMicroTextStyle}"
                            TextWrapping="Wrap" />
 
-                <TextBlock Text="城市" Style="{ThemeResource AppMicroTextStyle}" Margin="0,8,0,0" />
+                <TextBlock Text="具体地点" Style="{ThemeResource AppMicroTextStyle}" Margin="0,8,0,0" />
                 <TextBox x:Name="CityBox"
-                         PlaceholderText="拍摄城市"
+                         PlaceholderText="可填任意具体地点（上海·外滩 / 西湖断桥 / 巴黎）"
                          Text="{x:Bind ViewModel.CityText, Mode=TwoWay}"
                          LostFocus="CityBox_LostFocus"
                          KeyDown="CityBox_KeyDown" />
+
+                <!-- 自定义类别：用户自建维度，值自由填写；每行可删 -->
+                <TextBlock Text="自定义类别" Style="{ThemeResource AppMicroTextStyle}" Margin="0,10,0,0" />
+                <ItemsControl x:Name="CustomFieldsList" ItemsSource="{x:Bind ViewModel.CustomFields, Mode=OneWay}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:CustomFieldItem">
+                            <Grid ColumnSpacing="6" Margin="0,2,0,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="{x:Bind Dimension, Mode=OneWay}"
+                                           Style="{ThemeResource AppCaptionTextStyle}"
+                                           Foreground="{ThemeResource TextTertiaryBrush}"
+                                           MinWidth="64" VerticalAlignment="Center" />
+                                <TextBlock Grid.Column="1" Text="{x:Bind Value, Mode=OneWay}"
+                                           Style="{ThemeResource AppCaptionTextStyle}"
+                                           TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                <Button Grid.Column="2" Style="{ThemeResource AppIconButtonStyle}"
+                                        Click="RemoveCustomField_Click" Tag="{x:Bind Dimension, Mode=OneWay}"
+                                        ToolTipService.ToolTip="删除这个类别值">
+                                    <FontIcon Glyph="&#xE711;" FontSize="11" />
+                                </Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Grid ColumnSpacing="6" Margin="0,4,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <ComboBox Grid.Column="0" IsEditable="True"
+                              ItemsSource="{x:Bind ViewModel.CustomDimensions, Mode=OneWay}"
+                              Text="{x:Bind ViewModel.CustomDimension, Mode=TwoWay}"
+                              PlaceholderText="类别" />
+                    <TextBox Grid.Column="1" Text="{x:Bind ViewModel.CustomValueText, Mode=TwoWay}"
+                             PlaceholderText="值" />
+                    <Button Grid.Column="2" Click="AddCustomField_Click" ToolTipService.ToolTip="添加">
+                        <FontIcon Glyph="&#xE710;" FontSize="12" />
+                    </Button>
+                </Grid>
 
                 <TextBlock Text="评分" Style="{ThemeResource AppMicroTextStyle}" Margin="0,10,0,0" />
                 <uic:RatingStars x:Name="RatingStars"

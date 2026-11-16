@@ -156,12 +156,10 @@
                             <CheckBox Content="地点" Style="{StaticResource FieldLabelStyle}"
                                       IsChecked="{x:Bind ViewModel.UseLocation, Mode=TwoWay}" />
                             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                                <TextBox Text="{x:Bind ViewModel.CountryText, Mode=TwoWay}" Width="130"
-                                         PlaceholderText="国家" Style="{StaticResource FieldBoxStyle}" />
-                                <TextBox Text="{x:Bind ViewModel.ProvinceText, Mode=TwoWay}" Width="130"
-                                         PlaceholderText="省份" Style="{StaticResource FieldBoxStyle}" />
-                                <TextBox Text="{x:Bind ViewModel.CityText, Mode=TwoWay}" Width="160"
-                                         PlaceholderText="城市" Style="{StaticResource FieldBoxStyle}" />
+                                <!-- 一个自由输入框：填任意具体地点（城市 / 商圈 / 景点 / 场地名） -->
+                                <TextBox Text="{x:Bind ViewModel.CityText, Mode=TwoWay}" Width="360"
+                                         PlaceholderText="具体地点（如 上海·外滩 / 西湖断桥 / 巴黎）"
+                                         Style="{StaticResource FieldBoxStyle}" />
                             </StackPanel>
                         </Grid>
 
@@ -194,6 +192,25 @@
                                          PlaceholderText="主题（人像 / 风光 / 街头）" Style="{StaticResource FieldBoxStyle}" />
                                 <TextBox Text="{x:Bind ViewModel.ToneText, Mode=TwoWay}" Width="180"
                                          PlaceholderText="影调（高调 / 低调 / 硬调）" Style="{StaticResource FieldBoxStyle}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- 自定义类别：用户自建维度（项目 / 客户 / 场地…），值自由填 -->
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <CheckBox Content="自定义类别" Style="{StaticResource FieldLabelStyle}"
+                                      IsChecked="{x:Bind ViewModel.UseCustomCategory, Mode=TwoWay}" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                <ComboBox Width="170" IsEditable="True"
+                                          ItemsSource="{x:Bind ViewModel.CustomDimensions, Mode=OneWay}"
+                                          Text="{x:Bind ViewModel.CustomDimension, Mode=TwoWay}"
+                                          PlaceholderText="类别（项目 / 客户 / 场地）" />
+                                <TextBox Text="{x:Bind ViewModel.CustomValueText, Mode=TwoWay}" Width="260"
+                                         PlaceholderText="值（如 山河项目 / 某品牌 / 外景基地）"
+                                         Style="{StaticResource FieldBoxStyle}" />
                             </StackPanel>
                         </Grid>
 

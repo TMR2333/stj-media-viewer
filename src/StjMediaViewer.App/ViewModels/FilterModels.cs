@@ -20,6 +20,8 @@ public enum FilterGroupKind
     Log,
     Theme,
     Tone,
+    /// <summary>用户自建维度（维度名即分组标题，值是自由文本）。</summary>
+    Custom,
 }
 
 /// <summary>一个可勾选的筛选项（带计数）。</summary>
