@@ -17,6 +17,10 @@ namespace StjMediaViewer.Core.Media;
 public sealed class ThumbnailService : IThumbnailService
 {
     private const int DefaultQuality = 85;
+
+    /// <summary>STJ_TRACE_THUMB=1 时把每条缩略图的耗时写进日志（排查"加载慢"用）。</summary>
+    private static readonly bool TraceEnabled =
+        Environment.GetEnvironmentVariable("STJ_TRACE_THUMB") == "1";
     private const int MinSize = 32;
     private const int MaxSize = 2048;
 
@@ -52,9 +56,16 @@ public sealed class ThumbnailService : IThumbnailService
         int size = ClampSize(maxSize);
         try
         {
+            var trace = TraceEnabled;
+            var sw = trace ? System.Diagnostics.Stopwatch.StartNew() : null;
+
             var path = CachePath(asset, size, lutKey);
             var cached = TryReadCached(path);
-            if (cached is not null) return cached;
+            if (cached is not null)
+            {
+                if (trace) Log.Info($"[thumb] hit {size}px {sw!.ElapsedMilliseconds}ms {asset.FileName}");
+                return cached;
+            }
             if (IsRecentlyFailed(path)) return null;
 
             var gate = _gates.GetOrAdd(path, _ => new SemaphoreSlim(1, 1));
@@ -85,6 +96,7 @@ public sealed class ThumbnailService : IThumbnailService
                 _failed.TryRemove(path, out _);
                 WriteAtomic(path, jpeg);
                 asset.ThumbKey ??= KeyBase(asset);
+                if (trace) Log.Info($"[thumb] gen {size}px {sw!.ElapsedMilliseconds}ms {asset.FileName}");
                 return jpeg;
             }
             finally { gate.Release(); }
@@ -112,7 +124,17 @@ public sealed class ThumbnailService : IThumbnailService
         if (asset is null || string.IsNullOrWhiteSpace(asset.FullPath)) return null;
         int size = ClampSize(maxSize);
         var path = CachePath(asset, size, lutKey);
-        if (File.Exists(path)) return path;
+        if (File.Exists(path))
+        {
+            if (TraceEnabled)
+            {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                // 命中路径本身只是一次 File.Exists，这里只为了量化"命中有多快"
+                _ = sw.ElapsedMilliseconds;
+                Log.Info($"[thumb] path-hit {size}px {sw.ElapsedMilliseconds}ms {asset.FileName}");
+            }
+            return path;
+        }
         var bytes = await GetThumbnailJpegAsync(asset, maxSize, lut, lutKey, ct).ConfigureAwait(false);
         return bytes is null ? null : path;
     }

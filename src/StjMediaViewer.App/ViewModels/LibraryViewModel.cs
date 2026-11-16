@@ -220,6 +220,7 @@ public sealed partial class LibraryViewModel : ObservableObject
 
             Items.Clear();
             foreach (var a in items) Items.Add(new AssetCardItem(a));
+            PrefetchThumbnailsAhead(items);
 
             HasMore = items.Count >= PageSize;
             LoadMoreVisibility = HasMore ? Visibility.Visible : Visibility.Collapsed;
@@ -244,6 +245,21 @@ public sealed partial class LibraryViewModel : ObservableObject
                 LoadingVisibility = Visibility.Collapsed;
             }
         }
+    }
+
+    /// <summary>
+    /// 预取"首屏之后"的一批缩略图：解码是 CPU/IO 大头（24MP JPEG ≈ 140ms/张），
+    /// 提前在后台焐热磁盘缓存，滚动时直接命中（命中路径只有一次 File.Exists）。
+    /// </summary>
+    private static void PrefetchThumbnailsAhead(IReadOnlyList<MediaAsset> items)
+    {
+        try
+        {
+            if (items.Count <= 16) return;
+            var assets = items.Skip(16).Take(180).ToList();
+            if (assets.Count > 0) AppServices.Thumbs.Prefetch(assets, 360, maxCount: assets.Count);
+        }
+        catch (Exception ex) { Log.Warn("[thumb] prefetch failed", ex); }
     }
 
     /// <summary>加载下一页（滚动到底 / 点击"加载更多"）。</summary>

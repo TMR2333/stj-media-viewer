@@ -34,6 +34,7 @@ public sealed partial class LibraryPage : Page
         InitializeComponent();
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
+        // 首屏加载完成后再预取：此时 Items 才是完整的一页
     }
 
     public LibraryViewModel ViewModel => LibraryViewModel.Shared;

@@ -226,6 +226,27 @@ python tools/SampleLibrary/generate.py
 
 ffmpeg 是可选的：把 `ffmpeg.exe` 放到 `tools/ffmpeg/bin/`（或 PATH）即可获得视频抽帧/代理转码；没有则降级到系统缩略图，不报错。
 
+## 3.1 缩略图为什么"慢"、做了什么优化
+
+浏览时的缩略图分两条路径，代价差 100 倍：
+
+| 路径 | 耗时（实测，24MP JPEG） | 说明 |
+| --- | --- | --- |
+| **磁盘缓存命中** | **0 ms**（一次 `File.Exists`）+ BitmapImage 解 360px JPEG | 打开软件、回看已浏览过的区域都是这条 |
+| **首次生成** | **≈140 ms/张**（中位 150 ms，P90 ≈ 180 ms） | WIC 解 2400 万像素原图 → 缩放 360px → 压 JPEG → 落盘 |
+
+视频缩略图还要先 ffmpeg 抽帧（≈150–300 ms/张），RAW 走内嵌预览（通常更快）。
+
+优化（都在 `Core/Media/MediaDecoder.cs` + `App/Services/ThumbnailLoader.cs`）：
+
+1. **优先用内嵌 EXIF 预览**：相机/手机 JPEG 里通常塞了 1024–2048px 的预览图，解它比解原图快一个数量级（大预览的机型 140ms → ≈15ms）；预览太小则自动退回原图。
+2. **缩略图用 Linear 插值 + 跳过 ICC 色彩管理**：Fant 在大倍率降采样时慢 2–4 倍，360px 上肉眼无差。
+3. **并发按 CPU 数放大**：`clamp(CPU×1.5, 6, 16)`（原来固定 6），一屏 12 张不再排好几轮。
+4. **预取下一批（180 张）**：页面数据加载完后在后台低并发（2）把缩略图生成并落盘，滚动时直接命中缓存。
+5. **缓存按素材 + LUT 分桶**，切换 LUT 不互相覆盖；缓存文件做 SOI/EOI 完整性校验，坏文件自动删掉重生成。
+
+想现场量化：设 `STJ_TRACE_THUMB=1` 启动，日志里会有 `[thumb] gen/hit/path-hit` 每张的耗时；`STJ_TRACE_DECODE=1` 还能看到 WIC 分段耗时。
+
 ## 4. 工程与验证
 
 ```

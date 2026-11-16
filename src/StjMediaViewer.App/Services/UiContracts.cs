@@ -23,6 +23,8 @@ public interface IDesignLanguageService
 public interface IThumbnailLoader
 {
     Task<ImageSource?> LoadAsync(MediaAsset asset, int size, CancellationToken ct = default);
+    /// <summary>后台预热一批缩略图（只落磁盘缓存，不碰 UI 对象）。</summary>
+    void Prefetch(IEnumerable<MediaAsset> assets, int size, int maxCount = 48);
     void Invalidate(string assetId);
     void Clear();
 }

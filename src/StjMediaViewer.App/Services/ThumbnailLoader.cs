@@ -23,13 +23,23 @@ public sealed class ThumbnailLoader : IThumbnailLoader
     private readonly Dictionary<string, ImageSource> _cache = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Task<ImageSource?>> _inflight = new(StringComparer.Ordinal);
     private readonly Queue<string> _order = new();
-    private readonly SemaphoreSlim _gate = new(6, 6);
+    // 解码是 CPU/IO 混合任务：并发太低会排队（一屏 12 张要等好几轮），
+    // 太高又会和 UI 线程抢核。按核心数取 1.5 倍，夹在 6–16。
+    private static readonly int ThumbConcurrency =
+        Math.Clamp(Environment.ProcessorCount * 3 / 2, 6, 16);
+
+    private readonly SemaphoreSlim _gate;
+
+    public ThumbnailLoader(IThumbnailService service)
+    {
+        _service = service;
+        _gate = new SemaphoreSlim(ThumbConcurrency, ThumbConcurrency);
+    }
     private const int MaxEntries = 1200;
 
     private static readonly bool DisableThumbs =
         Environment.GetEnvironmentVariable("STJ_DISABLE_THUMBS") == "1";
 
-    public ThumbnailLoader(IThumbnailService service) => _service = service;
 
     public async Task<ImageSource?> LoadAsync(MediaAsset asset, int size, CancellationToken ct = default)
     {
@@ -114,6 +124,53 @@ public sealed class ThumbnailLoader : IThumbnailLoader
         while (_cache.Count > MaxEntries && _order.Count > 0)
             _cache.Remove(_order.Dequeue());
     }
+
+    /// <summary>
+    /// 预取（给"下一屏"用）：后台按低并发把缩略图生成并落盘，滚动到时直接命中缓存。
+    /// 不去动 UI 缓存（BitmapImage 必须在 UI 线程创建），只把磁盘缓存焐热。
+    /// </summary>
+    public void Prefetch(IEnumerable<MediaAsset> assets, int size, int maxCount = 48)
+    {
+        if (Environment.GetEnvironmentVariable("STJ_TRACE_THUMB") == "1")
+            Log.Info($"[thumb] prefetch start count={assets.Count()} size={size} max={maxCount}");
+        if (Interlocked.Exchange(ref _prefetchRunning, 1) == 1)
+        {
+            if (Environment.GetEnvironmentVariable("STJ_TRACE_THUMB") == "1") Log.Info("[thumb] prefetch skipped (already running)");
+            return;
+        }
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                using var gate = new SemaphoreSlim(2, 2);
+                int n = 0;
+                foreach (var asset in assets)
+                {
+                    if (n++ >= maxCount) break;
+                    await gate.WaitAsync().ConfigureAwait(false);
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var lutEntry = ResolveLut(asset);
+                            var lut = lutEntry is null ? null : await AppServices.Luts.LoadCubeAsync(lutEntry).ConfigureAwait(false);
+                            await _service.GetThumbnailPathAsync(asset, size, lut, lutEntry?.Id, CancellationToken.None)
+                                .ConfigureAwait(false);
+                        }
+                        catch { /* 预取失败无所谓 */ }
+                        finally { gate.Release(); }
+                    });
+                }
+                await Task.Delay(50).ConfigureAwait(false);
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _prefetchRunning, 0);
+            }
+        });
+    }
+
+    private int _prefetchRunning;
 
     public void Invalidate(string assetId)
     {
