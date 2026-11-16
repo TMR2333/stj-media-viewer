@@ -27,7 +27,8 @@ namespace StjMediaViewer.Core.Cloud;
 public sealed class WebDavCloudStorage : ICloudStorage
 {
     private const string DpapiPrefix = "dpapi:";
-    private const int TimeoutSeconds = 100;
+    // 大文件（RAW/视频）在慢速上行下传几分钟很正常：给足时间，别让本地超时把上传打断。
+    private const int TimeoutSeconds = 600;
     private const int HttpMultiStatus = 207;
     private const int HttpMethodNotAllowed = 405;
 

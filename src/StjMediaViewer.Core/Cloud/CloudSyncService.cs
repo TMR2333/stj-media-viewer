@@ -118,6 +118,43 @@ public sealed class CloudSyncService : ICloudSyncService
         };
     }
 
+    /// <summary>
+    /// 是否是"网络抖动 / 服务器主动断连"这类可重试的错误：
+    /// 坚果云等 WebDAV 在短时间大量上传时会直接关闭连接（远程主机强迫关闭了一个现有的连接），
+    /// 重试 + 间隔通常就能过去。
+    /// </summary>
+    public static bool IsTransient(Exception ex)
+    {
+        for (var current = ex; current is not null; current = current.InnerException)
+        {
+            switch (current)
+            {
+                case System.Net.Sockets.SocketException:
+                case System.Net.Http.HttpRequestException:
+                    return true;
+                case IOException io when LooksTransient(io.Message):
+                    return true;
+            }
+
+            if (current is TaskCanceledException || current.GetType().Name.Contains("Timeout", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return LooksTransient(ex.Message);
+    }
+
+    private static bool LooksTransient(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message)) return false;
+        string[] hints =
+        {
+            "强迫关闭", "现有的连接", "连接被", "连接已", "重置", "已中止",
+            "prematurely", "ResponseEnded", "connection", "reset by peer", "broken pipe",
+            "timed out", "超时", "forcibly closed", "unexpected end", "服务器关闭",
+        };
+        return hints.Any(h => message.Contains(h, StringComparison.OrdinalIgnoreCase));
+    }
+
     /// <summary>WebDAV 适配器由 Cloud 目录下的实现提供；找不到实现时给出明确错误。</summary>
     private static ICloudStorage CreateWebDav(CloudTarget target)
     {
@@ -354,7 +391,8 @@ public sealed class CloudSyncService : ICloudSyncService
             ct.ThrowIfCancellationRequested();
             var item = new CloudTransferResult { RelativePath = action.RelativePath, SizeBytes = action.SizeBytes };
             var itemSw = System.Diagnostics.Stopwatch.StartNew();
-            try
+
+            async Task TransferOnceAsync()
             {
                 switch (action.Kind)
                 {
@@ -373,6 +411,28 @@ public sealed class CloudSyncService : ICloudSyncService
                         item.Direction = "Conflict";
                         break;
                 }
+            }
+
+            try
+            {
+                // WebDAV 服务器（尤其坚果云）短时间连续上传会主动断连：失败就退避重试。
+                const int maxAttempts = 3;
+                for (var attempt = 1; ; attempt++)
+                {
+                    try
+                    {
+                        await TransferOnceAsync().ConfigureAwait(false);
+                        break;
+                    }
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception ex) when (attempt < maxAttempts &&
+                                               action.Kind is CloudActionKind.Upload or CloudActionKind.Download &&
+                                               IsTransient(ex))
+                    {
+                        Log.Warn($"[cloud] {action.RelativePath} 第 {attempt} 次失败（{ex.Message}），退避后重试");
+                        await Task.Delay(attempt == 1 ? 1200 : 3500, ct).ConfigureAwait(false);
+                    }
+                }
 
                 item.Ok = true;
                 if (item.Direction == "Upload")
@@ -390,14 +450,25 @@ public sealed class CloudSyncService : ICloudSyncService
                     report.Conflicts++;
                     item.Direction = "Conflict";
                 }
+
+                // 给服务器一点喘息时间：坚果云这类 WebDAV 对高频 PUT 很敏感
+                if (action.Kind == CloudActionKind.Upload && !dryRun)
+                {
+                    var pacing = target.Kind == CloudProviderKind.WebDav
+                        ? ((target.WebDavEndpoint ?? "").Contains("jianguoyun", StringComparison.OrdinalIgnoreCase) ? 350 : 120)
+                        : 0;
+                    if (pacing > 0) await Task.Delay(pacing, ct).ConfigureAwait(false);
+                }
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
                 item.Ok = false;
-                item.Error = ex.Message;
+                item.Error = IsTransient(ex)
+                    ? $"{ex.Message}（服务器/网络中断，已重试仍失败：WebDAV 短时间大量上传常被限流，稍后点「立即全部同步」继续即可）"
+                    : ex.Message;
                 report.Failed++;
-                report.Messages.Add($"{action.RelativePath}：{ex.Message}");
+                report.Messages.Add($"{action.RelativePath}：{item.Error}");
             }
 
             itemSw.Stop();
@@ -463,9 +534,28 @@ public sealed class CloudSyncService : ICloudSyncService
         IProgress<CloudSyncProgress>? progress = null,
         CancellationToken ct = default)
     {
-        var plan = await BuildPlanAsync(target, progress, ct).ConfigureAwait(false);
-        return await ExecuteAsync(plan, dryRun, progress, ct).ConfigureAwait(false);
+        // WebDAV（尤其坚果云）同一账号并行两个同步会话会被服务器直接断连，
+        // 手动「立即全部同步」和后台自动同步撞在一起时就是这种情况 → 全局串行。
+        if (target.Kind == CloudProviderKind.WebDav && !dryRun)
+        {
+            await WebDavSessionGate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                var plan = await BuildPlanAsync(target, progress, ct).ConfigureAwait(false);
+                return await ExecuteAsync(plan, dryRun, progress, ct).ConfigureAwait(false);
+            }
+            finally
+            {
+                WebDavSessionGate.Release();
+            }
+        }
+
+        var normalPlan = await BuildPlanAsync(target, progress, ct).ConfigureAwait(false);
+        return await ExecuteAsync(normalPlan, dryRun, progress, ct).ConfigureAwait(false);
     }
+
+    /// <summary>WebDAV 同步会话全局串行锁（同一进程内）。</summary>
+    private static readonly SemaphoreSlim WebDavSessionGate = new(1, 1);
 
     // ------------------------------------------------------------------ 群组作者 / 来源标记
 
