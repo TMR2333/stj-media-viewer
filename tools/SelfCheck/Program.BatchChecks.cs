@@ -70,4 +70,41 @@ public static partial class Program
         Check("批量填写：空 patch 不写库",
               await s.Store.ApplyBatchEditAsync(ids, new BatchEditPatch()) == 0, null);
     }
+    /// <summary>"只看未调色 / 只看已调色"：两集互斥、并集不超过全量；标记后期或套 LUT 后归入已调色。</summary>
+    private static async Task CheckColorFilter(Services s)
+    {
+        var all = await s.Store.QueryAsync(new AssetQuery { Limit = 0 });
+        var colored = await s.Store.QueryAsync(new AssetQuery { Limit = 0, Colored = true });
+        var uncolored = await s.Store.QueryAsync(new AssetQuery { Limit = 0, Colored = false });
+
+        Check("调色筛选：已调色 / 未调色都有结果", colored.Count > 0 && uncolored.Count > 0,
+              $"已调色 {colored.Count} / 未调色 {uncolored.Count} / 共 {all.Count}");
+        Check("调色筛选：两集互斥",
+              !colored.Select(a => a.Id).Intersect(uncolored.Select(a => a.Id), StringComparer.Ordinal).Any(),
+              null);
+        Check("调色筛选：并集不超过全量", colored.Count + uncolored.Count <= all.Count,
+              $"{colored.Count}+{uncolored.Count} <= {all.Count}");
+
+        var targets = uncolored.Take(2).ToList();
+        if (targets.Count == 0) return;
+        var ids = targets.Select(a => a.Id).ToList();
+
+        await s.Store.ApplyBatchEditAsync(ids, new BatchEditPatch { PostProcess = 2 });
+        var colored2 = await s.Store.QueryAsync(new AssetQuery { Limit = 0, Colored = true });
+        var uncolored2 = await s.Store.QueryAsync(new AssetQuery { Limit = 0, Colored = false });
+        Check("标记已后期后计入已调色", colored2.Count >= colored.Count + ids.Count,
+              $"{colored.Count} → {colored2.Count}");
+        Check("标记已后期后离开未调色", uncolored2.Count <= uncolored.Count - ids.Count,
+              $"{uncolored.Count} → {uncolored2.Count}");
+
+        var withLut = all.FirstOrDefault(a => a.Kind == MediaKind.Video);
+        if (withLut is not null)
+        {
+            await s.Store.SetAssetLutAsync(withLut.Id, "builtin:sony-slog3-cine-709");
+            var lutColored = await s.Store.QueryAsync(new AssetQuery { Limit = 0, Colored = true });
+            Check("套用 LUT 后计入已调色", lutColored.Any(a => a.Id == withLut.Id), withLut.FileName);
+            await s.Store.SetAssetLutAsync(withLut.Id, null);
+        }
+    }
+
 }

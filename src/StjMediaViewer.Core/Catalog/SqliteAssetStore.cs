@@ -854,6 +854,13 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
         }
 
         if (q.IsRaw is { } isRaw) w.And(isRaw ? "raw_format <> 0" : "raw_format = 0");
+        if (q.Colored is { } colored)
+        {
+            // "调色"包含两种情况：标记为已后期，或已经套用了 LUT
+            w.And(colored
+                ? "(post_process = 2 OR (lut_id IS NOT NULL AND lut_id <> ''))"
+                : "(COALESCE(post_process, 0) <> 2 AND (lut_id IS NULL OR lut_id = ''))");
+        }
         if (q.IsLog is { } isLog) w.And(isLog ? "is_log = 1" : "(is_log IS NULL OR is_log = 0)");
         if (q.HasGps is { } gps)
             w.And(gps ? "latitude IS NOT NULL AND longitude IS NOT NULL"

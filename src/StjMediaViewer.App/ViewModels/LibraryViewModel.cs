@@ -77,13 +77,25 @@ public sealed partial class LibraryViewModel : ObservableObject
 
     // ---------------- 快捷筛选 ----------------
     [ObservableProperty]
-    private bool _onlyUnclassified;
-
-    [ObservableProperty]
     private bool _onlyRaw;
 
     [ObservableProperty]
     private bool _onlyLog;
+
+    /// <summary>只看未调色（未后期且没套 LUT）。</summary>
+    [ObservableProperty]
+    private bool _onlyUncolored;
+
+    /// <summary>只看已调色（已后期，或已经套用 LUT）。</summary>
+    [ObservableProperty]
+    private bool _onlyColored;
+
+    /// <summary>按当前媒体类型显示"只看 RAW / 只看 Log"：选视频只留 Log，选图片只留 RAW。</summary>
+    [ObservableProperty]
+    private Visibility _rawChipVisibility = Visibility.Visible;
+
+    [ObservableProperty]
+    private Visibility _logChipVisibility = Visibility.Visible;
 
     // ---------------- 结果状态 ----------------
     [ObservableProperty]
@@ -158,7 +170,8 @@ public sealed partial class LibraryViewModel : ObservableObject
     public event EventHandler? SelectionChanged;
 
     public bool IsAnyFilterActive =>
-        Groups.Any(g => g.HasSelection) || OnlyUnclassified || OnlyRaw || OnlyLog || !string.IsNullOrWhiteSpace(SearchText);
+        Groups.Any(g => g.HasSelection) || OnlyRaw || OnlyLog || OnlyColored || OnlyUncolored ||
+        !string.IsNullOrWhiteSpace(SearchText);
 
     // ==================================================================================
     //  初始化 / 刷新
@@ -277,7 +290,6 @@ public sealed partial class LibraryViewModel : ObservableObject
             Limit = limit,
             SortBy = SortKey,
             Descending = Descending,
-            OnlyUnclassified = OnlyUnclassified,
             // 同一张照片的 JPG 与 RAW 在网格里合成一项（代表是 JPG，没有 JPG 才用 RAW），
             // 这样图库不会被 RAW 副本撑成两倍；要看全部文件勾「显示 RAW 副本」。
             CollapseGroups = !ShowGroupCopies,
@@ -322,6 +334,8 @@ public sealed partial class LibraryViewModel : ObservableObject
 
         if (OnlyRaw) q.IsRaw = true;
         if (OnlyLog) q.IsLog = true;
+        if (OnlyColored) q.Colored = true;
+        if (OnlyUncolored) q.Colored = false;
 
         return q;
     }
@@ -461,8 +475,26 @@ public sealed partial class LibraryViewModel : ObservableObject
     // ==================================================================================
     private void OnGroupSelectionChanged(object? sender, EventArgs e)
     {
+        UpdateKindChipVisibility();
         if (_suppressRefresh) return;
         OnFilterChanged();
+    }
+
+    /// <summary>
+    /// 媒体类型只选了"视频"时隐藏「只看 RAW」（并清掉已勾选的 RAW 条件），
+    /// 只选了"图片"时隐藏「只看 Log」，避免出现必然 0 条的组合。
+    /// </summary>
+    private void UpdateKindChipVisibility()
+    {
+        var selected = KindGroup.SelectedIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        bool onlyVideo = selected.Count == 1 && selected.Contains(nameof(MediaKind.Video));
+        bool onlyImage = selected.Count == 1 && selected.Contains(nameof(MediaKind.Image));
+
+        RawChipVisibility = onlyVideo ? Visibility.Collapsed : Visibility.Visible;
+        LogChipVisibility = onlyImage ? Visibility.Collapsed : Visibility.Visible;
+
+        if (RawChipVisibility == Visibility.Collapsed && OnlyRaw) OnlyRaw = false;
+        if (LogChipVisibility == Visibility.Collapsed && OnlyLog) OnlyLog = false;
     }
 
     private void OnFilterChanged()
@@ -480,7 +512,6 @@ public sealed partial class LibraryViewModel : ObservableObject
         _suppressRefresh = true;
         foreach (var g in Groups) g.Clear();
         _suppressRefresh = false;
-        OnlyUnclassified = false;
         OnlyRaw = false;
         OnlyLog = false;
         SearchText = "";
@@ -511,9 +542,20 @@ public sealed partial class LibraryViewModel : ObservableObject
         RequestRefresh();
     }
 
-    partial void OnOnlyUnclassifiedChanged(bool value) => OnQuickFilterChanged();
     partial void OnOnlyRawChanged(bool value) => OnQuickFilterChanged();
     partial void OnOnlyLogChanged(bool value) => OnQuickFilterChanged();
+
+    partial void OnOnlyColoredChanged(bool value)
+    {
+        if (value && OnlyUncolored) OnlyUncolored = false;
+        OnQuickFilterChanged();
+    }
+
+    partial void OnOnlyUncoloredChanged(bool value)
+    {
+        if (value && OnlyColored) OnlyColored = false;
+        OnQuickFilterChanged();
+    }
 
     private void OnQuickFilterChanged()
     {
@@ -527,9 +569,10 @@ public sealed partial class LibraryViewModel : ObservableObject
         var parts = new List<string>();
         foreach (var g in Groups)
             if (g.HasSelection) parts.Add($"{g.Title}: {string.Join(" / ", g.Options.Where(o => o.IsSelected).Select(o => o.Display))}");
-        if (OnlyUnclassified) parts.Add("只看未分类");
         if (OnlyRaw) parts.Add("只看 RAW");
         if (OnlyLog) parts.Add("只看 Log");
+        if (OnlyUncolored) parts.Add("只看未调色");
+        if (OnlyColored) parts.Add("只看已调色");
         if (!string.IsNullOrWhiteSpace(SearchText)) parts.Add($"搜索: {SearchText}");
 
         ActiveFilterSummary = string.Join("   ·   ", parts);

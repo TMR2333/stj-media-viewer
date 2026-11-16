@@ -149,14 +149,71 @@ public sealed partial class LibraryPage : Page
         ViewModel.ClearAllFilters();
     }
 
-    private void OnlyUnclassified_Click(object sender, RoutedEventArgs e) =>
-        ViewModel.OnlyUnclassified = (sender as ToggleButton)?.IsChecked == true;
-
     private void OnlyRaw_Click(object sender, RoutedEventArgs e) =>
         ViewModel.OnlyRaw = (sender as ToggleButton)?.IsChecked == true;
 
     private void OnlyLog_Click(object sender, RoutedEventArgs e) =>
         ViewModel.OnlyLog = (sender as ToggleButton)?.IsChecked == true;
+
+    private void OnlyUncolored_Click(object sender, RoutedEventArgs e) =>
+        ViewModel.OnlyUncolored = (sender as ToggleButton)?.IsChecked == true;
+
+    private void OnlyColored_Click(object sender, RoutedEventArgs e) =>
+        ViewModel.OnlyColored = (sender as ToggleButton)?.IsChecked == true;
+
+    /// <summary>卡片进入视野时预热 StorageFile，拖出时不至于卡住。</summary>
+    private void AssetList_ContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
+    {
+        if (args.InRecycleQueue || args.Item is not AssetCardItem card) return;
+        try
+        {
+            DragFileCache.Preload(new[] { card.Asset.FullPath }.Concat(card.Asset.CompanionPaths));
+        }
+        catch { /* 预热失败不影响展示 */ }
+    }
+
+    /// <summary>
+    /// 把素材拖到 Photoshop / Lightroom 等外部软件：DataPackage 里放真实磁盘文件
+    /// （JPG/RAW 配对的两个文件一起给），目标程序直接按路径打开。
+    /// </summary>
+    private void AssetList_DragItemsStarting(object sender, DragItemsStartingEventArgs e)
+    {
+        try
+        {
+            var assets = e.Items.OfType<AssetCardItem>().Select(i => i.Asset).ToList();
+            if (assets.Count == 0) assets = ViewModel.SelectedItems.Select(i => i.Asset).ToList();
+            if (assets.Count == 0) { e.Cancel = true; return; }
+
+            var files = new List<Windows.Storage.StorageFile>();
+            foreach (var asset in assets)
+            {
+                foreach (var path in new[] { asset.FullPath }.Concat(asset.CompanionPaths))
+                {
+                    var file = DragFileCache.Take(path);
+                    if (file is not null) files.Add(file);
+                }
+            }
+
+            if (files.Count == 0) { e.Cancel = true; return; }
+
+            e.Data.SetStorageItems(files);
+            e.Data.RequestedOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation.Copy;
+            e.Data.Properties.Description = files.Count == 1
+                ? Path.GetFileName(files[0].Path)
+                : $"{files.Count} 个文件";
+
+            Log.Info("[drag] 拖出 " + files.Count + " 个文件：" +
+                     string.Join(", ", files.Take(4).Select(f => Path.GetFileName(f.Path))));
+            AppEvents.SetStatus(files.Count == 1
+                ? $"拖出 1 个文件：{Path.GetFileName(files[0].Path)}"
+                : $"拖出 {files.Count} 个文件");
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("拖拽素材失败", ex);
+            e.Cancel = true;
+        }
+    }
 
     private void EmptyState_ActionInvoked(object? sender, EventArgs e)
     {

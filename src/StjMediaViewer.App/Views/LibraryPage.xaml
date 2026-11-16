@@ -444,24 +444,32 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                        <ToggleButton x:Name="ChipUnclassified"
-                                      Style="{StaticResource CompactToggleStyle}"
-                                      Content="只看未分类"
-                                      IsChecked="{x:Bind ViewModel.OnlyUnclassified, Mode=OneWay}"
-                                      Click="OnlyUnclassified_Click"
-                                      ToolTipService.ToolTip="只显示还没有主题或影调的素材" />
                         <ToggleButton x:Name="ChipRaw"
                                       Style="{StaticResource CompactToggleStyle}"
                                       Content="只看 RAW"
                                       IsChecked="{x:Bind ViewModel.OnlyRaw, Mode=OneWay}"
+                                      Visibility="{x:Bind ViewModel.RawChipVisibility, Mode=OneWay}"
                                       Click="OnlyRaw_Click"
-                                      ToolTipService.ToolTip="只显示 RAW 原片" />
+                                      ToolTipService.ToolTip="只显示 RAW 原片（选图片类型时出现）" />
                         <ToggleButton x:Name="ChipLog"
                                       Style="{StaticResource CompactToggleStyle}"
                                       Content="只看 Log"
                                       IsChecked="{x:Bind ViewModel.OnlyLog, Mode=OneWay}"
+                                      Visibility="{x:Bind ViewModel.LogChipVisibility, Mode=OneWay}"
                                       Click="OnlyLog_Click"
-                                      ToolTipService.ToolTip="只显示 Log 视频素材" />
+                                      ToolTipService.ToolTip="只显示 Log 视频素材（选视频类型时出现）" />
+                        <ToggleButton x:Name="ChipUncolored"
+                                      Style="{StaticResource CompactToggleStyle}"
+                                      Content="只看未调色"
+                                      IsChecked="{x:Bind ViewModel.OnlyUncolored, Mode=OneWay}"
+                                      Click="OnlyUncolored_Click"
+                                      ToolTipService.ToolTip="只显示还没调色的素材（未后期且没套 LUT）" />
+                        <ToggleButton x:Name="ChipColored"
+                                      Style="{StaticResource CompactToggleStyle}"
+                                      Content="只看已调色"
+                                      IsChecked="{x:Bind ViewModel.OnlyColored, Mode=OneWay}"
+                                      Click="OnlyColored_Click"
+                                      ToolTipService.ToolTip="只显示已调色的素材（标记为已后期，或已经套用 LUT）" />
 
                         <Border Width="1" Height="16" Background="{ThemeResource AppDividerBrush}" Margin="6,0" />
 
@@ -655,6 +663,9 @@
                 <ListView x:Name="AssetList"
                           Grid.Row="0"
                           SelectionMode="Extended"
+                          CanDragItems="True"
+                          DragItemsStarting="AssetList_DragItemsStarting"
+                          ContainerContentChanging="AssetList_ContainerContentChanging"
                           IsItemClickEnabled="False"
                           ItemsSource="{x:Bind ViewModel.Items}"
                           ItemContainerStyle="{StaticResource AssetItemStyle}"

@@ -19,6 +19,8 @@ public sealed class AssetQuery
 
     public bool? IsRaw { get; set; }
     public bool? IsLog { get; set; }
+    /// <summary>调色状态：true = 已调色（已后期或套了 LUT），false = 未调色，null = 不限。</summary>
+    public bool? Colored { get; set; }
     public bool? HasGps { get; set; }
     public bool? IsPick { get; set; }
     public PostProcessState? PostProcess { get; set; }
