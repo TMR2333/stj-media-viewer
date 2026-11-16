@@ -438,6 +438,16 @@
                     </Button>
                 </Grid>
 
+                <InfoBar x:Name="LibraryIssueBar"
+                         IsOpen="False"
+                         Severity="Warning"
+                         IsClosable="True"
+                         Title="媒体库目录不可用">
+                    <InfoBar.ActionButton>
+                        <Button Content="去设置修复" Click="FixMissingLibrary_Click" />
+                    </InfoBar.ActionButton>
+                </InfoBar>
+
                 <Grid ColumnSpacing="12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />

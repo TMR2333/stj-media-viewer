@@ -60,6 +60,7 @@ public sealed partial class LibraryPage : Page
 
         InspectorViewModel.Shared.Show(ViewModel.PrimaryAsset);
         UpdateShellCounts();
+        _ = CheckLibraryAvailabilityAsync();
         _ = ShellViewModel.Shared.RefreshCacheSizeAsync();
         TryHookScrollViewer();
     }
@@ -115,6 +116,36 @@ public sealed partial class LibraryPage : Page
                 break;
         }
     }
+
+    /// <summary>
+    /// 媒体库目录被删除 / 移动后（例如删掉旧版软件文件夹再装新版），
+    /// 网格里会只剩空白占位：这里明确提示，并给一个直达修复入口。
+    /// </summary>
+    private async Task CheckLibraryAvailabilityAsync()
+    {
+        try
+        {
+            var libraries = await AppServices.Library.GetLibrariesAsync();
+            var missing = libraries.Where(l => !string.IsNullOrWhiteSpace(l.Path) && !Directory.Exists(l.Path)).ToList();
+            if (missing.Count == 0)
+            {
+                LibraryIssueBar.IsOpen = false;
+                return;
+            }
+
+            LibraryIssueBar.Message = missing.Count == 1
+                ? $"找不到「{missing[0].Name}」的目录：{missing[0].Path}。缩略图不会生成；如果文件夹被移动/改名，用「重新定位」修复。"
+                : $"有 {missing.Count} 个媒体库目录不存在，缩略图不会生成：{string.Join("；", missing.Select(l => l.Name))}。";
+            LibraryIssueBar.IsOpen = true;
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("检查媒体库目录可用性失败", ex);
+        }
+    }
+
+    private void FixMissingLibrary_Click(object sender, RoutedEventArgs e)
+        => ShellPage.Current?.NavigateToView("settings");
 
     private void UpdateShellCounts()
     {

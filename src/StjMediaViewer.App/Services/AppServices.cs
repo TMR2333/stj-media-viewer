@@ -103,9 +103,22 @@ public static class AppServices
         get
         {
             var custom = Settings.Current.CacheDirectory;
-            return string.IsNullOrWhiteSpace(custom)
-                ? Path.Combine(Settings.AppDataDirectory, "Cache")
-                : Path.GetFullPath(custom!);
+            if (!string.IsNullOrWhiteSpace(custom))
+            {
+                try
+                {
+                    var full = Path.GetFullPath(custom!);
+                    Directory.CreateDirectory(full);   // 旧缓存目录被删掉时自动重建
+                    return full;
+                }
+                catch (Exception ex)
+                {
+                    // 自定义缓存目录不可用（比如指向已删除的软件文件夹 / 拔掉的移动硬盘）：
+                    // 回退到默认目录，保证缩略图还能生成。
+                    Log.Warn("自定义缓存目录不可用，回退默认缓存目录", ex);
+                }
+            }
+            return Path.Combine(Settings.AppDataDirectory, "Cache");
         }
     }
 

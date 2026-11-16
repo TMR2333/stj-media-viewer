@@ -131,6 +131,97 @@ public sealed class LibraryService : ILibraryService
         finally { _gate.Release(); }
     }
 
+    public async Task<LibraryRelocateResult> RelocateLibraryAsync(
+        string libraryId,
+        string newFolderPath,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(libraryId))
+            throw new ArgumentException("媒体库 id 不能为空", nameof(libraryId));
+
+        var newPath = PathUtil.Normalize(newFolderPath);
+        if (!Directory.Exists(newPath))
+            throw new DirectoryNotFoundException($"新目录不存在：{newPath}");
+
+        await _gate.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            var roots = (await _store.LoadLibraryRootsAsync(ct).ConfigureAwait(false)).ToList();
+            var root = roots.FirstOrDefault(r => string.Equals(r.Id, libraryId, StringComparison.OrdinalIgnoreCase))
+                       ?? throw new InvalidOperationException("找不到这个媒体库");
+
+            var oldPath = PathUtil.Normalize(root.Path);
+            if (string.Equals(oldPath, newPath, StringComparison.OrdinalIgnoreCase))
+                return new LibraryRelocateResult(0, 0, oldPath, newPath);
+
+            var oldPrefix = oldPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                            + Path.DirectorySeparatorChar;
+
+            var entries = await _store.ListAllPathsAsync(libraryId, ct).ConfigureAwait(false);
+            int updated = 0, missing = 0;
+            foreach (var entry in entries)
+            {
+                ct.ThrowIfCancellationRequested();
+                try
+                {
+                    var full = PathUtil.Normalize(entry.FullPath);
+                    var relative = full.StartsWith(oldPrefix, StringComparison.OrdinalIgnoreCase)
+                        ? full[oldPrefix.Length..]
+                        : Path.GetFileName(full);
+
+                    var candidate = Path.Combine(newPath, relative);
+                    if (!File.Exists(candidate))
+                    {
+                        // 相对结构变了（比如用户在子目录里整理过）：按文件名兜底找一次
+                        var fallback = FindFileByName(newPath, Path.GetFileName(full));
+                        if (fallback is null)
+                        {
+                            missing++;
+                            continue;
+                        }
+                        candidate = fallback;
+                    }
+
+                    var newRelative = Path.GetRelativePath(newPath, candidate).Replace('\\', '/');
+                    await _store.UpdateAssetPathAsync(entry.Id, candidate, newRelative, null, ct).ConfigureAwait(false);
+                    updated++;
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    missing++;
+                    Log.Warn($"[library] relocate {entry.FullPath} failed: {ex.Message}");
+                }
+            }
+
+            root.Path = newPath;
+            var name = Path.GetFileName(newPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            if (!string.IsNullOrWhiteSpace(name)) root.Name = name;
+            await _store.SaveLibraryRootsAsync(roots, ct).ConfigureAwait(false);
+            _roots = roots;
+            SyncSettings(roots);
+
+            Log.Info($"[library] relocated {libraryId}: {oldPath} → {newPath}（修复 {updated}，缺失 {missing}）");
+            return new LibraryRelocateResult(updated, missing, oldPath, newPath);
+        }
+        finally { _gate.Release(); }
+    }
+
+    private static string? FindFileByName(string root, string fileName)
+    {
+        if (string.IsNullOrWhiteSpace(fileName)) return null;
+        try
+        {
+            foreach (var file in Directory.EnumerateFiles(root, fileName, SearchOption.AllDirectories))
+                return file;
+        }
+        catch
+        {
+            // 权限/IO 问题就当作找不到
+        }
+        return null;
+    }
+
     // ==================================================================== 扫描入库
 
     public async Task<ScanProgress> ScanLibraryAsync(

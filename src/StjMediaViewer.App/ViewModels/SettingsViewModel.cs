@@ -780,6 +780,24 @@ public sealed partial class SettingsViewModel : ObservableObject
         }
     }
 
+    /// <summary>媒体库目录被删/移动后重新定位：按相对路径修复已有素材，缩略图会自动重生成。</summary>
+    public async Task RelocateLibraryAsync(LibraryItemViewModel item, string newFolderPath)
+    {
+        try
+        {
+            var result = await AppServices.Library.RelocateLibraryAsync(item.Id, newFolderPath);
+            await RefreshLibrariesAsync();
+            AppEvents.SetStatus(result.Missing > 0
+                ? $"已重新定位到 {result.NewPath}：修复 {result.Updated} 条，{result.Missing} 条在新目录里找不到（可用「清理失效记录」移除）"
+                : $"已重新定位到 {result.NewPath}：修复 {result.Updated} 条，缩略图会随浏览自动重新生成");
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("重新定位媒体库失败", ex);
+            AppEvents.SetError($"重新定位失败：{ex.Message}");
+        }
+    }
+
     public async Task PurgeMissingAsync(LibraryItemViewModel item)
     {
         try

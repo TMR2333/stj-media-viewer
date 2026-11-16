@@ -236,6 +236,9 @@ internal sealed class FallbackLibraryService : ILibraryService
         return new ScanProgress { Phase = ScanPhase.Completed, Message = "演示模式：未接入真实扫描" };
     }
 
+    public Task<LibraryRelocateResult> RelocateLibraryAsync(string libraryId, string newFolderPath, CancellationToken ct = default)
+        => Task.FromResult(new LibraryRelocateResult(0, 0, "", newFolderPath));
+
     public Task<int> PurgeMissingAsync(string libraryId, CancellationToken ct = default) => Task.FromResult(0);
 }
 

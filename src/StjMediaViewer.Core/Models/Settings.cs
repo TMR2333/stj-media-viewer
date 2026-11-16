@@ -1,5 +1,15 @@
 namespace StjMediaViewer.Core.Models;
 
+/// <summary>媒体库重新定位的结果（用户删了/移动了库目录后修复用）。</summary>
+public sealed record LibraryRelocateResult(
+    int Updated,
+    int Missing,
+    string OldPath,
+    string NewPath)
+{
+    public int Total => Updated + Missing;
+}
+
 public sealed class LibraryRoot
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N")[..12];

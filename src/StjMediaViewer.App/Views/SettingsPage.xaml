@@ -398,6 +398,10 @@
                                                     ToolTipService.ToolTip="重新扫描">
                                                 <FontIcon Glyph="&#xE895;" FontSize="{ThemeResource AppFontCaptionSize}" />
                                             </Button>
+                                            <Button Style="{ThemeResource AppIconButtonStyle}" Click="RelocateLibrary_Click"
+                                                    ToolTipService.ToolTip="重新定位（目录被删除 / 移动 / 改名后用它修复）">
+                                                <FontIcon Glyph="&#xE8B7;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                                            </Button>
                                             <Button Style="{ThemeResource AppIconButtonStyle}" Click="PurgeLibrary_Click"
                                                     ToolTipService.ToolTip="清理失效记录">
                                                 <FontIcon Glyph="&#xE74D;" FontSize="{ThemeResource AppFontCaptionSize}" />

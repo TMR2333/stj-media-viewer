@@ -124,6 +124,27 @@ public sealed partial class SettingsPage : Page
             await ViewModel.RescanAsync(item);
     }
 
+    private async void RelocateLibrary_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.DataContext is not LibraryItemViewModel item) return;
+        try
+        {
+            var picker = new FolderPicker();
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow!);
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+            picker.FileTypeFilter.Add("*");
+            picker.SuggestedStartLocation = PickerLocationId.ComputerFolder;
+            var folder = await picker.PickSingleFolderAsync();
+            if (folder is null) return;
+            await ViewModel.RelocateLibraryAsync(item, folder.Path);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("选择新目录失败", ex);
+            AppEvents.SetError($"选择目录失败：{ex.Message}");
+        }
+    }
+
     private async void PurgeLibrary_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.DataContext is LibraryItemViewModel item)

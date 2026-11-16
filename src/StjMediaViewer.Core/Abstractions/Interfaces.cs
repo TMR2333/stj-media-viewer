@@ -135,6 +135,12 @@ public interface ILibraryService
     Task RemoveLibraryAsync(string libraryId, CancellationToken ct = default);
     Task<ScanProgress> ScanLibraryAsync(LibraryRoot root, ScanOptions options, IProgress<ScanProgress>? progress = null, CancellationToken ct = default);
     Task<int> PurgeMissingAsync(string libraryId, CancellationToken ct = default);
+
+    /// <summary>
+    /// 媒体库目录被删除 / 移动 / 改名后重新定位：按相对路径把已有素材指到新目录，
+    /// 缩略图会在下一次显示时自动重新生成（缓存键含绝对路径）。
+    /// </summary>
+    Task<LibraryRelocateResult> RelocateLibraryAsync(string libraryId, string newFolderPath, CancellationToken ct = default);
 }
 
 // ---------------------------- 解码 / 缩略图 / 分析 ----------------------------

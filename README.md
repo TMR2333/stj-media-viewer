@@ -261,6 +261,19 @@
 - 从云端下载回来的素材自动记录来源云同步目标名（`assets.origin`）。
 - 筛选面板出现「云同步来源」分组：按某个云盘筛选，或选「本地文件」只看本地素材。
 
+### 删了 / 移动了软件或素材文件夹后，预览图不显示
+
+索引库里存的是**绝对路径**。如果导入过素材库之后把那个文件夹删掉、移动或改名（包括把便携版整个文件夹挪走），
+素材条目还在、但文件已经不在原处，缩略图自然生成不出来。v1.5.0 起：
+
+- 打开素材库时如果检测到库目录不存在，顶部会出现黄色提示条，写明「缩略图不会生成」和「去设置修复」；
+- **设置 → 媒体库 → 「重新定位」**：选择文件夹的新位置，程序会按**相对路径**把已有素材逐一指过去，
+  子目录结构保留；缩略图在下次浏览时自动重新生成；
+- 新目录里确实找不到的文件会被如实计数，可用「清理失效记录」移除（只删索引，不动磁盘文件）；
+- 自定义缓存目录失效（指向已删除的文件夹 / 拔掉的移动硬盘）时，自动回退默认缓存目录。
+
+> 说明：只是**卸载/覆盖安装**不会丢媒体库；丢的是"库目录本身被删除或移动"这种情况。
+
 ### 云同步上传失败（远程主机强迫关闭了一个现有的连接）
 
 坚果云等 WebDAV 服务器对短时间大量上传有限流：一次性同步几十张照片时，服务器会直接断连，
@@ -422,7 +435,7 @@ ffmpeg 是可选的：把 `ffmpeg.exe` 放到 `tools/ffmpeg/bin/`（或 PATH）�
 | 产物 | 大小 | 说明 |
 | --- | --- | --- |
 | `STJMediaViewer-Setup.exe` | ≈143 MB | **安装包**，带图形界面：可**自定义安装目录**、可选创建桌面快捷方式；装到用户目录，不需要管理员权限 |
-| `STJMediaViewer-1.4.1-portable.exe` | ≈143 MB | **便携版**：单文件，双击后解压到 `%LOCALAPPDATA%\StjMediaViewerPortable` 并直接启动；不写注册表、不建快捷方式 |
+| `STJMediaViewer-1.5.0-portable.exe` | ≈143 MB | **便携版**：单文件，双击后解压到 `%LOCALAPPDATA%\StjMediaViewerPortable` 并直接启动；不写注册表、不建快捷方式 |
 
 > 旧的 `*-portable-win-x64.zip` 已废弃：压缩包里的 exe 直接双击容易踩「没解压就在压缩包里运行 / SmartScreen 拦截」，
 > 现在改成**单文件便携 exe**，双击即用。
@@ -453,8 +466,8 @@ STJMediaViewer-Setup.exe                      交互式安装（选目录）
 STJMediaViewer-Setup.exe /S                   静默安装到默认目录
 STJMediaViewer-Setup.exe /S /D=D:\Apps\STJ  静默安装到指定目录
 STJMediaViewer-Setup.exe /uninstall           卸载（/S 静默；/D= 指定安装目录）
-STJMediaViewer-1.4.1-portable.exe            便携版：解压 + 启动
-STJMediaViewer-1.4.1-portable.exe /D=D:\STJ 便携版解压到指定目录
+STJMediaViewer-1.5.0-portable.exe            便携版：解压 + 启动
+STJMediaViewer-1.5.0-portable.exe /D=D:\STJ 便携版解压到指定目录
 ```
 
 **卸载**：Windows 设置 → 应用 → 已安装的应用（或 `Setup.exe /uninstall`）。
@@ -577,9 +590,9 @@ dotnet build tools/SelfCheck/StjMediaViewer.SelfCheck.csproj
 
 ### 3.5 版本号与发行流程
 
-当前版本 **v1.4.1**，历史见 [CHANGELOG.md](CHANGELOG.md)。
+当前版本 **v1.5.0**，历史见 [CHANGELOG.md](CHANGELOG.md)。
 
-- 规则：每次对外更新都 **+1 版本号**（`1.4.0` → `1.4.1` → `1.4.2` → …），同步改应用/安装器/便携版/macOS Info.plist；
+- 规则：每次对外更新都 **+1 版本号**（`1.4.1` → `1.5.0` → `1.5.1` → …），同步改应用/安装器/便携版/macOS Info.plist；
 - 每次发版：`git tag v<版本>` + 推送到 GitCode + 创建发行版（Release）；
 - 一键脚本（版本、构建、提交、打标签、推送、创建发行版）：
 
@@ -590,7 +603,7 @@ powershell -ExecutionPolicy Bypass -File tools/release.ps1 -Version 1.0.4 -Notes
 
 - 仓库：<https://gitcode.com/TMR2333/stj-media-viewer>
 - 发行版：<https://gitcode.com/TMR2333/stj-media-viewer/releases>
-  - v1.4.1：安装包 + 便携版（Release 附件直下）
+  - v1.5.0：安装包 + 便携版（Release 附件直下）
 
 **每次更新都会：**改版本号 → 构建 → 提交 → 打 tag → 推送 → 建发行版并上传安装包/便携版。
 
