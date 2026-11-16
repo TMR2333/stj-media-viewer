@@ -141,6 +141,24 @@
 - 明暗模式：跟随系统 / 浅色 / 深色，切换只重解析 token，不重建界面。
 - 全部界面只用语义 token（`{ThemeResource ...}`），页面里没有一处硬编码颜色/字号/圆角。
 
+### 2.9.1 应用图标
+
+<p align="center">
+  <img src="src/StjMediaViewer.App/Assets/AppIcon/icon-light.png" width="96" alt="应用图标（亮）" />
+  &nbsp;&nbsp;
+  <img src="src/StjMediaViewer.App/Assets/AppIcon/icon-dark.png" width="96" alt="应用图标（暗）" />
+</p>
+
+品牌图标：**SD + CF 卡**（金色线稿，亮/暗两版）。资源在 `src/StjMediaViewer.App/Assets/AppIcon/`：
+
+| 文件 | 用途 |
+| --- | --- |
+| `icon-light.png` / `icon-dark.png` | 原始方图（白底 / 深底），用于关于页等大尺寸展示 |
+| `icon-light-compact.png` / `icon-dark-compact.png` | 紧凑版（图形放大 7%），标题栏 28px 等小尺寸更清楚 |
+| `app.ico` | 多尺寸 ICO（16–256），exe 图标 + 任务栏 + 窗口图标 |
+
+接线：`<ApplicationIcon>Assets\AppIcon\app.ico</ApplicationIcon>` 决定 exe 图标；`MainWindow` 里 `AppWindow.SetIcon()` 保证窗口/任务栏图标；标题栏品牌位与关于页用紧凑版 PNG。
+
 ### 2.10 崩溃诊断（0xC000027B / 闪退）
 
 WinUI 的 **stowed exception**（退出码 `0xC000027B`）不会走 `UnhandledException`，日志里看不到"未处理异常"。为此内置三层留痕：

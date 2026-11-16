@@ -14,7 +14,22 @@ public sealed partial class MainWindow : Window
         InitializeComponent();
         Title = "STJ Media Viewer";
         AppWindow.TitleBar.ExtendsContentIntoTitleBar = false;
+        ApplyWindowIcon();
         RootFrame.Navigate(typeof(ShellPage));
+    }
+
+    /// <summary>标题栏 / 任务栏图标：用 Assets/AppIcon/app.ico（品牌图标：SD + CF 卡）。</summary>
+    private void ApplyWindowIcon()
+    {
+        try
+        {
+            var ico = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon", "app.ico");
+            if (System.IO.File.Exists(ico)) AppWindow.SetIcon(ico);
+        }
+        catch (Exception ex)
+        {
+            Core.Util.Log.Warn("设置窗口图标失败", ex);
+        }
     }
 
     /// <summary>在窗口 Activate 之后调用，避免 AppWindow 还没拿到显示器信息。</summary>

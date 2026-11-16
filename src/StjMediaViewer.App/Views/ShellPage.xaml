@@ -55,14 +55,12 @@
 
             <!-- 品牌 -->
             <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
-                <Border Width="28" Height="28"
-                        CornerRadius="{ThemeResource AppRadiusMedium}"
-                        Background="{ThemeResource AccentSubtleBrush}"
-                        BorderBrush="{ThemeResource AccentBorderBrush}"
-                        BorderThickness="1">
-                    <FontIcon Glyph="&#xE8B9;" FontSize="{ThemeResource AppFontBodySize}"
-                              Foreground="{ThemeResource AccentBrush}" />
-                </Border>
+                <!-- 品牌图标：SD + CF 卡（与任务栏 / exe 图标同一套资源） -->
+                <Image x:Name="BrandIcon"
+                       Width="28" Height="28"
+                       Stretch="Uniform"
+                       Source="ms-appx:///Assets/AppIcon/icon-light-compact.png"
+                       VerticalAlignment="Center" />
                 <TextBlock Text="STJ Media Viewer"
                            Style="{ThemeResource AppSubtitleTextStyle}"
                            VerticalAlignment="Center" />

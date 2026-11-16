@@ -13,7 +13,7 @@
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <SelfContained>true</SelfContained>
     <EnableMsixTooling>true</EnableMsixTooling>
-    <ApplicationIcon />
+    <ApplicationIcon>Assets\AppIcon\app.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

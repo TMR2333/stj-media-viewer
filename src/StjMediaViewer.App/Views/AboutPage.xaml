@@ -19,6 +19,12 @@
                     CornerRadius="{ThemeResource AppRadiusLarge}"
                     Padding="28,24">
                 <StackPanel Spacing="18" HorizontalAlignment="Center">
+                    <!-- 应用图标（暗色版：金色线稿，适合深色卡片） -->
+                    <Image Source="ms-appx:///Assets/AppIcon/icon-light-compact.png"
+                           Width="96" Height="96"
+                           Stretch="Uniform"
+                           HorizontalAlignment="Center" />
+
                     <!-- LOGO（黑底白字，原图自带留白，这里只做等比缩放 + 圆角裁切） -->
                     <Border Background="#0A0A0C"
                             CornerRadius="{ThemeResource AppRadiusMedium}"
