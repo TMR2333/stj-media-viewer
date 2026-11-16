@@ -38,16 +38,15 @@ public static class ImageSourceLoader
         {
             if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return null;
 
-            var file = await StorageFile.GetFileFromPathAsync(path);
-            using var stream = await file.OpenAsync(FileAccessMode.Read);
-            var bitmap = new BitmapImage
+            ct.ThrowIfCancellationRequested();
+            // 文件 URI 加载：BitmapImage 自己管理文件句柄生命周期，
+            // 不会出现"流已释放但解码还没完成"导致的原生崩溃。
+            return new BitmapImage
             {
                 DecodePixelType = DecodePixelType.Logical,
                 DecodePixelWidth = Math.Clamp(size, 64, 4096),
+                UriSource = new Uri(Path.GetFullPath(path)),
             };
-            ct.ThrowIfCancellationRequested();
-            await bitmap.SetSourceAsync(stream);
-            return bitmap;
         }
         catch (OperationCanceledException) { throw; }
         catch (Exception ex)
@@ -80,10 +79,15 @@ public static class ImageSourceLoader
         {
             if (string.IsNullOrWhiteSpace(asset.FullPath) || !File.Exists(asset.FullPath)) return null;
             var file = await StorageFile.GetFileFromPathAsync(asset.FullPath);
-            using var thumb = await file.GetThumbnailAsync(ThumbnailMode.MusicView, 512);
-            if (thumb is null || thumb.Size == 0) return null;
-            var bitmap = new BitmapImage();
+            var thumb = await file.GetThumbnailAsync(ThumbnailMode.MusicView, 512);
+            if (thumb is null || thumb.Size == 0) { thumb?.Dispose(); return null; }
+
+            var bitmap = new BitmapImage { DecodePixelType = DecodePixelType.Logical };
             await bitmap.SetSourceAsync(thumb);
+            // 缩略图流必须活到解码完成：ImageOpened / ImageFailed 之后再释放。
+            void Release() { try { thumb.Dispose(); } catch { } }
+            bitmap.ImageOpened += (_, _) => Release();
+            bitmap.ImageFailed += (_, _) => Release();
             return bitmap;
         }
         catch (Exception ex)

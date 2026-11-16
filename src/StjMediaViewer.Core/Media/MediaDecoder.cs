@@ -24,6 +24,9 @@ public sealed class MediaDecoder : IMediaDecoder
     private readonly IMetadataService _metadata;
     private readonly IFfmpegService _ffmpeg;
 
+    /// <summary>Shell 缩略图处理器是进程内第三方 DLL，并发进入是已知崩溃源，这里串行化。</summary>
+    private static readonly SemaphoreSlim _systemThumbGate = new(1, 1);
+
     public MediaDecoder(IMetadataService metadata, IFfmpegService ffmpeg)
     {
         _metadata = metadata ?? throw new ArgumentNullException(nameof(metadata));
@@ -182,6 +185,9 @@ public sealed class MediaDecoder : IMediaDecoder
 
     private async Task<DecodedImage?> DecodeVideoAsync(string fullPath, int maxDimension, CancellationToken ct)
     {
+        // 诊断开关：STJ_DISABLE_VIDEO_THUMBS=1 时视频缩略图直接走占位（定位视频网格崩溃用）
+        if (Environment.GetEnvironmentVariable("STJ_DISABLE_VIDEO_THUMBS") == "1") return null;
+
         int size = maxDimension > 0 ? maxDimension : 640;
 
         // 1) ffmpeg：优先 1s（避开常见黑场），再退回首帧
@@ -197,6 +203,7 @@ public sealed class MediaDecoder : IMediaDecoder
         }
 
         // 2) 系统缩略图（Windows 自带解码器，不需要 ffmpeg）
+        if (Environment.GetEnvironmentVariable("STJ_NO_SYSTEM_THUMBS") == "1") return null;
         return await SystemThumbnailAsync(fullPath, size, ThumbnailMode.VideosView, maxDimension, ct).ConfigureAwait(false);
     }
 
@@ -384,16 +391,20 @@ public sealed class MediaDecoder : IMediaDecoder
     private static async Task<byte[]?> SystemThumbnailBytesAsync(
         string fullPath, int size, ThumbnailMode mode, CancellationToken ct)
     {
+        var trace = Environment.GetEnvironmentVariable("STJ_TRACE_DECODE") == "1";
+        await _systemThumbGate.WaitAsync(ct).ConfigureAwait(false);
         try
         {
             return await Task.Run(async () =>
             {
                 var abs = Path.GetFullPath(fullPath);
+                if (trace) Log.Info($"[decode] system-thumb begin {abs} mode={mode} size={size}");
                 var file = await StorageFile.GetFileFromPathAsync(abs).AsTask(ct).ConfigureAwait(false);
                 uint request = (uint)Math.Clamp(size <= 0 ? 320 : size, 32, 2048);
                 using StorageItemThumbnail thumb = await file
                     .GetThumbnailAsync(mode, request, ThumbnailOptions.UseCurrentScale)
                     .AsTask(ct).ConfigureAwait(false);
+                if (trace) Log.Info($"[decode] system-thumb got {fullPath} bytes={thumb?.Size}");
                 if (thumb is null || thumb.Size == 0) return null;
 
                 var reader = new DataReader(thumb);
@@ -413,6 +424,7 @@ public sealed class MediaDecoder : IMediaDecoder
             Log.Warn($"[media] system thumbnail failed {fullPath}: {ex.GetType().Name}: {ex.Message}");
             return null;
         }
+        finally { _systemThumbGate.Release(); }
     }
 
     // ==================================================================== 类型判定

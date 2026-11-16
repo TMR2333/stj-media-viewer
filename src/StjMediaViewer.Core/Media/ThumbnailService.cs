@@ -224,14 +224,28 @@ public sealed class ThumbnailService : IThumbnailService
         catch (Exception ex) { Log.Warn($"[thumb] cannot create cache dir {_cacheDir}: {ex.Message}"); }
     }
 
+    /// <summary>
+    /// 读缓存并做一次便宜的完整性校验：只认 SOI(FFD8) 开头且以 EOI(FFD9) 结尾的 JPEG。
+    /// 进程被强杀时可能留下半截文件，WIC 拿半截 JPEG 去解码是已知的原生崩溃源，
+    /// 这里直接判定为无效并删掉重生成。
+    /// </summary>
     private static byte[]? TryReadCached(string path)
     {
         try
         {
             if (!File.Exists(path)) return null;
             var fi = new FileInfo(path);
-            if (fi.Length <= 0) return null;
-            return File.ReadAllBytes(path);
+            if (fi.Length < 4) return null;
+
+            var bytes = File.ReadAllBytes(path);
+            if (bytes.Length < 4 || bytes[0] != 0xFF || bytes[1] != 0xD8 ||
+                bytes[^2] != 0xFF || bytes[^1] != 0xD9)
+            {
+                try { File.Delete(path); } catch { }
+                return null;
+            }
+
+            return bytes;
         }
         catch (IOException) { return null; }
         catch (UnauthorizedAccessException) { return null; }

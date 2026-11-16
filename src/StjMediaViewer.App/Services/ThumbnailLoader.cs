@@ -3,7 +3,6 @@ using Microsoft.UI.Xaml.Media.Imaging;
 using StjMediaViewer.Core.Abstractions;
 using StjMediaViewer.Core.Models;
 using StjMediaViewer.Core.Util;
-using Windows.Storage.Streams;
 
 namespace StjMediaViewer.App.Services;
 
@@ -26,11 +25,16 @@ public sealed class ThumbnailLoader : IThumbnailLoader
     private readonly SemaphoreSlim _gate = new(6, 6);
     private const int MaxEntries = 1200;
 
+    private static readonly bool DisableThumbs =
+        Environment.GetEnvironmentVariable("STJ_DISABLE_THUMBS") == "1";
+
     public ThumbnailLoader(IThumbnailService service) => _service = service;
 
     public async Task<ImageSource?> LoadAsync(MediaAsset asset, int size, CancellationToken ct = default)
     {
         if (asset is null || string.IsNullOrEmpty(asset.Id)) return null;
+        // 诊断开关：STJ_DISABLE_THUMBS=1 时完全不解码缩略图（定位崩溃用）
+        if (DisableThumbs) return null;
         var key = $"{asset.Id}@{size}";
         if (_cache.TryGetValue(key, out var cached)) return cached;
         if (asset.IsAudio) return null;
@@ -67,19 +71,18 @@ public sealed class ThumbnailLoader : IThumbnailLoader
         {
             if (_cache.TryGetValue(key, out var hit)) return hit;
 
-            var bytes = await _service.GetThumbnailJpegAsync(asset, size, CancellationToken.None).ConfigureAwait(true);
-            if (bytes is null || bytes.Length == 0) return null;
+            // 让 Core 生成（或命中）磁盘缓存，然后按"文件"加载：
+            // 不要用 InMemoryRandomAccessStream + SetSourceAsync 再立刻释放流 ——
+            // BitmapImage 是延迟解码的，流被释放后渲染线程读已释放内存会直接原生崩溃。
+            var path = await _service.GetThumbnailPathAsync(asset, size, CancellationToken.None).ConfigureAwait(true);
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return null;
 
-            using var stream = new InMemoryRandomAccessStream();
-            var writer = new DataWriter(stream);
-            writer.WriteBytes(bytes);
-            await writer.StoreAsync();
-            writer.DetachStream();
-            writer.Dispose();
-            stream.Seek(0);
-
-            var image = new BitmapImage { DecodePixelType = DecodePixelType.Logical };
-            await image.SetSourceAsync(stream);
+            var image = new BitmapImage
+            {
+                DecodePixelType = DecodePixelType.Logical,
+                DecodePixelWidth = Math.Max(64, size),
+                UriSource = new Uri(path),
+            };
             Remember(key, image);
             return image;
         }
