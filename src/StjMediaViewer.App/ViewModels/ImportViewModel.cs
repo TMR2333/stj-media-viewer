@@ -696,6 +696,9 @@ public sealed partial class ImportViewModel : ObservableObject
     [ObservableProperty]
     private string _subfolderTemplate = "{yyyy}/{yyyy-MM-dd}";
 
+    /// <summary>「按细分位置」一个范围的半径（米）：范围内的算同一个文件夹。</summary>
+    [ObservableProperty] private double _geoRadiusMeters = 500;
+
     [ObservableProperty]
     private bool _copyInsteadOfMove = true;
 
@@ -721,10 +724,36 @@ public sealed partial class ImportViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(VerifyDestinationRoot)) VerifyDestinationRoot = path;
     }
 
+    public Visibility GeoRadiusVisibility =>
+        SubfolderTemplate?.Contains("{geo}", StringComparison.OrdinalIgnoreCase) == true
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+    partial void OnSubfolderTemplateChanged(string value) => OnPropertyChanged(nameof(GeoRadiusVisibility));
+
+    private static readonly double[] GeoRadiusChoices = { 200, 500, 1000, 2000, 5000 };
+
+    /// <summary>半径下拉（200 米 / 500 米 / 1 公里 / 2 公里 / 5 公里）。</summary>
+    public int GeoRadiusIndex
+    {
+        get
+        {
+            var index = Array.FindIndex(GeoRadiusChoices, r => Math.Abs(r - GeoRadiusMeters) < 1);
+            return index < 0 ? 1 : index;
+        }
+        set
+        {
+            if (value < 0 || value >= GeoRadiusChoices.Length) return;
+            GeoRadiusMeters = GeoRadiusChoices[value];
+            OnPropertyChanged();
+        }
+    }
+
     private ImportOptions BuildOptions() => new()
     {
         DestinationRoot = DestinationRoot,
         SubfolderTemplate = string.IsNullOrWhiteSpace(SubfolderTemplate) ? null : SubfolderTemplate,
+        GeoClusterRadiusMeters = GeoRadiusMeters > 0 ? GeoRadiusMeters : 500,
         CopyInsteadOfMove = CopyInsteadOfMove,
         IncludeSidecars = IncludeSidecars,
         SkipExisting = SkipExisting,

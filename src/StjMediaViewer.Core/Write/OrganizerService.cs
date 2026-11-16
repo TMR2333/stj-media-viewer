@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using StjMediaViewer.Core.Abstractions;
+using StjMediaViewer.Core.Import;
 using StjMediaViewer.Core.Models;
 using StjMediaViewer.Core.Util;
 
@@ -46,7 +47,7 @@ public sealed class OrganizerService
     // =================================================================================
 
     /// <summary>按维度算出一个素材该进的文件夹名。</summary>
-    public static string CategoryFor(MediaAsset asset, OrganizeDimension dimension, string? customValue = null)
+    public static string CategoryFor(MediaAsset asset, OrganizeDimension dimension, string? customValue = null, string? geoValue = null)
     {
         var captured = asset.CapturedAt ?? asset.FileModified;
         return dimension switch
@@ -62,6 +63,7 @@ public sealed class OrganizerService
             OrganizeDimension.Theme => Blank(asset.Theme) ? "未分类" : Vocabularies.ThemeDisplay(asset.Theme!, "zh-CN"),
             OrganizeDimension.Tone => Blank(asset.Tone) ? "未分类" : Vocabularies.ToneDisplay(asset.Tone!, "zh-CN"),
             OrganizeDimension.CustomCategory => Blank(customValue) ? "未分类" : customValue!,
+            OrganizeDimension.GeoArea => Blank(geoValue) ? GeoClusterer.UnknownLocationFolder : geoValue!,
             OrganizeDimension.Format => Blank(asset.FormatCode) ? "UNKNOWN" : asset.FormatCode,
             OrganizeDimension.Kind => asset.Kind switch
             {
@@ -85,11 +87,12 @@ public sealed class OrganizerService
     public static string CategoryPathFor(
         MediaAsset asset,
         OrganizeOptions options,
-        string? customValue = null)
+        string? customValue = null,
+        string? geoValue = null)
     {
-        var parts = new List<string> { CategoryFor(asset, options.Primary, customValue) };
+        var parts = new List<string> { CategoryFor(asset, options.Primary, customValue, geoValue) };
         if (options.Secondary is { } secondary && secondary != options.Primary)
-            parts.Add(CategoryFor(asset, secondary, customValue));
+            parts.Add(CategoryFor(asset, secondary, customValue, geoValue));
         return string.Join('/', parts.Where(p => !string.IsNullOrWhiteSpace(p)).Select(SanitizeFolder));
     }
 
@@ -126,6 +129,11 @@ public sealed class OrganizerService
         var plan = new OrganizePlan();
         var reserved = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        // 「细分位置」：先按 GPS 把范围内的照片聚成一个片区，再当文件夹名用
+        var geoFolders = NeedsGeo(options)
+            ? BuildGeoFolders(assets, options)
+            : null;
+
         foreach (var asset in assets)
         {
             if (string.IsNullOrWhiteSpace(asset.FullPath) || !File.Exists(asset.FullPath))
@@ -148,10 +156,14 @@ public sealed class OrganizerService
             if (NeedsCustom(options) && options.CustomValuesByAssetId is not null)
                 options.CustomValuesByAssetId.TryGetValue(asset.Id, out customValue);
 
+            string? geoValue = null;
+            if (geoFolders is not null)
+                geoFolders.TryGetValue(asset.Id, out geoValue);
+
             string category;
             try
             {
-                category = CategoryPathFor(asset, options, customValue);
+                category = CategoryPathFor(asset, options, customValue, geoValue);
             }
             catch (Exception ex)
             {
@@ -196,6 +208,20 @@ public sealed class OrganizerService
 
     private static bool NeedsCustom(OrganizeOptions options) =>
         options.Primary == OrganizeDimension.CustomCategory || options.Secondary == OrganizeDimension.CustomCategory;
+
+    private static bool NeedsGeo(OrganizeOptions options) =>
+        options.Primary == OrganizeDimension.GeoArea || options.Secondary == OrganizeDimension.GeoArea;
+
+    /// <summary>按 GPS 把素材聚成片区：素材 id → 「城市-区县」目录名（没有 GPS 的不在表里）。</summary>
+    private static Dictionary<string, string> BuildGeoFolders(IReadOnlyList<MediaAsset> assets, OrganizeOptions options)
+    {
+        var points = assets
+            .Where(a => a.Latitude is >= -90 and <= 90 && a.Longitude is >= -180 and <= 180)
+            .Select(a => new GeoPoint(a.Id, a.Latitude!.Value, a.Longitude!.Value))
+            .ToList();
+
+        return GeoClusterer.FolderNames(points, options.GeoRadiusMeters, options.GeoPlaceResolver);
+    }
 
     private static string? PlanTarget(
         string targetDir,
@@ -494,6 +520,8 @@ public sealed class OrganizerService
         foreach (var asset in catalog)
             byName.TryAdd(asset.FileName, asset);
 
+        var geoFolders = NeedsGeo(options) ? BuildGeoFolders(catalog, options) : null;
+
         var reserved = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var file in files)
         {
@@ -511,7 +539,10 @@ public sealed class OrganizerService
             if (NeedsCustom(options) && options.CustomValuesByAssetId is not null)
                 options.CustomValuesByAssetId.TryGetValue(asset.Id, out customValue);
 
-            var category = CategoryPathFor(asset, options, customValue);
+            string? geoValue = null;
+            geoFolders?.TryGetValue(asset.Id, out geoValue);
+
+            var category = CategoryPathFor(asset, options, customValue, geoValue);
             var to = string.IsNullOrEmpty(category) ? file.FileName : category + "/" + file.FileName;
 
             if (string.Equals(NormalizeRel(to), rel, StringComparison.OrdinalIgnoreCase)) continue;

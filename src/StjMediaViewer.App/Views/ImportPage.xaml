@@ -380,7 +380,7 @@
                         </StackPanel>
 
                         <!-- 子目录模板 -->
-                        <StackPanel Spacing="4" MaxWidth="420" HorizontalAlignment="Left">
+                        <StackPanel Spacing="4" MaxWidth="520" HorizontalAlignment="Left">
                             <TextBlock Text="子目录模板" Style="{ThemeResource AppMicroTextStyle}" />
                             <ComboBox x:Name="TemplateBox"
                                       HorizontalAlignment="Stretch"
@@ -389,8 +389,26 @@
                                 <ComboBoxItem Content="{}{yyyy}/{yyyy-MM-dd}（按天，推荐）" Tag="{}{yyyy}/{yyyy-MM-dd}" />
                                 <ComboBoxItem Content="{}{yyyy}/{MM}（按月）" Tag="{}{yyyy}/{MM}" />
                                 <ComboBoxItem Content="{}{yyyy}/{country}/{city}（按国家 / 城市）" Tag="{}{yyyy}/{country}/{city}" />
+                                <ComboBoxItem Content="{}{geo}（按细分位置：一个范围内算一个文件夹）" Tag="{}{geo}" />
+                                <ComboBoxItem Content="{}{yyyy}/{geo}（先按年，再按细分位置）" Tag="{}{yyyy}/{geo}" />
                                 <ComboBoxItem Content="不建子目录（直接放根目录）" Tag="" />
                             </ComboBox>
+                            <StackPanel Spacing="4" Margin="0,4,0,0"
+                                        Visibility="{x:Bind ViewModel.GeoRadiusVisibility, Mode=OneWay}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="一个范围" Style="{ThemeResource AppMicroTextStyle}" VerticalAlignment="Center" />
+                                    <ComboBox Width="150" SelectedIndex="{x:Bind ViewModel.GeoRadiusIndex, Mode=TwoWay}">
+                                        <ComboBoxItem Content="200 米" Tag="200" />
+                                        <ComboBoxItem Content="500 米（推荐）" Tag="500" />
+                                        <ComboBoxItem Content="1 公里" Tag="1000" />
+                                        <ComboBoxItem Content="2 公里" Tag="2000" />
+                                        <ComboBoxItem Content="5 公里" Tag="5000" />
+                                    </ComboBox>
+                                </StackPanel>
+                                <TextBlock Text="范围内的照片归到同一个「城市-区县」文件夹；没有 GPS 的放「未定位」。"
+                                           Style="{ThemeResource AppMicroTextStyle}"
+                                           Foreground="{ThemeResource TextTertiaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
                         </StackPanel>
 
                         <!-- 开关区 -->

@@ -100,6 +100,17 @@
                                 <TextBox Width="180" Text="{x:Bind ViewModel.CustomDimension, Mode=TwoWay}"
                                          PlaceholderText="项目 / 客户 / 场地" />
                             </StackPanel>
+                            <StackPanel Spacing="4" Visibility="{x:Bind ViewModel.GeoOptionsVisibility, Mode=OneWay}">
+                                <TextBlock Text="一个范围" Style="{ThemeResource AppMicroTextStyle}"
+                                           Foreground="{ThemeResource TextTertiaryBrush}" />
+                                <ComboBox Width="170" SelectedIndex="{x:Bind ViewModel.GeoRadiusIndex, Mode=TwoWay}">
+                                    <ComboBoxItem Content="200 米" />
+                                    <ComboBoxItem Content="500 米（推荐）" />
+                                    <ComboBoxItem Content="1 公里" />
+                                    <ComboBoxItem Content="2 公里" />
+                                    <ComboBoxItem Content="5 公里" />
+                                </ComboBox>
+                            </StackPanel>
                             <StackPanel Spacing="4">
                                 <TextBlock Text="重名处理" Style="{ThemeResource AppMicroTextStyle}"
                                            Foreground="{ThemeResource TextTertiaryBrush}" />

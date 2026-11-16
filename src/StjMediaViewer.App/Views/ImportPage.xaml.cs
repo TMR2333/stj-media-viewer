@@ -31,6 +31,29 @@ public sealed partial class ImportPage : Page
         if (_loadedOnce) return;
         _loadedOnce = true;
         await ViewModel.InitializeAsync();
+
+        // 截图/验收用：STJ_DEMO_IMPORT_GEO=1 时把子目录模板切到「按细分位置」
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_IMPORT_GEO") == "1")
+        {
+            DispatcherQueue.TryEnqueue(async () =>
+            {
+                var index = TemplateBox.Items
+                    .Select((item, i) => (item, i))
+                    .Where(x => x.item is ComboBoxItem { Tag: "{geo}" })
+                    .Select(x => x.i)
+                    .DefaultIfEmpty(-1)
+                    .First();
+                if (index >= 0) TemplateBox.SelectedIndex = index;
+
+                // 展开「导入设置」并滚到子目录模板附近，方便截图验收
+                await Task.Delay(600);
+                var expander = FindAncestor<Expander>(TemplateBox);
+                if (expander is not null) expander.IsExpanded = true;
+                await Task.Delay(400);
+                if (FindDescendant<ScrollViewer>(this) is { } scroll)
+                    scroll.ChangeView(null, 620, null);
+            });
+        }
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e) => ViewModel.CancelThumbnails();
@@ -174,5 +197,28 @@ public sealed partial class ImportPage : Page
             Log.Warn("[import] 打开目标目录失败", ex);
             AppEvents.SetError("无法打开目标目录");
         }
+    }
+
+    private static T? FindAncestor<T>(DependencyObject node) where T : DependencyObject
+    {
+        var current = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(node);
+        while (current is not null)
+        {
+            if (current is T match) return match;
+            current = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetParent(current);
+        }
+        return null;
+    }
+
+    private static T? FindDescendant<T>(DependencyObject root) where T : DependencyObject
+    {
+        var count = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(root);
+        for (int i = 0; i < count; i++)
+        {
+            var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(root, i);
+            if (child is T match) return match;
+            if (FindDescendant<T>(child) is { } nested) return nested;
+        }
+        return null;
     }
 }

@@ -52,6 +52,10 @@ public sealed class ImportGroup
     public int Kind { get; set; }                 // MediaKind 的整型值，避免 Model 层依赖枚举
     public DateTimeOffset? CapturedAt { get; set; }
     public string? CameraHint { get; set; }
+
+    /// <summary>拍摄地 GPS（导卡时从 EXIF 读，用于「按细分位置」归档）。</summary>
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
     public bool IsSelected { get; set; } = true;
 
     /// <summary>本组需要拷贝的全部文件（JPG + RAW + 其它 + 边车）。</summary>
@@ -88,6 +92,9 @@ public sealed class ImportOptions
     public string? LibraryId { get; set; }
     /// <summary>只导入这个时间之后拍摄的（null = 不限）。</summary>
     public DateTimeOffset? CapturedAfter { get; set; }
+
+    /// <summary>「按细分位置」一个范围（簇）的半径，米；默认 500。</summary>
+    public double GeoClusterRadiusMeters { get; set; } = 500;
 }
 
 public sealed class ImportPlan
@@ -101,6 +108,9 @@ public sealed class ImportPlan
     public List<string> Warnings { get; set; } = new();
     /// <summary>源目录里发现但因为"已有同名同大小文件"等原因会跳过的组数（预估）。</summary>
     public int EstimatedDuplicates { get; set; }
+
+    /// <summary>「按细分位置」预计算好的组 → 片区目录名（只有模板里用了 {geo} 时才有值）。</summary>
+    public Dictionary<string, string>? GeoFolders { get; set; }
 }
 
 public sealed class ImportItemResult

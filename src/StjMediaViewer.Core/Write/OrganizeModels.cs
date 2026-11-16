@@ -25,6 +25,8 @@ public enum OrganizeDimension
     Rating = 13,
     ColorLabel = 14,
     Extension = 15,
+    /// <summary>细分位置：GPS 半径范围内的归一个文件夹（城市-区县）。</summary>
+    GeoArea = 16,
 }
 
 public static class OrganizeDimensions
@@ -49,6 +51,7 @@ public static class OrganizeDimensions
         OrganizeDimension.Rating => "评分",
         OrganizeDimension.ColorLabel => "颜色标签",
         OrganizeDimension.Extension => "扩展名",
+        OrganizeDimension.GeoArea => "细分位置",
         _ => dimension.ToString(),
     };
 
@@ -70,6 +73,7 @@ public static class OrganizeDimensions
         OrganizeDimension.Rating => "5 星 … 未评分",
         OrganizeDimension.ColorLabel => "红 / 黄 / 绿 …",
         OrganizeDimension.Extension => "jpg / arw / mov",
+        OrganizeDimension.GeoArea => "上海-黄浦区 / 杭州-西湖区（范围内的算一个）",
         _ => "",
     };
 }
@@ -105,6 +109,12 @@ public sealed class OrganizeOptions
 
     /// <summary>本地整理时：素材 id → 自定义类别值（只在一级/二级用到自定义类别时需要）。</summary>
     public IReadOnlyDictionary<string, string>? CustomValuesByAssetId { get; set; }
+
+    /// <summary>「细分位置」的聚类半径（米）：半径内的照片归一个文件夹。</summary>
+    public double GeoRadiusMeters { get; set; } = 500;
+
+    /// <summary>GPS → 「城市-区县」地点名；为 null 时用坐标命名。</summary>
+    public Func<double, double, string?>? GeoPlaceResolver { get; set; }
 }
 
 /// <summary>计划里的一个文件（主文件或边车）。</summary>

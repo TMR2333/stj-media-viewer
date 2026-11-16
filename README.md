@@ -261,6 +261,26 @@
 - 从云端下载回来的素材自动记录来源云同步目标名（`assets.origin`）。
 - 筛选面板出现「云同步来源」分组：按某个云盘筛选，或选「本地文件」只看本地素材。
 
+### 2.15 按细分位置分类（GPS 范围内算一个文件夹）
+
+![导卡按细分位置](shots/final-import-geo.png)
+
+导卡（导入）的子目录模板新增 **`{geo}`**：按拍摄地 GPS 聚类，**一个范围内**（默认 500 米）的照片
+归到同一个文件夹：
+
+- 目录名优先用离线城市库反查的「**城市-区县**」（如 `上海-黄浦区`、`杭州-西湖区`）；
+  城市库不可用/查不到时用坐标兜底（如 `31.231_121.474`，保留 3 位小数约 100 米精度）；
+- 范围可选 **200 米 / 500 米（默认）/ 1 公里 / 2 公里 / 5 公里**；
+- 模板可组合：`{geo}` 或 `{yyyy}/{geo}`；
+- 没有 GPS 的照片进「**未定位**」文件夹，不会丢；
+- 只有选了 `{geo}` 才读 GPS，普通导卡不受影响。
+
+「整理」页也加了同名维度 **「细分位置」**，与导卡共用同一套聚类，可单独用，也可作为二级目录
+（例如 `设备/细分位置`），同样支持 200 米 ~ 5 公里与「未定位」。
+
+实现：`Core/Import/GeoClusterer.cs`（Haversine 距离 + 贪心聚类 + 同名去重），
+导卡走 `ImportService` 的模板展开，整理走 `OrganizerService` 的维度计算。
+
 ### 2.14 自定义缓存路径与自动清理
 
 ![缓存设置](shots/final-cache-settings.png)
@@ -388,7 +408,7 @@ ffmpeg 是可选的：把 `ffmpeg.exe` 放到 `tools/ffmpeg/bin/`（或 PATH）�
 | 产物 | 大小 | 说明 |
 | --- | --- | --- |
 | `STJMediaViewer-Setup.exe` | ≈143 MB | **安装包**，带图形界面：可**自定义安装目录**、可选创建桌面快捷方式；装到用户目录，不需要管理员权限 |
-| `STJMediaViewer-1.3.3-portable.exe` | ≈143 MB | **便携版**：单文件，双击后解压到 `%LOCALAPPDATA%\StjMediaViewerPortable` 并直接启动；不写注册表、不建快捷方式 |
+| `STJMediaViewer-1.4.0-portable.exe` | ≈143 MB | **便携版**：单文件，双击后解压到 `%LOCALAPPDATA%\StjMediaViewerPortable` 并直接启动；不写注册表、不建快捷方式 |
 
 > 旧的 `*-portable-win-x64.zip` 已废弃：压缩包里的 exe 直接双击容易踩「没解压就在压缩包里运行 / SmartScreen 拦截」，
 > 现在改成**单文件便携 exe**，双击即用。
@@ -419,8 +439,8 @@ STJMediaViewer-Setup.exe                      交互式安装（选目录）
 STJMediaViewer-Setup.exe /S                   静默安装到默认目录
 STJMediaViewer-Setup.exe /S /D=D:\Apps\STJ  静默安装到指定目录
 STJMediaViewer-Setup.exe /uninstall           卸载（/S 静默；/D= 指定安装目录）
-STJMediaViewer-1.3.3-portable.exe            便携版：解压 + 启动
-STJMediaViewer-1.3.3-portable.exe /D=D:\STJ 便携版解压到指定目录
+STJMediaViewer-1.4.0-portable.exe            便携版：解压 + 启动
+STJMediaViewer-1.4.0-portable.exe /D=D:\STJ 便携版解压到指定目录
 ```
 
 **卸载**：Windows 设置 → 应用 → 已安装的应用（或 `Setup.exe /uninstall`）。
@@ -543,9 +563,9 @@ dotnet build tools/SelfCheck/StjMediaViewer.SelfCheck.csproj
 
 ### 3.5 版本号与发行流程
 
-当前版本 **v1.3.3**，历史见 [CHANGELOG.md](CHANGELOG.md)。
+当前版本 **v1.4.0**，历史见 [CHANGELOG.md](CHANGELOG.md)。
 
-- 规则：每次对外更新都 **+1 版本号**（`1.3.2` → `1.3.3` → `1.3.4` → …），同步改应用/安装器/便携版/macOS Info.plist；
+- 规则：每次对外更新都 **+1 版本号**（`1.3.3` → `1.4.0` → `1.4.1` → …），同步改应用/安装器/便携版/macOS Info.plist；
 - 每次发版：`git tag v<版本>` + 推送到 GitCode + 创建发行版（Release）；
 - 一键脚本（版本、构建、提交、打标签、推送、创建发行版）：
 
@@ -556,7 +576,7 @@ powershell -ExecutionPolicy Bypass -File tools/release.ps1 -Version 1.0.4 -Notes
 
 - 仓库：<https://gitcode.com/TMR2333/stj-media-viewer>
 - 发行版：<https://gitcode.com/TMR2333/stj-media-viewer/releases>
-  - v1.3.3：安装包 + 便携版（Release 附件直下）
+  - v1.4.0：安装包 + 便携版（Release 附件直下）
 
 **每次更新都会：**改版本号 → 构建 → 提交 → 打 tag → 推送 → 建发行版并上传安装包/便携版。
 

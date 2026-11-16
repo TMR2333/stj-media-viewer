@@ -82,16 +82,51 @@ public sealed partial class OrganizeViewModel : ObservableObject
     [ObservableProperty] private string _rootPath = "";
     [ObservableProperty] private int _selectedConflictIndex;
 
+    /// <summary>「细分位置」的聚类半径（米）：范围内的算一个文件夹。</summary>
+    [ObservableProperty] private double _geoRadiusMeters = 500;
+
+    private static readonly double[] GeoRadiusChoices = { 200, 500, 1000, 2000, 5000 };
+
+    public int GeoRadiusIndex
+    {
+        get
+        {
+            var index = Array.FindIndex(GeoRadiusChoices, r => Math.Abs(r - GeoRadiusMeters) < 1);
+            return index < 0 ? 1 : index;
+        }
+        set
+        {
+            if (value < 0 || value >= GeoRadiusChoices.Length) return;
+            GeoRadiusMeters = GeoRadiusChoices[value];
+            OnPropertyChanged();
+        }
+    }
+
     public Visibility CustomDimensionVisibility =>
         SelectedPrimaryIndex > 0 && DimensionAt(SelectedPrimaryIndex) == OrganizeDimension.CustomCategory ||
         SelectedSecondaryIndex > 0 && DimensionAt(SelectedSecondaryIndex) == OrganizeDimension.CustomCategory
             ? Visibility.Visible
             : Visibility.Collapsed;
 
+    public Visibility GeoOptionsVisibility =>
+        (SelectedPrimaryIndex > 0 && DimensionAt(SelectedPrimaryIndex) == OrganizeDimension.GeoArea) ||
+        (SelectedSecondaryIndex > 0 && DimensionAt(SelectedSecondaryIndex) == OrganizeDimension.GeoArea)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
     private static OrganizeDimension DimensionAt(int index) => OrganizeDimensions.All[index - 1];
 
-    partial void OnSelectedPrimaryIndexChanged(int value) => OnPropertyChanged(nameof(CustomDimensionVisibility));
-    partial void OnSelectedSecondaryIndexChanged(int value) => OnPropertyChanged(nameof(CustomDimensionVisibility));
+    partial void OnSelectedPrimaryIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(CustomDimensionVisibility));
+        OnPropertyChanged(nameof(GeoOptionsVisibility));
+    }
+
+    partial void OnSelectedSecondaryIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(CustomDimensionVisibility));
+        OnPropertyChanged(nameof(GeoOptionsVisibility));
+    }
 
     // ---------------- 状态 ----------------
     [ObservableProperty] private string _status = "";
@@ -160,6 +195,8 @@ public sealed partial class OrganizeViewModel : ObservableObject
         Secondary = SelectedSecondaryIndex > 0 ? DimensionAt(SelectedSecondaryIndex) : null,
         CustomDimensionName = string.IsNullOrWhiteSpace(CustomDimension) ? null : CustomDimension.Trim(),
         RootPath = IsCloudSource ? null : (string.IsNullOrWhiteSpace(RootPath) ? null : RootPath.Trim()),
+        GeoRadiusMeters = GeoRadiusMeters > 0 ? GeoRadiusMeters : 500,
+        GeoPlaceResolver = ResolveGeoPlace,
         ConflictPolicy = SelectedConflictIndex switch
         {
             1 => OrganizeConflictPolicy.Skip,
@@ -167,6 +204,24 @@ public sealed partial class OrganizeViewModel : ObservableObject
             _ => OrganizeConflictPolicy.Rename,
         },
     };
+
+    /// <summary>GPS → 「城市-区县」（离线城市库；不可用时用坐标命名）。</summary>
+    private static string? ResolveGeoPlace(double latitude, double longitude)
+    {
+        try
+        {
+            var place = AppServices.Geocoder?.Reverse(latitude, longitude);
+            if (place is null) return null;
+            var city = place.City ?? place.Province ?? place.Country;
+            if (string.IsNullOrWhiteSpace(city)) return null;
+            var district = string.IsNullOrWhiteSpace(place.District) ? null : place.District!.Trim();
+            return district is null ? city!.Trim() : $"{city!.Trim()}-{district}";
+        }
+        catch
+        {
+            return null;
+        }
+    }
 
     private bool NeedsCustom(OrganizeOptions options) =>
         options.Primary == OrganizeDimension.CustomCategory || options.Secondary == OrganizeDimension.CustomCategory;
