@@ -22,6 +22,9 @@ public sealed class AssetQuery
     /// <summary>调色状态：true = 已调色（已后期或套了 LUT），false = 未调色，null = 不限。</summary>
     public bool? Colored { get; set; }
 
+    /// <summary>来源云同步目标名筛选（"来自 xx 云同步"）。</summary>
+    public List<string> Origins { get; set; } = new();
+
     /// <summary>自定义类别筛选：维度名 → 允许的值（同一维度内 OR，不同维度之间 AND）。</summary>
     public Dictionary<string, List<string>> CustomFilters { get; set; } = new(StringComparer.Ordinal);
     public bool? HasGps { get; set; }
@@ -89,6 +92,11 @@ public sealed class FacetCounts
     /// <summary>主题/影调为空的素材数（"未填写"伪选项用）。</summary>
     /// <summary>自定义类别分面：维度 → (值 → 计数)。</summary>
     public Dictionary<string, Dictionary<string, int>> ByCustom { get; set; } = new(StringComparer.Ordinal);
+
+    public Dictionary<string, int> ByOrigin { get; set; } = new(StringComparer.Ordinal);
+
+    /// <summary>没有来源标记（本地文件）的数量。</summary>
+    public int OriginUnsetCount { get; set; }
 
     public int ThemeUnsetCount { get; set; }
     public int ToneUnsetCount { get; set; }

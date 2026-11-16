@@ -242,6 +242,19 @@ internal sealed class FallbackAssetStore : IAssetStore
                 ? new Dictionary<string, string>(fields, StringComparer.Ordinal)
                 : new Dictionary<string, string>(StringComparer.Ordinal));
 
+    public Task<IReadOnlyDictionary<string, string>> GetCustomFieldsBulkAsync(string dimension,
+        IEnumerable<string> assetIds, CancellationToken ct = default)
+    {
+        var dim = (dimension ?? "").Trim();
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var id in assetIds ?? Array.Empty<string>())
+        {
+            if (_customFields.TryGetValue(id, out var fields) && fields.TryGetValue(dim, out var value))
+                result[id] = value;
+        }
+        return Task.FromResult<IReadOnlyDictionary<string, string>>(result);
+    }
+
     public Task<IReadOnlyList<string>> ListCustomDimensionsAsync(CancellationToken ct = default) =>
         Task.FromResult<IReadOnlyList<string>>(
             _customFields.Values.SelectMany(v => v.Keys).Distinct(StringComparer.Ordinal).OrderBy(x => x).ToList());
@@ -259,6 +272,31 @@ internal sealed class FallbackAssetStore : IAssetStore
         var val = (value ?? "").Trim();
         if (val.Length == 0) fields.Remove(dim);
         else fields[dim] = val;
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateAssetPathAsync(string assetId, string fullPath, string? relativePath,
+        IReadOnlyList<string>? sidecars = null, CancellationToken ct = default)
+    {
+        var asset = _assets.FirstOrDefault(a => a.Id == assetId);
+        if (asset is not null)
+        {
+            asset.FullPath = fullPath;
+            if (relativePath is not null) asset.RelativePath = relativePath;
+            if (sidecars is not null) asset.Sidecars = sidecars.ToList();
+        }
+        return Task.CompletedTask;
+    }
+
+    public Task UpdateAssetMetaByPathAsync(string fullPath, string? creator = null, string? origin = null,
+        CancellationToken ct = default)
+    {
+        var asset = _assets.FirstOrDefault(a => string.Equals(a.FullPath, fullPath, StringComparison.OrdinalIgnoreCase));
+        if (asset is not null)
+        {
+            if (creator is not null) asset.Creator = creator;
+            if (origin is not null) asset.Origin = origin;
+        }
         return Task.CompletedTask;
     }
 

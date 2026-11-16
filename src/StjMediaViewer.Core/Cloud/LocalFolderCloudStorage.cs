@@ -124,6 +124,24 @@ public sealed class LocalFolderCloudStorage : ICloudStorage
         return Task.CompletedTask;
     }
 
+    public Task MoveAsync(string fromRelativePath, string toRelativePath, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(fromRelativePath) || string.IsNullOrWhiteSpace(toRelativePath))
+            throw new IOException("移动路径不能为空");
+
+        var from = ToAbsolute(fromRelativePath);
+        var to = ToAbsolute(toRelativePath);
+        var dir = Path.GetDirectoryName(to);
+        if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+
+        if (string.Equals(from, to, StringComparison.OrdinalIgnoreCase)) return Task.CompletedTask;
+        if (!File.Exists(from)) throw new FileNotFoundException("云端（挂载目录）里找不到文件", from);
+        if (File.Exists(to)) throw new IOException("目标已存在：" + toRelativePath);
+
+        File.Move(from, to, overwrite: false);
+        return Task.CompletedTask;
+    }
+
     public Task EnsureFolderAsync(string relativePath, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(relativePath)) return Task.CompletedTask;

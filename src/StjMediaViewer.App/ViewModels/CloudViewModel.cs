@@ -62,6 +62,15 @@ public sealed partial class CloudViewModel : ObservableObject
     [ObservableProperty]
     private string _editorTitle = "添加同步目标";
 
+    [ObservableProperty] private bool _editorGroupEnabled;
+
+    /// <summary>群组协作里的自己的用户名（勾选群组后必填）。</summary>
+    [ObservableProperty] private string _editorAuthorName = "";
+
+    public Visibility EditorAuthorVisibility => EditorGroupEnabled ? Visibility.Visible : Visibility.Collapsed;
+
+    partial void OnEditorGroupEnabledChanged(bool value) => OnPropertyChanged(nameof(EditorAuthorVisibility));
+
     [ObservableProperty]
     private string _editorName = "";
 
@@ -219,6 +228,8 @@ public sealed partial class CloudViewModel : ObservableObject
         _editingId = null;
         EditorTitle = "添加同步目标";
         EditorName = "我的云盘";
+        EditorGroupEnabled = false;
+        EditorAuthorName = "";
         EditorKind = "localfolder";
         EditorLocalFolder = AppServices.Settings.Current.Libraries.FirstOrDefault()?.Path ?? "";
         EditorRemoteFolder = "";
@@ -245,6 +256,8 @@ public sealed partial class CloudViewModel : ObservableObject
         EditorTitle = "编辑同步目标";
         EditorName = t.Name;
         EditorKind = t.Kind == CloudProviderKind.WebDav ? "webdav" : "localfolder";
+        EditorGroupEnabled = t.GroupEnabled;
+        EditorAuthorName = t.AuthorName ?? "";
         EditorLocalFolder = t.LocalFolderPath;
         EditorRemoteFolder = t.RemoteFolderPath ?? "";
         EditorEndpoint = t.WebDavEndpoint ?? "";
@@ -326,6 +339,8 @@ public sealed partial class CloudViewModel : ObservableObject
 
         target.Id = _editingId ?? Guid.NewGuid().ToString("N")[..12];
         target.Name = EditorName.Trim();
+        target.GroupEnabled = EditorGroupEnabled;
+        target.AuthorName = EditorGroupEnabled ? EditorAuthorName.Trim() : null;
         target.Enabled = true;
         target.LocalFolderPath = EditorLocalFolder.Trim();
         target.Kind = EditorKind == "webdav" ? CloudProviderKind.WebDav : CloudProviderKind.LocalFolder;
@@ -419,6 +434,11 @@ public sealed partial class CloudViewModel : ObservableObject
     [RelayCommand]
     private async Task SaveTargetAsync()
     {
+        if (EditorGroupEnabled && string.IsNullOrWhiteSpace(EditorAuthorName))
+        {
+            EditorError = "已勾选群组协作，请填写群组用户名（同步时会写入作者名）";
+            return;
+        }
         if (!TryBuildTarget(out var target, out var error))
         {
             SetEditorError(error);

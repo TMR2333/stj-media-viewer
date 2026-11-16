@@ -233,6 +233,32 @@
 - **复用现有能力**：数据源是素材库的**当前筛选条件**（搜索 / 分面 / 分组都继承），右侧内嵌同一个检视面板（元数据 + 手工分类 + 保存 / AI / XMP），视频可直接转码压缩，快速编辑立即落库。
 - 解码只取当前一张（2400px），切换时取消上一张请求；胶片带缩略图走同一套磁盘缓存，4000+ 张的库翻页也不掉帧。
 
+### 2.11 文件整理（按分类移动真实文件，本地 + 云端）
+
+![整理页](shots/final-organize.png)
+
+- **种类**：拍摄设备 / 相机品牌 / 年份 / 年月 / 月份 / 日期 / 城市 / 国家 / 主题 / 影调 /
+  自定义类别 / 格式 / 媒体类型 / 评分 / 色标 / 扩展名；支持一级 + 二级（`设备/年份`）。
+- **操作的是硬盘上的真实文件夹**：先出计划（原路径 → 目标路径、冲突、大小）→ 再执行；移动完自动更新索引库路径，
+  不用重新扫描；`.xmp` 边车跟着主文件走。
+- **重名策略**：默认自动加序号，也可「跳过已存在」「覆盖」。
+- **云端也能整理**：选云同步目标 → 用本地索引库元数据算出目标目录 → 云端 MOVE（WebDAV `MOVE` / 本地挂载目录直接移动）；
+  索引里没有元数据的云端文件会跳过并提示。
+- **撤销上次整理**：每次整理都会记录移动映射，一键搬回原处（本地/云端都支持）。
+- 实现：`Core/Write/OrganizerService.cs`（计划 / 执行 / 撤销）+ `Core/Cloud` 的 `ICloudStorage.MoveAsync`。
+
+### 2.12 云同步群组协作（写入作者名）
+
+- 同步目标勾选「群组协作」→ 填自己的用户名（必填）。
+- 上传时作者名写入三处：本地素材 XMP `dc:creator`、索引库 `creator`、云端作者清单 `.stj-authors.json`
+  （清单合并更新，不会覆盖其他成员写入的记录）。
+- 适合多人共用一个云空间：事后能查到每个文件是谁传的。
+
+### 2.13 素材库「来自 xx 云同步」分类
+
+- 从云端下载回来的素材自动记录来源云同步目标名（`assets.origin`）。
+- 筛选面板出现「云同步来源」分组：按某个云盘筛选，或选「本地文件」只看本地素材。
+
 ### 2.10 关于页
 
 品牌署名 **Stjarna PERSPECTIVE 出品 / co-worked with DeepSeek Harness**，含 logo、版本与环境信息（.NET / Windows 版本 / 构建日期）、技术栈与第三方许可清单，以及四张项目表情包（随仓库分发）。
@@ -338,7 +364,7 @@ ffmpeg 是可选的：把 `ffmpeg.exe` 放到 `tools/ffmpeg/bin/`（或 PATH）�
 | 产物 | 大小 | 说明 |
 | --- | --- | --- |
 | `STJMediaViewer-Setup.exe` | ≈143 MB | **安装包**，带图形界面：可**自定义安装目录**、可选创建桌面快捷方式；装到用户目录，不需要管理员权限 |
-| `STJMediaViewer-1.0.3-portable.exe` | ≈143 MB | **便携版**：单文件，双击后解压到 `%LOCALAPPDATA%\StjMediaViewerPortable` 并直接启动；不写注册表、不建快捷方式 |
+| `STJMediaViewer-1.1.0-portable.exe` | ≈143 MB | **便携版**：单文件，双击后解压到 `%LOCALAPPDATA%\StjMediaViewerPortable` 并直接启动；不写注册表、不建快捷方式 |
 
 > 旧的 `*-portable-win-x64.zip` 已废弃：压缩包里的 exe 直接双击容易踩「没解压就在压缩包里运行 / SmartScreen 拦截」，
 > 现在改成**单文件便携 exe**，双击即用。
@@ -369,8 +395,8 @@ STJMediaViewer-Setup.exe                      交互式安装（选目录）
 STJMediaViewer-Setup.exe /S                   静默安装到默认目录
 STJMediaViewer-Setup.exe /S /D=D:\Apps\STJ  静默安装到指定目录
 STJMediaViewer-Setup.exe /uninstall           卸载（/S 静默；/D= 指定安装目录）
-STJMediaViewer-1.0.3-portable.exe            便携版：解压 + 启动
-STJMediaViewer-1.0.3-portable.exe /D=D:\STJ 便携版解压到指定目录
+STJMediaViewer-1.1.0-portable.exe            便携版：解压 + 启动
+STJMediaViewer-1.1.0-portable.exe /D=D:\STJ 便携版解压到指定目录
 ```
 
 **卸载**：Windows 设置 → 应用 → 已安装的应用（或 `Setup.exe /uninstall`）。
@@ -493,9 +519,9 @@ dotnet build tools/SelfCheck/StjMediaViewer.SelfCheck.csproj
 
 ### 3.5 版本号与发行流程
 
-当前版本 **v1.0.3**，历史见 [CHANGELOG.md](CHANGELOG.md)。
+当前版本 **v1.1.0**，历史见 [CHANGELOG.md](CHANGELOG.md)。
 
-- 规则：每次对外更新都 **+1 修订号**（`1.0.2` → `1.0.3` → …），同步改应用/安装器/便携版/macOS Info.plist；
+- 规则：每次对外更新都 **+1 版本号**（`1.0.3` → `1.1.0` → `1.1.1` → …），同步改应用/安装器/便携版/macOS Info.plist；
 - 每次发版：`git tag v<版本>` + 推送到 GitCode + 创建发行版（Release）；
 - 一键脚本（版本、构建、提交、打标签、推送、创建发行版）：
 
@@ -506,7 +532,7 @@ powershell -ExecutionPolicy Bypass -File tools/release.ps1 -Version 1.0.4 -Notes
 
 - 仓库：<https://gitcode.com/TMR2333/stj-media-viewer>
 - 发行版：<https://gitcode.com/TMR2333/stj-media-viewer/releases>
-  - v1.0.3：安装包 + 便携版（Release 附件直下）
+  - v1.1.0：安装包 + 便携版（Release 附件直下）
 
 **每次更新都会：**改版本号 → 构建 → 提交 → 打 tag → 推送 → 建发行版并上传安装包/便携版。
 

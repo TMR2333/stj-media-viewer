@@ -29,7 +29,7 @@ internal static class AssetMapper
         "title", "caption", "creator", "copyright",
         "keywords_json", "keywords_flat",
         "post_process", "has_develop_edits", "develop_engine", "xmp_path",
-        "sidecars_json", "has_embedded_xmp",
+        "sidecars_json", "has_embedded_xmp", "origin",
         "group_id", "is_group_cover", "group_has_raw", "group_has_jpeg", "companions_json", "lut_id",
         "theme", "tone", "rating", "color_label", "is_pick",
         "ai_subject", "ai_mood", "quality_score", "provenance_json",
@@ -141,6 +141,7 @@ internal static class AssetMapper
         "develop_engine" => N(a.DevelopEngine),
         "xmp_path" => N(a.XmpPath),
         "sidecars_json" => JsonList(a.Sidecars),
+        "origin" => N(a.Origin),
         "has_embedded_xmp" => a.HasEmbeddedXmp ? 1 : 0,
         "group_id" => N(a.GroupId),
         "is_group_cover" => a.IsGroupCover ? 1 : 0,
@@ -253,6 +254,7 @@ internal static class AssetMapper
 
         a.Keywords = JsonToKeywords(GetS(r, "keywords_json"));
         a.Sidecars = JsonToList(GetS(r, "sidecars_json"));
+        a.Origin = GetN(r, "origin");
         a.CompanionPaths = JsonToList(GetS(r, "companions_json"));
         a.LutId = GetS(r, "lut_id");
         a.Provenance = JsonToProvenance(GetS(r, "provenance_json"));

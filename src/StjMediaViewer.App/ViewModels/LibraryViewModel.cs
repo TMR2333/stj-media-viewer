@@ -39,11 +39,12 @@ public sealed partial class LibraryViewModel : ObservableObject
         LogGroup = new FilterGroupViewModel(FilterGroupKind.Log, "视频 Log", false);
         ThemeGroup = new FilterGroupViewModel(FilterGroupKind.Theme, "拍摄主题", true);
         ToneGroup = new FilterGroupViewModel(FilterGroupKind.Tone, "拍摄影调", true);
+        OriginGroup = new FilterGroupViewModel(FilterGroupKind.Origin, "云同步来源", true);
 
         Groups = new ObservableCollection<FilterGroupViewModel>
         {
             KindGroup, FormatGroup, DeviceGroup, YearGroup, MonthGroup, CityGroup,
-            PostProcessGroup, RawJpgGroup, LogGroup, ThemeGroup, ToneGroup,
+            PostProcessGroup, RawJpgGroup, LogGroup, ThemeGroup, ToneGroup, OriginGroup,
         };
         foreach (var g in Groups) g.SelectionChanged += OnGroupSelectionChanged;
 
@@ -65,6 +66,7 @@ public sealed partial class LibraryViewModel : ObservableObject
     public FilterGroupViewModel LogGroup { get; }
     public FilterGroupViewModel ThemeGroup { get; }
     public FilterGroupViewModel ToneGroup { get; }
+    public FilterGroupViewModel OriginGroup { get; }
 
     // ---------------- 搜索 / 排序 ----------------
     [ObservableProperty]
@@ -316,6 +318,9 @@ public sealed partial class LibraryViewModel : ObservableObject
         foreach (var id in FormatGroup.SelectedIds) q.Formats.Add(id);
         foreach (var id in DeviceGroup.SelectedIds) q.Devices.Add(id);
         foreach (var id in CityGroup.SelectedIds) q.Cities.Add(id);
+
+        // 「来自 xx 云同步」：__unset__ = 本地文件（没有来源标记）
+        foreach (var id in OriginGroup.SelectedIds) q.Origins.Add(id);
         foreach (var id in ThemeGroup.SelectedIds) q.Themes.Add(id);
         foreach (var group in Groups.Where(g => g.Kind == FilterGroupKind.Custom))
         {
@@ -438,7 +443,8 @@ public sealed partial class LibraryViewModel : ObservableObject
         IReadOnlyDictionary<string, int> counts,
         Func<string, string> display,
         int unsetCount = 0,
-        bool descendingKeys = false)
+        bool descendingKeys = false,
+        string unsetDisplay = "未填写")
     {
         var ordered = counts.Where(kv => kv.Value > 0)
             .OrderByDescending(kv => kv.Value);
@@ -449,7 +455,7 @@ public sealed partial class LibraryViewModel : ObservableObject
             .ToList();
 
         if (unsetCount > 0)
-            target.Add((Id: "__unset__", Display: "未填写", Count: unsetCount));
+            target.Add((Id: "__unset__", Display: unsetDisplay, Count: unsetCount));
 
         var currentIds = group.Options.Select(o => o.Id).OrderBy(id => id, StringComparer.Ordinal).ToList();
         var targetIds = target.Select(t => t.Id).OrderBy(id => id, StringComparer.Ordinal).ToList();
@@ -479,6 +485,11 @@ public sealed partial class LibraryViewModel : ObservableObject
                 unsetCount: facets.ThemeUnsetCount);
             SyncOptions(ToneGroup, facets.ByTone, key => Vocabularies.ToneDisplay(key, "zh-CN"),
                 unsetCount: facets.ToneUnsetCount);
+
+            // 只有库里真有"来自云同步"的素材时才显示这个筛选组（避免给纯本地用户塞一个空维度）
+            if (facets.ByOrigin.Count > 0 || OriginGroup.Options.Count > 0)
+                SyncOptions(OriginGroup, facets.ByOrigin, static key => key,
+                    unsetCount: facets.OriginUnsetCount, unsetDisplay: "本地文件");
 
             SyncCustomGroups(facets.ByCustom);
 

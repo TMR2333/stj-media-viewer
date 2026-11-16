@@ -36,12 +36,24 @@ public interface IAssetStore
     Task<IReadOnlyDictionary<string, string>> GetCustomFieldsAsync(string assetId,
         CancellationToken ct = default);
 
+    /// <summary>批量取某个维度下的自定义类别值（整理/筛选用，避免 N 次查询）。</summary>
+    Task<IReadOnlyDictionary<string, string>> GetCustomFieldsBulkAsync(string dimension,
+        IEnumerable<string> assetIds, CancellationToken ct = default);
+
     /// <summary>所有已用过的自定义类别维度名（按字典序）。</summary>
     Task<IReadOnlyList<string>> ListCustomDimensionsAsync(CancellationToken ct = default);
 
     /// <summary>设置/删除某个素材的一个自定义类别（value 为空 = 删除该维度）。</summary>
     Task SetCustomFieldAsync(string assetId, string dimension, string? value,
         CancellationToken ct = default);
+
+    /// <summary>整理/移动文件后更新索引里的物理路径（文件名不变；sidecars 为新的边车路径）。</summary>
+    /// <summary>同步/导入后按物理路径回写作者名（XMP creator）与来源云同步目标名。</summary>
+    Task UpdateAssetMetaByPathAsync(string fullPath, string? creator = null, string? origin = null,
+        CancellationToken ct = default);
+
+    Task UpdateAssetPathAsync(string assetId, string fullPath, string? relativePath,
+        IReadOnlyList<string>? sidecars = null, CancellationToken ct = default);
 
     Task<int> ApplyBatchEditAsync(IReadOnlyList<string> assetIds, BatchEditPatch patch, CancellationToken ct = default);
 
@@ -361,6 +373,9 @@ public interface ICloudStorage : IAsyncDisposable
     Task UploadAsync(string localPath, string relativePath, CancellationToken ct = default);
 
     Task EnsureFolderAsync(string relativePath, CancellationToken ct = default);
+
+    /// <summary>把云端文件从 A 移到 B（目标目录由调用方先 EnsureFolderAsync 建好）。</summary>
+    Task MoveAsync(string fromRelativePath, string toRelativePath, CancellationToken ct = default);
 }
 
 /// <summary>

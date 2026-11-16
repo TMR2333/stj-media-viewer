@@ -42,6 +42,8 @@ internal static class CatalogSchema
         EnsureColumn(conn, TableAssets, "companions_json", "TEXT NOT NULL DEFAULT '[]'");
         // LUT：素材选用的调色 LUT（空 = 自动匹配内置基准 LUT）
         EnsureColumn(conn, TableAssets, "lut_id", "TEXT");
+        EnsureColumn(conn, TableAssets, "origin", "TEXT");
+        EnsureColumn(conn, TableAssets, "creator", "TEXT");
 
         // 迁移：v2 之前"不属于任何 JPG/RAW 组"的素材（视频 / 音频 / 单张图）没被标成组封面，
         // 折叠模式下这些素材会被 `is_group_cover = 1` 过滤掉 → 按"视频"筛选出现 0 条。

@@ -322,6 +322,48 @@ public sealed class WebDavCloudStorage : ICloudStorage
         catch (Exception ex) { throw Wrap("上传文件", relativePath, ex); }
     }
 
+    private static readonly HttpMethod MoveMethod = new("MOVE");
+
+    public async Task MoveAsync(string fromRelativePath, string toRelativePath, CancellationToken ct = default)
+    {
+        EnsureConfigured();
+        if (string.IsNullOrWhiteSpace(fromRelativePath) || string.IsNullOrWhiteSpace(toRelativePath))
+            throw new IOException("移动路径不能为空");
+        if (string.Equals(NormalizeRelative(fromRelativePath), NormalizeRelative(toRelativePath), StringComparison.Ordinal))
+            return;
+
+        try
+        {
+            var fromUri = BuildFileUri(fromRelativePath);
+            var toUri = BuildFileUri(toRelativePath);
+            using var request = CreateRequest(MoveMethod, fromUri);
+            request.Headers.TryAddWithoutValidation("Destination", toUri);
+            request.Headers.TryAddWithoutValidation("Overwrite", "F");
+
+            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct)
+                .ConfigureAwait(false);
+            if (response.IsSuccessStatusCode) return;
+
+            var status = (int)response.StatusCode;
+            // 412 = 目标已存在；409 = 目标父目录不存在
+            throw status switch
+            {
+                412 => new IOException("目标已存在"),
+                409 => new IOException("目标目录不存在（请先建目录）"),
+                404 => new IOException("源文件不存在"),
+                401 or 403 => new IOException("没有权限移动该文件"),
+                405 => new IOException("服务器不支持 MOVE（WebDAV 不完整）"),
+                _ => new IOException($"移动失败：HTTP {status}"),
+            };
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (IOException) { throw; }
+        catch (Exception ex) { throw Wrap("移动云端文件", fromRelativePath, ex); }
+    }
+
+    private static string NormalizeRelative(string relative) =>
+        relative.Replace('\\', '/').Trim('/');
+
     public async Task EnsureFolderAsync(string relativePath, CancellationToken ct = default)
     {
         EnsureConfigured();

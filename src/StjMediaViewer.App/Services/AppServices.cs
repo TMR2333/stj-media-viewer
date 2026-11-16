@@ -53,6 +53,7 @@ public static class AppServices
 
     // ---- 云同步 ----
     public static ICloudSyncService Cloud { get; private set; } = null!;
+    public static OrganizerService Organizer { get; private set; } = null!;
     public static CloudAutoSyncService CloudAuto { get; private set; } = null!;
 
     // ---- 转码 / 压缩 ----
@@ -160,8 +161,9 @@ public static class AppServices
         Transcode = new TranscodeService(Ffmpeg);
         Luts = new LutService(Settings, Decoder, Encoder);
         Warmup = new ThumbnailWarmup(Store, Thumbnails, Luts);
-        Cloud = new CloudSyncService();
+        Cloud = new CloudSyncService(store: Store, xmp: Xmp);
         CloudAuto = new CloudAutoSyncService(Settings, Cloud);
+        Organizer = new OrganizerService(Settings.AppDataDirectory, Cloud);
 
         AiClient = new OpenAiCompatibleClient(Settings);
         Ai = new AiClassificationService(AiClient, Decoder, Encoder, Settings);
@@ -201,6 +203,7 @@ public static class AppServices
         Warmup = new ThumbnailWarmup(Store, Thumbnails, Luts);
         Cloud = new FallbackCloudSyncService();
         CloudAuto = new CloudAutoSyncService(Settings, Cloud);
+        Organizer = new OrganizerService(Settings.AppDataDirectory, Cloud);
         return Task.CompletedTask;
     }
 

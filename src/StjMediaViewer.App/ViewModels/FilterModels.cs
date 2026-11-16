@@ -20,6 +20,8 @@ public enum FilterGroupKind
     Log,
     Theme,
     Tone,
+    /// <summary>来源云同步目标（"来自 xx 云同步"）。</summary>
+    Origin,
     /// <summary>用户自建维度（维度名即分组标题，值是自由文本）。</summary>
     Custom,
 }

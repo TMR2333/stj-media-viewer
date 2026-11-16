@@ -418,6 +418,8 @@ internal sealed class FallbackCloudStorage : ICloudStorage
     public Task UploadAsync(string localPath, string relativePath, CancellationToken ct = default)
         => throw new NotSupportedException("演示模式不执行同步");
     public Task EnsureFolderAsync(string relativePath, CancellationToken ct = default) => Task.CompletedTask;
+    public Task MoveAsync(string fromRelativePath, string toRelativePath, CancellationToken ct = default)
+        => throw new NotSupportedException("演示模式不执行移动");
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
 

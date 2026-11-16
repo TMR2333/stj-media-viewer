@@ -57,6 +57,12 @@ public sealed class CloudTarget
     /// <summary>WebDAV 根地址，例如 https://dav.jianguoyun.com/dav/。</summary>
     public string? WebDavEndpoint { get; set; }
     public string? WebDavUsername { get; set; }
+    /// <summary>群组协作：同步到云端时写入作者名（多人共用一个云空间时能看出是谁传的）。</summary>
+    public bool GroupEnabled { get; set; }
+
+    /// <summary>群组里的自己的用户名（群组开启时必填，写进 XMP dc:creator 与云端作者清单）。</summary>
+    public string? AuthorName { get; set; }
+
     /// <summary>DPAPI 加密后的密码（Base64），以 "dpapi:" 开头；明文绝不落盘。</summary>
     public string? WebDavPasswordProtected { get; set; }
     /// <summary>服务器上的子目录（相对 WebDAV 根），例如 "照片/2026"。</summary>

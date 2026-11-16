@@ -10,6 +10,9 @@ public sealed class MediaAsset
     // ---- 身份 / 文件 ----
     public string Id { get; set; } = "";
     public string LibraryId { get; set; } = "";
+
+    /// <summary>来源云同步目标名（例如「坚果云 · 素材库」）；本地扫描/导入的素材为空。</summary>
+    public string? Origin { get; set; }
     public string FullPath { get; set; } = "";
     public string FileName { get; set; } = "";
     public string? RelativePath { get; set; }

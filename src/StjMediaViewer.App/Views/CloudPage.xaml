@@ -188,6 +188,8 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
 
                             <TextBlock Text="名称" Style="{ThemeResource AppCaptionTextStyle}" VerticalAlignment="Center" />
@@ -284,6 +286,19 @@
                                            SmallChange="1" SpinButtonPlacementMode="Compact" Width="120" />
                                 <TextBlock Text="分钟" Style="{ThemeResource AppCaptionTextStyle}" VerticalAlignment="Center" />
                             </StackPanel>
+                            <TextBlock Grid.Row="5" Text="群组协作" Style="{ThemeResource AppCaptionTextStyle}" VerticalAlignment="Top" Margin="0,6,0,0" />
+                            <StackPanel Grid.Row="5" Grid.Column="1" Spacing="6">
+                                <CheckBox Content="同步时写入作者名（多人共用云端时标出谁上传的）"
+                                          IsChecked="{x:Bind ViewModel.EditorGroupEnabled, Mode=TwoWay}" />
+                                <StackPanel Orientation="Horizontal" Spacing="8"
+                                            Visibility="{x:Bind ViewModel.EditorAuthorVisibility, Mode=OneWay}">
+                                    <TextBlock Text="用户名" Style="{ThemeResource AppCaptionTextStyle}" VerticalAlignment="Center" />
+                                    <TextBox Width="220"
+                                             Text="{x:Bind ViewModel.EditorAuthorName, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             PlaceholderText="你在群组里的名字（写入 XMP 作者与云端作者清单）" />
+                                </StackPanel>
+                            </StackPanel>
+
                         </Grid>
 
                         <!-- 错误提示 -->

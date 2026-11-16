@@ -25,8 +25,18 @@ public sealed class CloudSyncService : ICloudSyncService
     /// <paramref name="storageFactory"/> 可注入自定义适配器（测试/未来加 S3、FTP 等）；
     /// 为 null 时按 <see cref="CloudTarget.Kind"/> 自己创建。
     /// </summary>
-    public CloudSyncService(Func<CloudTarget, ICloudStorage>? storageFactory = null)
-        => _storageFactory = storageFactory;
+    private readonly IAssetStore? _store;
+    private readonly IXmpWriter? _xmp;
+
+    public CloudSyncService(
+        Func<CloudTarget, ICloudStorage>? storageFactory = null,
+        IAssetStore? store = null,
+        IXmpWriter? xmp = null)
+    {
+        _storageFactory = storageFactory;
+        _store = store;
+        _xmp = xmp;
+    }
 
     public ICloudStorage CreateStorage(CloudTarget target)
     {
@@ -323,6 +333,20 @@ public sealed class CloudSyncService : ICloudSyncService
 
         if (!dryRun)
         {
+            try
+            {
+                await PostProcessAsync(storage, target, actions, report, ct).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                Log.Warn("云同步后处理（作者名 / 来源标记）失败", ex);
+                report.Messages.Add($"后处理失败：{ex.Message}");
+            }
+        }
+
+        if (!dryRun)
+        {
             target.LastSyncAt = DateTimeOffset.Now;
             target.LastSyncStatus = report.Failed == 0 ? "ok" : "partial";
             target.LastSyncMessage = report.Summary;
@@ -353,6 +377,166 @@ public sealed class CloudSyncService : ICloudSyncService
     {
         var plan = await BuildPlanAsync(target, progress, ct).ConfigureAwait(false);
         return await ExecuteAsync(plan, dryRun, progress, ct).ConfigureAwait(false);
+    }
+
+    // ------------------------------------------------------------------ 群组作者 / 来源标记
+
+    /// <summary>云端作者清单文件名（放在同步根，记录每个文件由谁上传）。</summary>
+    public const string AuthorManifestName = ".stj-authors.json";
+
+    /// <summary>
+    /// 同步后处理：
+    ///  - 群组目标：把作者名写进本地素材的 XMP（dc:creator）与索引库，并更新云端作者清单；
+    ///  - 下载回来的文件：标记「来自 xx 云同步」，供素材库按来源分类筛选。
+    /// </summary>
+    private async Task PostProcessAsync(
+        ICloudStorage storage,
+        CloudTarget target,
+        IReadOnlyList<CloudSyncAction> actions,
+        CloudSyncReport report,
+        CancellationToken ct)
+    {
+        if (_store is null) return;
+
+        var localRoot = Path.GetFullPath(target.LocalFolderPath);
+        var author = target.GroupEnabled ? target.AuthorName?.Trim() : null;
+        if (!string.IsNullOrEmpty(author)) author = author!.Trim();
+        var origin = target.Name;
+
+        var uploaded = new List<string>();
+        foreach (var action in actions)
+        {
+            ct.ThrowIfCancellationRequested();
+            var localPath = Path.Combine(localRoot, action.RelativePath.Replace('/', Path.DirectorySeparatorChar));
+
+            bool isUpload = action.Kind == CloudActionKind.Upload
+                            || (action.Kind == CloudActionKind.Conflict
+                                && action.Resolution is CloudConflictPolicy.PreferLocal or CloudConflictPolicy.KeepBoth);
+
+            if (action.Kind == CloudActionKind.Download)
+            {
+                // 「来自 xx 云同步」：把目标名记到索引库，素材库可按来源筛选
+                try { await _store.UpdateAssetMetaByPathAsync(localPath, origin: origin, ct: ct).ConfigureAwait(false); }
+                catch (Exception ex) { Log.Warn($"标记来源失败 {action.RelativePath}", ex); }
+                continue;
+            }
+
+            if (!isUpload || string.IsNullOrEmpty(author)) continue;
+
+            uploaded.Add(action.RelativePath);
+            try
+            {
+                await _store.UpdateAssetMetaByPathAsync(localPath, creator: author, ct: ct).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Log.Warn($"写入作者名失败 {action.RelativePath}", ex);
+            }
+
+            // XMP 边车：把 dc:creator 写进文件旁边的 .xmp（下次同步会一起带上云端）
+            if (_xmp is not null && File.Exists(localPath))
+            {
+                try
+                {
+                    var asset = new MediaAsset
+                    {
+                        FullPath = localPath,
+                        FileName = Path.GetFileName(localPath),
+                        Creator = author,
+                        Kind = GuessKind(Path.GetExtension(localPath)),
+                    };
+                    await _xmp.WriteSidecarAsync(asset, ct).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    Log.Warn($"写 XMP 作者失败 {action.RelativePath}", ex);
+                }
+            }
+        }
+
+        if (!string.IsNullOrEmpty(author) && uploaded.Count > 0)
+        {
+            try
+            {
+                await UpdateAuthorManifestAsync(storage, author!, uploaded, ct).ConfigureAwait(false);
+                report.Messages.Add($"已写入作者名「{author}」（{uploaded.Count} 个文件）");
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("更新云端作者清单失败", ex);
+                report.Messages.Add($"作者清单更新失败：{ex.Message}");
+            }
+        }
+    }
+
+    private static MediaKind GuessKind(string extension)
+    {
+        var ext = extension.TrimStart('.').ToLowerInvariant();
+        return ext switch
+        {
+            "mp4" or "mov" or "mkv" or "avi" or "mxf" or "webm" or "m4v" or "r3d" or "braw" => MediaKind.Video,
+            "wav" or "mp3" or "flac" or "aac" or "m4a" or "ogg" or "aiff" => MediaKind.Audio,
+            _ => MediaKind.Image,
+        };
+    }
+
+    /// <summary>把作者名合并进云端 `.stj-authors.json`（保留其他群组成员写入的记录）。</summary>
+    private static async Task UpdateAuthorManifestAsync(
+        ICloudStorage storage,
+        string author,
+        IReadOnlyList<string> uploadedPaths,
+        CancellationToken ct)
+    {
+        var temp = Path.Combine(Path.GetTempPath(), "stj-authors-" + Guid.NewGuid().ToString("N") + ".json");
+        var authors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        try
+        {
+            try
+            {
+                await storage.DownloadAsync(AuthorManifestName, temp, ct).ConfigureAwait(false);
+                if (File.Exists(temp))
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(await File.ReadAllTextAsync(temp, ct).ConfigureAwait(false));
+                    if (doc.RootElement.TryGetProperty("authors", out var map) && map.ValueKind == System.Text.Json.JsonValueKind.Object)
+                    {
+                        foreach (var prop in map.EnumerateObject())
+                        {
+                            if (prop.Value.ValueKind == System.Text.Json.JsonValueKind.String)
+                                authors[prop.Name] = prop.Value.GetString() ?? "";
+                            else if (prop.Value.ValueKind == System.Text.Json.JsonValueKind.Object &&
+                                     prop.Value.TryGetProperty("author", out var authorProp))
+                                authors[prop.Name] = authorProp.GetString() ?? "";
+                        }
+                    }
+                }
+            }
+            catch
+            {
+                // 云端还没有清单（第一次同步）或格式不合法：从空清单开始
+            }
+
+            foreach (var path in uploadedPaths) authors[path] = author;
+
+            var payload = new
+            {
+                version = 1,
+                updatedAt = DateTimeOffset.Now.ToString("O"),
+                authors,
+            };
+            var json = System.Text.Json.JsonSerializer.Serialize(payload,
+                new System.Text.Json.JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                    Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+                });
+            await File.WriteAllTextAsync(temp, json, ct).ConfigureAwait(false);
+            await storage.UploadAsync(temp, AuthorManifestName, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            try { if (File.Exists(temp)) File.Delete(temp); } catch { }
+        }
     }
 
     // ------------------------------------------------------------------ 冲突处理

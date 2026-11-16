@@ -519,6 +519,41 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
         }, ct).ContinueWith(_ => (IReadOnlyDictionary<string, string>)result, ct);
     }
 
+    public Task<IReadOnlyDictionary<string, string>> GetCustomFieldsBulkAsync(string dimension,
+        IEnumerable<string> assetIds, CancellationToken ct = default)
+    {
+        var result = new Dictionary<string, string>(StringComparer.Ordinal);
+        var ids = assetIds?.Where(id => !string.IsNullOrEmpty(id)).Distinct(StringComparer.Ordinal).ToList()
+                  ?? new List<string>();
+        if (string.IsNullOrWhiteSpace(dimension) || ids.Count == 0)
+            return Task.FromResult<IReadOnlyDictionary<string, string>>(result);
+
+        var dim = dimension.Trim();
+        return RunAsync(() =>
+        {
+            foreach (var chunk in Chunk(ids, InClauseChunk))
+            {
+                using var cmd = _conn!.CreateCommand();
+                var sb = new StringBuilder("SELECT asset_id, value FROM asset_custom WHERE dimension = @d AND asset_id IN (");
+                cmd.Parameters.AddWithValue("@d", dim);
+                for (int i = 0; i < chunk.Count; i++)
+                {
+                    if (i > 0) sb.Append(',');
+                    sb.Append("@i").Append(i);
+                    cmd.Parameters.AddWithValue("@i" + i, chunk[i]);
+                }
+                sb.Append(')');
+                cmd.CommandText = sb.ToString();
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    if (reader.IsDBNull(0) || reader.IsDBNull(1)) continue;
+                    result[reader.GetString(0)] = reader.GetString(1);
+                }
+            }
+        }, ct).ContinueWith(_ => (IReadOnlyDictionary<string, string>)result, ct);
+    }
+
     public Task<IReadOnlyList<string>> ListCustomDimensionsAsync(CancellationToken ct = default)
     {
         var result = new List<string>();
@@ -568,6 +603,45 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
             }
 
             tx.Commit();
+        }, ct);
+    }
+
+    public Task UpdateAssetMetaByPathAsync(string fullPath, string? creator = null, string? origin = null,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(fullPath)) return Task.CompletedTask;
+        if (creator is null && origin is null) return Task.CompletedTask;
+
+        return RunAsync(() =>
+        {
+            using var cmd = _conn!.CreateCommand();
+            var sets = new List<string>();
+            if (creator is not null) { sets.Add("creator = @c"); cmd.Parameters.AddWithValue("@c", (object?)creator ?? DBNull.Value); }
+            if (origin is not null) { sets.Add("origin = @o"); cmd.Parameters.AddWithValue("@o", (object?)origin ?? DBNull.Value); }
+            cmd.CommandText = "UPDATE assets SET " + string.Join(", ", sets) + " WHERE full_path = @p";
+            cmd.Parameters.AddWithValue("@p", fullPath);
+            cmd.ExecuteNonQuery();
+        }, ct);
+    }
+
+    public Task UpdateAssetPathAsync(string assetId, string fullPath, string? relativePath,
+        IReadOnlyList<string>? sidecars = null, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(assetId) || string.IsNullOrWhiteSpace(fullPath))
+            return Task.CompletedTask;
+
+        return RunAsync(() =>
+        {
+            using var cmd = _conn!.CreateCommand();
+            cmd.CommandText =
+                "UPDATE assets SET full_path = @p, relative_path = @r" +
+                (sidecars is null ? "" : ", sidecars_json = @s") +
+                " WHERE id = @id";
+            cmd.Parameters.AddWithValue("@p", fullPath);
+            cmd.Parameters.AddWithValue("@r", (object?)relativePath ?? DBNull.Value);
+            if (sidecars is not null) cmd.Parameters.AddWithValue("@s", AssetMapper.JsonList(sidecars.ToList()));
+            cmd.Parameters.AddWithValue("@id", assetId);
+            cmd.ExecuteNonQuery();
         }, ct);
     }
 
@@ -697,6 +771,8 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
             f.LogCount = (int)Scalar1("SELECT COUNT(*) FROM assets" + w.Sql + AndWhere(w, "is_log=1"), w);
             f.GpsCount = (int)Scalar1("SELECT COUNT(*) FROM assets" + w.Sql +
                                       AndWhere(w, "latitude IS NOT NULL AND longitude IS NOT NULL"), w);
+            f.OriginUnsetCount = (int)Scalar1(
+                "SELECT COUNT(*) FROM assets" + w.Sql + AndWhere(w, "(origin IS NULL OR origin='')"), w);
             f.ThemeUnsetCount = (int)Scalar1(
                 "SELECT COUNT(*) FROM assets" + w.Sql + AndWhere(w, "(theme IS NULL OR theme='')"), w);
             f.ToneUnsetCount = (int)Scalar1(
@@ -735,6 +811,10 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
                             "WHERE acv.asset_id IN (SELECT assets.id FROM assets" + w.Sql + ") " +
                             "GROUP BY acv.dimension, acv.value";
             f.ByCustom = GroupText2(customSql, w);
+
+            f.ByOrigin = GroupText("origin",
+                "SELECT origin, COUNT(*) FROM assets" + w.Sql + AndWhere(w, "origin IS NOT NULL AND origin<>''") +
+                " GROUP BY origin", w);
 
             f.ByPick = GroupText("is_pick",
                 "SELECT is_pick, COUNT(*) FROM assets" + w.Sql + " GROUP BY is_pick", w,
@@ -1027,6 +1107,8 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
             sbCustom.Append("))");
             w.And(sbCustom.ToString());
         }
+
+        AddInOrUnset(w, "origin", q.Origins);
 
         if (q.IsRaw is { } isRaw) w.And(isRaw ? "raw_format <> 0" : "raw_format = 0");
         if (q.Colored is { } colored)
