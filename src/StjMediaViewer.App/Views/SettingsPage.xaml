@@ -480,6 +480,80 @@
                         </Button>
                     </Grid>
 
+                    <!-- 缓存位置 + 自动清理 -->
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="缓存位置" Style="{ThemeResource AppMicroTextStyle}" />
+                        <Grid ColumnSpacing="8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBox Grid.Column="0"
+                                     PlaceholderText="留空 = %LOCALAPPDATA%\StjMediaViewer\Cache"
+                                     Text="{x:Bind ViewModel.CachePath, Mode=TwoWay}" />
+                            <Button Grid.Column="1" Style="{ThemeResource AppSubtleButtonStyle}"
+                                    Padding="12,2,12,2" MinHeight="30" Click="PickCacheFolder_Click">
+                                <TextBlock Text="浏览…" Style="{ThemeResource AppCaptionTextStyle}" />
+                            </Button>
+                            <Button Grid.Column="2" Style="{ThemeResource AppSubtleButtonStyle}"
+                                    Padding="12,2,12,2" MinHeight="30" Click="ResetCacheFolder_Click">
+                                <TextBlock Text="恢复默认" Style="{ThemeResource AppCaptionTextStyle}" />
+                            </Button>
+                        </Grid>
+                        <TextBlock Text="换位置后缩略图会重新生成；旧缓存留在原目录，可手动删除，不会自动搬。"
+                                   Style="{ThemeResource AppMicroTextStyle}"
+                                   Foreground="{ThemeResource TextTertiaryBrush}" TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0" Spacing="2">
+                                <TextBlock Text="体积上限 (MB)" Style="{ThemeResource AppMicroTextStyle}" />
+                                <NumberBox Value="{x:Bind ViewModel.CacheLimitMb, Mode=TwoWay}" Minimum="64" Maximum="65536"
+                                           SmallChange="64" SpinButtonPlacementMode="Compact" Width="130" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Spacing="2">
+                                <TextBlock Text="保留天数（0 = 不限）" Style="{ThemeResource AppMicroTextStyle}" />
+                                <NumberBox Value="{x:Bind ViewModel.CacheMaxAgeDays, Mode=TwoWay}" Minimum="0" Maximum="3650"
+                                           SmallChange="7" SpinButtonPlacementMode="Compact" Width="150" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="2">
+                                <TextBlock Text="检查间隔（小时）" Style="{ThemeResource AppMicroTextStyle}" />
+                                <NumberBox Value="{x:Bind ViewModel.CacheCleanIntervalHours, Mode=TwoWay}" Minimum="1" Maximum="168"
+                                           SmallChange="1" SpinButtonPlacementMode="Compact" Width="140" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="3" Spacing="2" VerticalAlignment="Bottom">
+                                <ToggleSwitch Header="自动清理" IsOn="{x:Bind ViewModel.CacheAutoClean, Mode=TwoWay}" MinWidth="0" />
+                            </StackPanel>
+                        </Grid>
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{x:Bind ViewModel.CacheCleanStatus, Mode=OneWay}"
+                                       Style="{ThemeResource AppMicroTextStyle}"
+                                       Foreground="{ThemeResource TextTertiaryBrush}" VerticalAlignment="Center" TextWrapping="Wrap" />
+                            <Button Grid.Column="1" Style="{ThemeResource AppSubtleButtonStyle}"
+                                    Padding="12,2,12,2" MinHeight="30" Click="CleanCacheNow_Click">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE74D;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                                    <TextBlock Text="立即清理" Style="{ThemeResource AppCaptionTextStyle}" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                        <TextBlock Text="自动清理在启动后约 20 秒跑一次，之后每 30 分钟检查、到间隔才真正执行；只删缓存目录里的缩略图，不动素材。"
+                                   Style="{ThemeResource AppMicroTextStyle}"
+                                   Foreground="{ThemeResource TextTertiaryBrush}" TextWrapping="Wrap" />
+                    </StackPanel>
+
                     <!-- 后台全库预热：低并发把整库缩略图生成并落盘，之后滚动都走 0ms 缓存命中 -->
                     <StackPanel Spacing="6">
                         <Grid ColumnSpacing="10">

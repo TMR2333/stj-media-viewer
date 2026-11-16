@@ -65,6 +65,18 @@ public sealed class AppSettings
     public bool WriteXmpOnSave { get; set; } = true;
     public bool AutoClassifyOnImport { get; set; }
     public int ThumbnailCacheMb { get; set; } = 512;
+
+    /// <summary>缩略图缓存根目录；null/空 = 默认 %LOCALAPPDATA%\StjMediaViewer\Cache。</summary>
+    public string? CacheDirectory { get; set; }
+
+    /// <summary>自动清理缓存（启动时 + 按间隔）。</summary>
+    public bool CacheAutoCleanEnabled { get; set; } = true;
+
+    /// <summary>缓存文件最多保留多少天（0 = 不限）。</summary>
+    public int CacheMaxAgeDays { get; set; } = 90;
+
+    /// <summary>自动清理间隔（小时）。</summary>
+    public int CacheCleanIntervalHours { get; set; } = 6;
     public int ScanParallelism { get; set; } = 4;
     public bool WatchLibraries { get; set; } = true;
 

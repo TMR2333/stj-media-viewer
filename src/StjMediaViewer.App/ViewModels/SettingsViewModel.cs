@@ -280,6 +280,24 @@ public sealed partial class SettingsViewModel : ObservableObject
     //  工具链
     // ==================================================================================
     [ObservableProperty]
+    private string _cachePath = "";
+
+    [ObservableProperty]
+    private int _cacheLimitMb = 512;
+
+    [ObservableProperty]
+    private bool _cacheAutoClean = true;
+
+    [ObservableProperty]
+    private int _cacheMaxAgeDays = 90;
+
+    [ObservableProperty]
+    private int _cacheCleanIntervalHours = 6;
+
+    [ObservableProperty]
+    private string _cacheCleanStatus = "";
+
+    [ObservableProperty]
     private string _ffmpegPath = "";
 
     [ObservableProperty]
@@ -375,6 +393,14 @@ public sealed partial class SettingsViewModel : ObservableObject
             ThemeMode = (settings.ThemeMode ?? "system").ToLowerInvariant();
 
             FfmpegPath = settings.FfmpegPath ?? "";
+            CachePath = settings.CacheDirectory ?? "";
+            CacheLimitMb = settings.ThumbnailCacheMb <= 0 ? 512 : settings.ThumbnailCacheMb;
+            CacheAutoClean = settings.CacheAutoCleanEnabled;
+            CacheMaxAgeDays = settings.CacheMaxAgeDays;
+            CacheCleanIntervalHours = settings.CacheCleanIntervalHours <= 0 ? 6 : settings.CacheCleanIntervalHours;
+            CacheCleanStatus = AppServices.CacheMaintenance?.LastRun is { } last && last > DateTimeOffset.MinValue
+                ? $"上次自动清理：{last:yyyy-MM-dd HH:mm}"
+                : "还没自动清理过";
             SettingsPath = AppServices.Settings.SettingsFilePath;
             AppDataPath = AppServices.Settings.AppDataDirectory;
             VersionText = ResolveVersion();
@@ -489,7 +515,22 @@ public sealed partial class SettingsViewModel : ObservableObject
 
             AppServices.Settings.Current.FfmpegPath = string.IsNullOrWhiteSpace(FfmpegPath) ? null : FfmpegPath.Trim();
 
+            var oldCachePath = AppServices.Settings.Current.CacheDirectory;
+            var newCachePath = string.IsNullOrWhiteSpace(CachePath) ? null : CachePath.Trim();
+            AppServices.Settings.Current.CacheDirectory = newCachePath;
+            AppServices.Settings.Current.ThumbnailCacheMb = Math.Clamp(CacheLimitMb, 64, 65536);
+            AppServices.Settings.Current.CacheAutoCleanEnabled = CacheAutoClean;
+            AppServices.Settings.Current.CacheMaxAgeDays = Math.Clamp(CacheMaxAgeDays, 0, 3650);
+            AppServices.Settings.Current.CacheCleanIntervalHours = Math.Clamp(CacheCleanIntervalHours, 1, 168);
+
             await AppServices.Settings.SaveAsync();
+
+            // 缓存路径变了：热切换缩略图服务（旧缓存留在旧目录，不会自动删）
+            if (!string.Equals(oldCachePath ?? "", newCachePath ?? "", StringComparison.OrdinalIgnoreCase))
+            {
+                AppServices.ReloadThumbnailCache();
+                await RefreshCacheSizeAsync();
+            }
             ShowSavedHint();
         }
         catch (Exception ex)
@@ -877,6 +918,26 @@ public sealed partial class SettingsViewModel : ObservableObject
         if (dispatcher is null) Apply();
         else dispatcher.TryEnqueue(Apply);
     }
+
+    /// <summary>立即按当前规则清理一次缓存（设置页按钮）。</summary>
+    public async Task CleanCacheNowAsync()
+    {
+        try
+        {
+            CacheCleanStatus = "正在清理…";
+            var result = await AppServices.CacheMaintenance.RunNowAsync();
+            CacheCleanStatus = $"上次清理：{DateTimeOffset.Now:HH:mm} · {result.Summary}";
+            await RefreshCacheSizeAsync();
+            AppEvents.SetStatus("缓存清理完成：" + result.Summary);
+        }
+        catch (Exception ex)
+        {
+            CacheCleanStatus = "清理失败：" + ex.Message;
+            Log.Warn("立即清理缓存失败", ex);
+        }
+    }
+
+    public void ResetCachePath() => CachePath = "";
 
     public async Task ClearCacheAsync()
     {

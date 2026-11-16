@@ -241,6 +241,10 @@ public sealed class JsonSettingsService : ISettingsService
         if (s.Grid.Density is not ("compact" or "comfortable" or "spacious")) s.Grid.Density = "comfortable";
 
         s.ThumbnailCacheMb = Math.Clamp(s.ThumbnailCacheMb <= 0 ? 512 : s.ThumbnailCacheMb, 64, 65536);
+
+        s.CacheDirectory = string.IsNullOrWhiteSpace(s.CacheDirectory) ? null : s.CacheDirectory.Trim();
+        s.CacheMaxAgeDays = Math.Clamp(s.CacheMaxAgeDays, 0, 3650);
+        s.CacheCleanIntervalHours = Math.Clamp(s.CacheCleanIntervalHours <= 0 ? 6 : s.CacheCleanIntervalHours, 1, 168);
         s.ScanParallelism = Math.Clamp(s.ScanParallelism <= 0 ? 4 : s.ScanParallelism, 1, 32);
         return s;
     }

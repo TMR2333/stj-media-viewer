@@ -19,6 +19,7 @@ public sealed partial class SettingsPage : Page
     public SettingsPage()
     {
         InitializeComponent();
+        Loaded += (_, _) => ApplyDemoScroll();
         Loaded += OnLoaded;
     }
 
@@ -140,7 +141,63 @@ public sealed partial class SettingsPage : Page
     // ==================================================================================
     private async void ReloadFfmpeg_Click(object sender, RoutedEventArgs e) => await ViewModel.ReloadFfmpegAsync();
 
+    /// <summary>截图/验收用：STJ_DEMO_SETTINGS_CACHE=1 时滚到缓存区。</summary>
+    private void ApplyDemoScroll()
+    {
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_SETTINGS_CACHE") != "1") return;
+        DispatcherQueue.TryEnqueue(async () =>
+        {
+            await Task.Delay(1200);
+            if (FindScrollViewer(this) is { } scroll)
+            {
+                scroll.ChangeView(null, scroll.ScrollableHeight, null);
+            }
+        });
+    }
+
+    private static ScrollViewer? FindScrollViewer(DependencyObject root)
+    {
+        if (root is ScrollViewer sv) return sv;
+        var count = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(root);
+        for (int i = 0; i < count; i++)
+        {
+            if (FindScrollViewer(Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(root, i)) is { } found)
+                return found;
+        }
+        return null;
+    }
+
     private async void ClearCache_Click(object sender, RoutedEventArgs e) => await ViewModel.ClearCacheAsync();
+
+    private async void PickCacheFolder_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var picker = new Windows.Storage.Pickers.FolderPicker
+            {
+                SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.ComputerFolder,
+            };
+            picker.FileTypeFilter.Add("*");
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+            var folder = await picker.PickSingleFolderAsync();
+            if (folder is null) return;
+            ViewModel.CachePath = folder.Path;
+            ViewModel.ScheduleSave();
+        }
+        catch (Exception ex)
+        {
+            Core.Util.Log.Warn("选择缓存目录失败", ex);
+        }
+    }
+
+    private void ResetCacheFolder_Click(object sender, RoutedEventArgs e)
+    {
+        ViewModel.ResetCachePath();
+        ViewModel.ScheduleSave();
+    }
+
+    private async void CleanCacheNow_Click(object sender, RoutedEventArgs e) => await ViewModel.CleanCacheNowAsync();
 
     private void ReplayOnboarding_Click(object sender, RoutedEventArgs e) => ViewModel.ReplayOnboarding();
 

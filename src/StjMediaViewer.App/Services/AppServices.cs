@@ -65,6 +65,9 @@ public static class AppServices
     // ---- 后台缩略图预热 ----
     public static ThumbnailWarmup Warmup { get; private set; } = null!;
 
+    /// <summary>缩略图缓存自动清理服务。</summary>
+    public static CacheMaintenanceService CacheMaintenance { get; private set; } = null!;
+
     /// <summary>密码加解密（DPAPI）：UI 只碰明文，落盘一律密文。</summary>
     public static class Secrets
     {
@@ -94,7 +97,44 @@ public static class AppServices
     public static event EventHandler? ServicesReplaced;
 
     public static string AppDataDirectory => Settings.AppDataDirectory;
-    public static string ThumbnailCacheDirectory => Path.Combine(Settings.AppDataDirectory, "Cache", "thumbs");
+    /// <summary>缓存根目录：自定义路径优先，否则 %LOCALAPPDATA%\StjMediaViewer\Cache。</summary>
+    public static string CacheRootDirectory
+    {
+        get
+        {
+            var custom = Settings.Current.CacheDirectory;
+            return string.IsNullOrWhiteSpace(custom)
+                ? Path.Combine(Settings.AppDataDirectory, "Cache")
+                : Path.GetFullPath(custom!);
+        }
+    }
+
+    public static string ThumbnailCacheDirectory => Path.Combine(CacheRootDirectory, "thumbs");
+
+    /// <summary>设置里改了缓存路径后热切换：重建缩略图服务 / 加载器 / 预热器（旧缓存留在原目录，可手动清）。</summary>
+    public static void ReloadThumbnailCache()
+    {
+        try
+        {
+            Thumbnails = new ThumbnailService(Decoder, Encoder, ThumbnailCacheDirectory);
+            Thumbs = new ThumbnailLoader(Thumbnails);
+            Warmup = new ThumbnailWarmup(Store, Thumbnails, Luts);
+            Log.Info($"缩略图缓存目录已切换：{ThumbnailCacheDirectory}");
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("切换缩略图缓存目录失败", ex);
+        }
+    }
+
+    /// <summary>按当前设置清理一次缩略图缓存。</summary>
+    public static async Task<CacheCleanResult> CleanThumbnailCacheAsync(CancellationToken ct = default)
+    {
+        var settings = Settings.Current;
+        var maxBytes = settings.ThumbnailCacheMb > 0 ? settings.ThumbnailCacheMb * 1024L * 1024L : 0;
+        return await ThumbnailCacheCleaner.CleanAsync(
+            ThumbnailCacheDirectory, maxBytes, settings.CacheMaxAgeDays, ct).ConfigureAwait(false);
+    }
     public static string LibraryDatabasePath => Path.Combine(Settings.AppDataDirectory, "catalog.db");
 
     public static async Task InitializeAsync()
@@ -128,6 +168,9 @@ public static class AppServices
             try { await Luts.ListAsync().ConfigureAwait(false); }
             catch (Exception ex) { Log.Warn("LUT 预热失败", ex); }
         });
+
+        CacheMaintenance = new CacheMaintenanceService(Settings);
+        CacheMaintenance.Start();
 
         IsReady = true;
         ServicesReplaced?.Invoke(null, EventArgs.Empty);
