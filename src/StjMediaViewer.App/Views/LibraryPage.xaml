@@ -499,12 +499,22 @@
                                       ToolTipService.ToolTip="默认把同一张照片的 JPEG 与 RAW 合成一项；开启后两个文件各自成项" />
                     </StackPanel>
 
-                    <ToggleButton Grid.Column="1" x:Name="InspectorToggle"
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="12,2,12,2" MinHeight="30"
+                            Click="BatchEdit_Click"
+                            ToolTipService.ToolTip="给选中的素材批量填日期 / 城市 / 分类等信息">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE70F;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                            <TextBlock Text="批量填写" Style="{ThemeResource AppCaptionTextStyle}" />
+                        </StackPanel>
+                    </Button>
+                    <ToggleButton x:Name="InspectorToggle"
                                   Style="{StaticResource CompactToggleStyle}"
                                   Content="检视面板"
                                   IsChecked="True"
                                   Click="InspectorToggle_Click"
                                   VerticalAlignment="Center" />
+                    </StackPanel>
                 </Grid>
 
                 <TextBlock Text="{x:Bind ViewModel.ActiveFilterSummary, Mode=OneWay}"

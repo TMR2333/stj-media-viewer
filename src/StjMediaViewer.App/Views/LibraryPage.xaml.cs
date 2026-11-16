@@ -214,6 +214,16 @@ public sealed partial class LibraryPage : Page
         TryHookScrollViewer();
     }
 
+    private void BatchEdit_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.SelectedItems.Count == 0)
+        {
+            AppEvents.SetError("先在图库里选中素材，再批量填写信息");
+            return;
+        }
+        Frame.Navigate(typeof(BatchEditPage));
+    }
+
     private void InspectorToggle_Click(object sender, RoutedEventArgs e) =>
         ApplyInspectorVisibility(InspectorToggle.IsChecked == true);
 

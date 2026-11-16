@@ -564,6 +564,16 @@
                         </Button>
                         <Button Style="{ThemeResource AppSubtleButtonStyle}"
                                 Padding="12,2,12,2" MinHeight="30"
+                                Click="BatchEdit_Click"
+                                Visibility="{x:Bind ViewModel.BatchEditVisibility, Mode=OneWay}"
+                                ToolTipService.ToolTip="为这批刚导入的素材批量填写日期 / 城市 / 分类">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE70F;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                                <TextBlock Text="填写这批文件的信息" Style="{ThemeResource AppCaptionTextStyle}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{ThemeResource AppSubtleButtonStyle}"
+                                Padding="12,2,12,2" MinHeight="30"
                                 Click="Reimport_Click">
                             <StackPanel Orientation="Horizontal" Spacing="6">
                                 <FontIcon Glyph="&#xE72C;" FontSize="{ThemeResource AppFontCaptionSize}" />

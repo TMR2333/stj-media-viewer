@@ -877,8 +877,19 @@ public sealed partial class ImportViewModel : ObservableObject
 
     public void CancelImport() => _importCts?.Cancel();
 
+    /// <summary>本次导入成功落盘的文件（供"填写这批文件的信息"使用）。</summary>
+    public List<string> LastImportedPaths { get; } = new();
+
+    [ObservableProperty] private Visibility _batchEditVisibility = Visibility.Collapsed;
+
     private void ApplyImportReport(ImportReport report)
     {
+        LastImportedPaths.Clear();
+        foreach (var item in report.Items)
+            if (item.DestinationPath is { Length: > 0 } dest && item.Status == "Copied")
+                LastImportedPaths.Add(dest);
+        BatchEditVisibility = LastImportedPaths.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+
         HasReport = true;
         ReportVisibility = Visibility.Visible;
         ReportTitleText = report.Success ? "导入完成" : "导入完成（有失败 / 损坏 / 缺失）";

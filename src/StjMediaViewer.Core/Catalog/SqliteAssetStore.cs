@@ -295,6 +295,155 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
         }
     }
 
+    public Task<int> ApplyBatchEditAsync(IReadOnlyList<string> assetIds, BatchEditPatch patch,
+        CancellationToken ct = default)
+    {
+        if (assetIds is null || assetIds.Count == 0 || patch is null || !patch.HasChanges)
+            return Task.FromResult(0);
+
+        var ids = assetIds.Where(i => !string.IsNullOrEmpty(i)).Distinct().ToList();
+        if (ids.Count == 0) return Task.FromResult(0);
+
+        int affected = 0;
+        return RunAsync(() =>
+        {
+            using var tx = _conn!.BeginTransaction();
+
+            foreach (var chunk in Chunk(ids, InClauseChunk))
+            {
+                ct.ThrowIfCancellationRequested();
+
+                // 关键词是 JSON 数组：先读出来合并再写回（只有要求改关键词时才读）
+                Dictionary<string, List<string>>? keywords = null;
+                if (patch.AddKeywords is { Count: > 0 } || patch.ReplaceKeywords is not null)
+                {
+                    keywords = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+                    using var read = _conn.CreateCommand();
+                    read.Transaction = tx;
+                    var sbRead = new StringBuilder("SELECT id, keywords_json FROM assets WHERE id IN (");
+                    for (int i = 0; i < chunk.Count; i++)
+                    {
+                        if (i > 0) sbRead.Append(',');
+                        sbRead.Append("@k").Append(i);
+                        read.Parameters.AddWithValue("@k" + i, chunk[i]);
+                    }
+                    sbRead.Append(')');
+                    read.CommandText = sbRead.ToString();
+                    using var reader = read.ExecuteReader();
+                    while (reader.Read())
+                    {
+                        var id = reader.GetString(0);
+                        var json = reader.IsDBNull(1) ? "[]" : reader.GetString(1);
+                        keywords[id] = ParseJsonList(json);
+                    }
+                }
+
+                using var cmd = _conn.CreateCommand();
+                cmd.Transaction = tx;
+                var sets = new List<string>();
+                void Set(string column, object? value)
+                {
+                    var name = "@p" + sets.Count;
+                    sets.Add(column + " = " + name);
+                    cmd.Parameters.AddWithValue(name, value ?? DBNull.Value);
+                }
+
+                if (patch.CapturedAt is { } captured)
+                {
+                    var local = captured.ToLocalTime();
+                    Set("captured_at", captured.ToString("O"));
+                    Set("captured_ms", captured.ToUnixTimeMilliseconds());
+                    Set("captured_day", local.ToString("yyyy-MM-dd"));
+                    Set("captured_at_source", "manual");
+                }
+                if (patch.Country is not null) Set("country", NullIfEmpty(patch.Country));
+                if (patch.Province is not null) Set("province", NullIfEmpty(patch.Province));
+                if (patch.City is not null)
+                {
+                    Set("city", NullIfEmpty(patch.City));
+                    Set("city_source", patch.City.Length == 0 ? null : "manual");
+                }
+                if (patch.CameraMake is not null) Set("camera_make", NullIfEmpty(patch.CameraMake));
+                if (patch.DeviceKey is not null) Set("device_key", NullIfEmpty(patch.DeviceKey));
+                if (patch.PostProcess is { } pp) Set("post_process", Math.Clamp(pp, 0, 2));
+                if (patch.IsLog is { } isLog) Set("is_log", isLog ? 1 : 0);
+                if (patch.LogProfile is not null) Set("log_profile", NullIfEmpty(patch.LogProfile));
+                if (patch.Theme is not null) Set("theme", NullIfEmpty(patch.Theme));
+                if (patch.Tone is not null) Set("tone", NullIfEmpty(patch.Tone));
+                if (patch.Rating is { } rating) Set("rating", Math.Clamp(rating, 0, 5));
+                if (patch.ColorLabel is not null) Set("color_label", NullIfEmpty(patch.ColorLabel));
+                if (patch.IsPick is { } isPick) Set("is_pick", isPick ? 1 : 0);
+                if (patch.Title is not null) Set("title", NullIfEmpty(patch.Title));
+                if (patch.Caption is not null) Set("caption", NullIfEmpty(patch.Caption));
+
+                var sb = new StringBuilder("UPDATE assets SET ");
+                sb.Append(string.Join(", ", sets));
+
+                // 关键词：按 id 单独更新（每条要合并）
+                sb.Append(", keywords_json = CASE id ");
+                for (int i = 0; i < chunk.Count; i++)
+                {
+                    var id = chunk[i];
+                    List<string> merged;
+                    if (patch.ReplaceKeywords is not null) merged = patch.ReplaceKeywords;
+                    else
+                    {
+                        merged = keywords is not null && keywords.TryGetValue(id, out var old)
+                            ? new List<string>(old)
+                            : new List<string>();
+                        foreach (var kw in patch.AddKeywords ?? new List<string>())
+                            if (!merged.Contains(kw, StringComparer.OrdinalIgnoreCase)) merged.Add(kw);
+                    }
+
+                    sb.Append(" WHEN @k").Append(i).Append(" THEN @kw").Append(i);
+                    cmd.Parameters.AddWithValue("@kw" + i, AssetMapper.JsonList(merged));
+                }
+                sb.Append(" ELSE keywords_json END, keywords_flat = CASE id ");
+                for (int i = 0; i < chunk.Count; i++)
+                {
+                    List<string> flatSource;
+                    if (patch.ReplaceKeywords is not null) flatSource = patch.ReplaceKeywords;
+                    else
+                    {
+                        flatSource = keywords is not null && keywords.TryGetValue(chunk[i], out var old)
+                            ? new List<string>(old)
+                            : new List<string>();
+                        foreach (var kw in patch.AddKeywords ?? new List<string>())
+                            if (!flatSource.Contains(kw, StringComparer.OrdinalIgnoreCase)) flatSource.Add(kw);
+                    }
+                    sb.Append(" WHEN @k").Append(i).Append(" THEN @f").Append(i);
+                    cmd.Parameters.AddWithValue("@f" + i, string.Join(' ', flatSource));
+                }
+                sb.Append(" ELSE keywords_flat END");
+
+                sb.Append(" WHERE id IN (");
+                for (int i = 0; i < chunk.Count; i++)
+                {
+                    if (i > 0) sb.Append(',');
+                    sb.Append("@k").Append(i);
+                    cmd.Parameters.AddWithValue("@k" + i, chunk[i]);
+                }
+                sb.Append(')');
+
+                cmd.CommandText = sb.ToString();
+                affected += cmd.ExecuteNonQuery();
+            }
+
+            tx.Commit();
+        }, ct).ContinueWith(t => affected, ct);
+    }
+
+    private static object? NullIfEmpty(string value) => value.Length == 0 ? null : value;
+
+    private static List<string> ParseJsonList(string json)
+    {
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>();
+        }
+        catch { return new List<string>(); }
+    }
+
     public Task SetAssetLutAsync(string assetId, string? lutId, CancellationToken ct = default)
     {
         if (string.IsNullOrEmpty(assetId)) return Task.CompletedTask;

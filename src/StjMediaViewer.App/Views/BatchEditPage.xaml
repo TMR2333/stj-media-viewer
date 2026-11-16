@@ -1,0 +1,349 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="StjMediaViewer.App.Views.BatchEditPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:vm="using:StjMediaViewer.App.ViewModels"
+    Background="{ThemeResource AppTransparentBrush}">
+
+    <Page.Resources>
+        <Style x:Key="FieldLabelStyle" TargetType="CheckBox">
+            <Setter Property="FontFamily" Value="{ThemeResource AppFontFamily}" />
+            <Setter Property="FontSize" Value="{ThemeResource AppFontCaptionSize}" />
+            <Setter Property="MinWidth" Value="132" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+        <Style x:Key="FieldBoxStyle" TargetType="TextBox">
+            <Setter Property="FontFamily" Value="{ThemeResource AppFontFamily}" />
+            <Setter Property="FontSize" Value="{ThemeResource AppFontCaptionSize}" />
+            <Setter Property="MinHeight" Value="30" />
+            <Setter Property="Padding" Value="8,5,8,5" />
+        </Style>
+    </Page.Resources>
+
+    <Grid Background="{ThemeResource AppSurfaceBrush}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- 页头 -->
+        <Grid Padding="24,18,24,10" ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Spacing="2">
+                <TextBlock Text="批量填写信息" Style="{ThemeResource AppTitleTextStyle}" />
+                <TextBlock Style="{ThemeResource AppCaptionTextStyle}" TextWrapping="Wrap"
+                           Text="左边挑要改哪些文件，右边勾上要写的字段并填值 —— 没勾的字段保持原样，不会覆盖。适合导卡 / 扫描之后一次性补日期、城市、分类等信息。" />
+                <TextBlock Text="{x:Bind ViewModel.SummaryText, Mode=OneWay}"
+                           Style="{ThemeResource AppMicroTextStyle}"
+                           Foreground="{ThemeResource TextTertiaryBrush}" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="12,2,12,2" MinHeight="30"
+                        Click="SelectAll_Click" ToolTipService.ToolTip="全部勾选 / 全部取消">
+                    <TextBlock Text="全选 / 全不选" Style="{ThemeResource AppCaptionTextStyle}" />
+                </Button>
+                <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="12,2,12,2" MinHeight="30"
+                        Click="Invert_Click">
+                    <TextBlock Text="反选" Style="{ThemeResource AppCaptionTextStyle}" />
+                </Button>
+            </StackPanel>
+        </Grid>
+
+        <!-- 左：文件列表 / 右：字段表单 -->
+        <Grid Grid.Row="1" Padding="24,0,24,10" ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="480" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Background="{ThemeResource AppSurfaceAltBrush}"
+                    BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                    BorderThickness="{ThemeResource AppCardStrokeThickness}"
+                    CornerRadius="{ThemeResource AppCardRadius}">
+                <Grid>
+                    <ListView x:Name="AssetList"
+                              ItemsSource="{x:Bind ViewModel.Items, Mode=OneWay}"
+                              SelectionMode="None"
+                              Padding="6">
+                        <ListView.ItemContainerStyle>
+                            <Style TargetType="ListViewItem">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                <Setter Property="Padding" Value="0" />
+                                <Setter Property="MinHeight" Value="0" />
+                                <Setter Property="CornerRadius" Value="{ThemeResource AppRadiusSmall}" />
+                            </Style>
+                        </ListView.ItemContainerStyle>
+                        <ListView.ItemTemplate>
+                            <DataTemplate x:DataType="vm:BatchAssetItem">
+                                <Grid Padding="8,6" ColumnSpacing="8" RowSpacing="1">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <CheckBox Grid.RowSpan="2" Grid.Column="0"
+                                              IsChecked="{x:Bind IsChecked, Mode=TwoWay}"
+                                              MinWidth="0"
+                                              VerticalAlignment="Center" />
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{x:Bind FileText, Mode=OneWay}"
+                                               Style="{ThemeResource AppCaptionTextStyle}"
+                                               Foreground="{ThemeResource TextPrimaryBrush}"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <Border Grid.Row="0" Grid.Column="2"
+                                            Background="{ThemeResource AccentSubtleBrush}"
+                                            CornerRadius="{ThemeResource AppRadiusPill}"
+                                            Padding="6,0" VerticalAlignment="Center">
+                                        <TextBlock Text="{x:Bind KindText}" Style="{ThemeResource AppMicroTextStyle}"
+                                                   Foreground="{ThemeResource AccentBrush}" />
+                                    </Border>
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2"
+                                               Text="{x:Bind MetaText, Mode=OneWay}"
+                                               Style="{ThemeResource AppMicroTextStyle}"
+                                               Foreground="{ThemeResource TextTertiaryBrush}"
+                                               TextTrimming="CharacterEllipsis" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+
+                    <TextBlock Text="这里还没有素材。回素材库框选一批，或从「导入」完成页点「填写这批文件的信息」。"
+                               Style="{ThemeResource AppCaptionTextStyle}"
+                               Foreground="{ThemeResource TextSecondaryBrush}"
+                               TextWrapping="Wrap" Margin="16" VerticalAlignment="Center"
+                               Visibility="{x:Bind ViewModel.EmptyVisibility, Mode=OneWay}" />
+                </Grid>
+            </Border>
+
+            <Border Grid.Column="1"
+                    Background="{ThemeResource AppSurfaceAltBrush}"
+                    BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                    BorderThickness="{ThemeResource AppCardStrokeThickness}"
+                    CornerRadius="{ThemeResource AppCardRadius}">
+                <ScrollViewer VerticalScrollMode="Enabled" VerticalScrollBarVisibility="Auto" Padding="16,12">
+                    <StackPanel Spacing="10">
+
+                        <!-- 拍摄时间 -->
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <CheckBox Content="拍摄时间" Style="{StaticResource FieldLabelStyle}"
+                                      IsChecked="{x:Bind ViewModel.UseCapturedAt, Mode=TwoWay}" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                <DatePicker Date="{x:Bind ViewModel.CapturedDate, Mode=TwoWay}" MinHeight="30" />
+                                <TimePicker Time="{x:Bind ViewModel.CapturedTime, Mode=TwoWay}" MinHeight="30"
+                                            ClockIdentifier="24HourClock" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- 地点 -->
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <CheckBox Content="地点" Style="{StaticResource FieldLabelStyle}"
+                                      IsChecked="{x:Bind ViewModel.UseLocation, Mode=TwoWay}" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                <TextBox Text="{x:Bind ViewModel.CountryText, Mode=TwoWay}" Width="130"
+                                         PlaceholderText="国家" Style="{StaticResource FieldBoxStyle}" />
+                                <TextBox Text="{x:Bind ViewModel.ProvinceText, Mode=TwoWay}" Width="130"
+                                         PlaceholderText="省份" Style="{StaticResource FieldBoxStyle}" />
+                                <TextBox Text="{x:Bind ViewModel.CityText, Mode=TwoWay}" Width="160"
+                                         PlaceholderText="城市" Style="{StaticResource FieldBoxStyle}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- 设备 -->
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <CheckBox Content="拍摄设备" Style="{StaticResource FieldLabelStyle}"
+                                      IsChecked="{x:Bind ViewModel.UseDevice, Mode=TwoWay}" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                <TextBox Text="{x:Bind ViewModel.CameraMakeText, Mode=TwoWay}" Width="150"
+                                         PlaceholderText="品牌（Sony）" Style="{StaticResource FieldBoxStyle}" />
+                                <TextBox Text="{x:Bind ViewModel.DeviceKeyText, Mode=TwoWay}" Width="220"
+                                         PlaceholderText="机型（Sony ZV-E10M2）" Style="{StaticResource FieldBoxStyle}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- 分类：主题 / 影调 -->
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <CheckBox Content="主题 / 影调" Style="{StaticResource FieldLabelStyle}"
+                                      IsChecked="{x:Bind ViewModel.UseTheme, Mode=TwoWay}" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                <TextBox Text="{x:Bind ViewModel.ThemeText, Mode=TwoWay}" Width="180"
+                                         PlaceholderText="主题（人像 / 风光 / 街头）" Style="{StaticResource FieldBoxStyle}" />
+                                <TextBox Text="{x:Bind ViewModel.ToneText, Mode=TwoWay}" Width="180"
+                                         PlaceholderText="影调（高调 / 低调 / 硬调）" Style="{StaticResource FieldBoxStyle}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- 已后期 -->
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <CheckBox Content="已后期" Style="{StaticResource FieldLabelStyle}"
+                                      IsChecked="{x:Bind ViewModel.UsePostProcess, Mode=TwoWay}" />
+                            <ComboBox Grid.Column="1" SelectedIndex="{x:Bind ViewModel.PostProcessIndex, Mode=TwoWay}"
+                                      MinWidth="180" MinHeight="30">
+                                <ComboBoxItem Content="未后期" Tag="0" />
+                                <ComboBoxItem Content="已后期" Tag="1" />
+                                <ComboBoxItem Content="未知" Tag="2" />
+                            </ComboBox>
+                        </Grid>
+
+                        <!-- Log -->
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <CheckBox Content="Log 素材" Style="{StaticResource FieldLabelStyle}"
+                                      IsChecked="{x:Bind ViewModel.UseLog, Mode=TwoWay}" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                <ComboBox SelectedIndex="{x:Bind ViewModel.LogIndex, Mode=TwoWay}"
+                                          MinWidth="120" MinHeight="30">
+                                    <ComboBoxItem Content="非 Log" Tag="0" />
+                                    <ComboBoxItem Content="是 Log" Tag="1" />
+                                </ComboBox>
+                                <TextBox Text="{x:Bind ViewModel.LogProfileText, Mode=TwoWay}" Width="180"
+                                         PlaceholderText="曲线（S-Log3 / V-Log）" Style="{StaticResource FieldBoxStyle}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- 评分 / 色标 / 选用 -->
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <CheckBox Content="评分 / 色标 / 选用" Style="{StaticResource FieldLabelStyle}"
+                                      IsChecked="{x:Bind ViewModel.UseRating, Mode=TwoWay}" />
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                <ComboBox SelectedIndex="{x:Bind ViewModel.RatingIndex, Mode=TwoWay}"
+                                          MinWidth="100" MinHeight="30">
+                                    <ComboBoxItem Content="0 星" />
+                                    <ComboBoxItem Content="1 星" />
+                                    <ComboBoxItem Content="2 星" />
+                                    <ComboBoxItem Content="3 星" />
+                                    <ComboBoxItem Content="4 星" />
+                                    <ComboBoxItem Content="5 星" />
+                                </ComboBox>
+                                <ComboBox SelectedIndex="{x:Bind ViewModel.ColorLabelIndex, Mode=TwoWay}"
+                                          MinWidth="110" MinHeight="30">
+                                    <ComboBoxItem Content="无色标" />
+                                    <ComboBoxItem Content="红" />
+                                    <ComboBoxItem Content="黄" />
+                                    <ComboBoxItem Content="绿" />
+                                    <ComboBoxItem Content="蓝" />
+                                    <ComboBoxItem Content="紫" />
+                                </ComboBox>
+                                <ComboBox SelectedIndex="{x:Bind ViewModel.PickIndex, Mode=TwoWay}"
+                                          MinWidth="100" MinHeight="30">
+                                    <ComboBoxItem Content="选用" />
+                                    <ComboBoxItem Content="废片" />
+                                </ComboBox>
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- 标题 / 说明 -->
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <CheckBox Content="标题 / 说明" Style="{StaticResource FieldLabelStyle}"
+                                      IsChecked="{x:Bind ViewModel.UseTitle, Mode=TwoWay}" />
+                            <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBox Text="{x:Bind ViewModel.TitleText, Mode=TwoWay}"
+                                         PlaceholderText="标题" Style="{StaticResource FieldBoxStyle}" />
+                                <TextBox Text="{x:Bind ViewModel.CaptionText, Mode=TwoWay}"
+                                         PlaceholderText="说明" TextWrapping="Wrap" MinHeight="56"
+                                         Style="{StaticResource FieldBoxStyle}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <!-- 关键词 -->
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <CheckBox Content="追加关键词" Style="{StaticResource FieldLabelStyle}"
+                                      IsChecked="{x:Bind ViewModel.UseKeywords, Mode=TwoWay}" />
+                            <TextBox Grid.Column="1" Text="{x:Bind ViewModel.KeywordsText, Mode=TwoWay}"
+                                     PlaceholderText="用逗号分隔，例如：街拍, 夜景, 索尼"
+                                     Style="{StaticResource FieldBoxStyle}" />
+                        </Grid>
+
+                        <Border Background="{ThemeResource AppSurfaceRaisedBrush}"
+                                BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                                BorderThickness="{ThemeResource AppCardStrokeThickness}"
+                                CornerRadius="{ThemeResource AppRadiusSmall}"
+                                Padding="10,8">
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="将要写入" Style="{ThemeResource AppMicroTextStyle}"
+                                           Foreground="{ThemeResource TextTertiaryBrush}" />
+                                <TextBlock Text="{x:Bind ViewModel.PatchText, Mode=OneWay}"
+                                           Style="{ThemeResource AppCaptionTextStyle}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+
+        <!-- 底部操作 -->
+        <Border Grid.Row="2"
+                Background="{ThemeResource AppSurfaceAltBrush}"
+                BorderBrush="{ThemeResource AppDividerBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="24,10">
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <ProgressRing Width="20" Height="20"
+                                  IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}"
+                                  Visibility="{x:Bind ViewModel.BusyVisibility, Mode=OneWay}"
+                                  Foreground="{ThemeResource AccentBrush}" />
+                    <TextBlock Text="{x:Bind ViewModel.BusyText, Mode=OneWay}"
+                               Style="{ThemeResource AppCaptionTextStyle}"
+                               Foreground="{ThemeResource TextSecondaryBrush}" />
+                </StackPanel>
+                <Button Grid.Column="1"
+                        Style="{ThemeResource AppSubtleButtonStyle}" Padding="14,4,14,4" MinHeight="32"
+                        Click="Apply_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE73E;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                        <TextBlock Text="写入勾选的素材" Style="{ThemeResource AppCaptionTextStyle}" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
+    </Grid>
+</Page>

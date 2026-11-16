@@ -202,6 +202,11 @@
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItem Content="时间线" Tag="timeline" Icon="Calendar" />
+                <NavigationViewItem Content="批量填写" Tag="batch">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE70F;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
                 <NavigationViewItem Content="LUT" Tag="lut">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE790;" />

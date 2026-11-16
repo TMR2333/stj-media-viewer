@@ -194,6 +194,36 @@ internal sealed class FallbackAssetStore : IAssetStore
         return Task.CompletedTask;
     }
 
+    public Task<int> ApplyBatchEditAsync(IReadOnlyList<string> assetIds, BatchEditPatch patch,
+        CancellationToken ct = default)
+    {
+        if (assetIds is null || patch is null) return Task.FromResult(0);
+        int n = 0;
+        foreach (var id in assetIds.Distinct())
+        {
+            var asset = _assets.FirstOrDefault(a => a.Id == id);
+            if (asset is null) continue;
+            if (patch.CapturedAt is { } t) asset.CapturedAt = t;
+            if (patch.City is not null) asset.City = patch.City.Length == 0 ? null : patch.City;
+            if (patch.Country is not null) asset.Country = patch.Country.Length == 0 ? null : patch.Country;
+            if (patch.Province is not null) asset.Province = patch.Province.Length == 0 ? null : patch.Province;
+            if (patch.CameraMake is not null) asset.CameraMake = patch.CameraMake.Length == 0 ? null : patch.CameraMake;
+            if (patch.DeviceKey is not null) asset.DeviceKey = patch.DeviceKey.Length == 0 ? null : patch.DeviceKey;
+            if (patch.Theme is not null) asset.Theme = patch.Theme.Length == 0 ? null : patch.Theme;
+            if (patch.Tone is not null) asset.Tone = patch.Tone.Length == 0 ? null : patch.Tone;
+            if (patch.PostProcess is { } pp) asset.PostProcess = (PostProcessState)pp;
+            if (patch.IsLog is { } isLog) asset.IsLog = isLog;
+            if (patch.LogProfile is not null) asset.LogProfile = patch.LogProfile.Length == 0 ? null : patch.LogProfile;
+            if (patch.Rating is { } r) asset.Rating = r;
+            if (patch.ColorLabel is not null) asset.ColorLabel = patch.ColorLabel.Length == 0 ? null : patch.ColorLabel;
+            if (patch.IsPick is { } pick) asset.IsPick = pick;
+            if (patch.Title is not null) asset.Title = patch.Title.Length == 0 ? null : patch.Title;
+            if (patch.Caption is not null) asset.Caption = patch.Caption.Length == 0 ? null : patch.Caption;
+            n++;
+        }
+        return Task.FromResult(n);
+    }
+
     public Task SetAssetLutAsync(string assetId, string? lutId, CancellationToken ct = default)
     {
         var asset = _assets.FirstOrDefault(a => a.Id == assetId);

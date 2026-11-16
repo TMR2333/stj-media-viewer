@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using StjMediaViewer.App.Services;
 using StjMediaViewer.App.ViewModels;
 using StjMediaViewer.Core.Util;
 using Windows.Storage.Pickers;
@@ -96,6 +97,26 @@ public sealed partial class ImportPage : Page
     private void OpenDestination_Click(object sender, RoutedEventArgs e) => OpenFolder(ViewModel.LastImportDestination);
 
     private async void Reimport_Click(object sender, RoutedEventArgs e) => await ViewModel.ReimportAsync();
+
+    /// <summary>把这批刚导入的素材带去批量填写页。</summary>
+    private void BatchEdit_Click(object sender, RoutedEventArgs e)
+    {
+        var paths = ImportViewModel.Shared.LastImportedPaths.ToList();
+        if (paths.Count == 0) return;
+        _ = LoadPendingIdsAsync(paths);
+        Frame.Navigate(typeof(BatchEditPage));
+    }
+
+    private static async Task LoadPendingIdsAsync(List<string> paths)
+    {
+        try
+        {
+            var ids = await AppServices.Store.GetIdsByPathsAsync(paths);
+            BatchEditViewModel.PendingIds.Clear();
+            BatchEditViewModel.PendingIds.AddRange(ids);
+        }
+        catch { /* 页面会回落到图库选择 */ }
+    }
 
     // ==================================================================================
     //  ⑤ 核验导出

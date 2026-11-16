@@ -31,6 +31,9 @@ public interface IAssetStore
 
     Task UpsertAsync(MediaAsset asset, CancellationToken ct = default);
     Task UpsertManyAsync(IEnumerable<MediaAsset> assets, CancellationToken ct = default);
+    /// <summary>批量填写分类 / 日期 / 城市等字段（null 字段不改动）。返回受影响的行数。</summary>
+    Task<int> ApplyBatchEditAsync(IReadOnlyList<string> assetIds, BatchEditPatch patch, CancellationToken ct = default);
+
     /// <summary>只更新某条素材选用的 LUT（null = 恢复自动匹配）。</summary>
     Task SetAssetLutAsync(string assetId, string? lutId, CancellationToken ct = default);
     Task DeleteAsync(IEnumerable<string> ids, CancellationToken ct = default);
