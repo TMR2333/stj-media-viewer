@@ -205,6 +205,9 @@ public static class AppServices
         Luts = new LutService(Settings, Decoder, Encoder);
         Warmup = new ThumbnailWarmup(Store, Thumbnails, Luts);
         Cloud = new CloudSyncService(store: Store, xmp: Xmp);
+        // 别把 App 自己的缓存/数据目录当素材同步（缩略图缓存被用户放进库里时也安全）
+        CloudSyncService.ExcludeDirectory(Path.Combine(Settings.AppDataDirectory, "Cache"));
+        CloudSyncService.ExcludeDirectory(ThumbnailCacheDirectory);
         CloudAuto = new CloudAutoSyncService(Settings, Cloud);
         Organizer = new OrganizerService(Settings.AppDataDirectory, Cloud);
 

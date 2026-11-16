@@ -162,6 +162,9 @@ public sealed class CloudSyncPlan
     public List<CloudSyncAction> Actions { get; set; } = new();
     public int LocalFileCount { get; set; }
     public int RemoteFileCount { get; set; }
+
+    /// <summary>本次比对时被忽略的系统/隐藏文件数（`._xxx`、`.DS_Store`、`@eaDir`、缓存目录等）。</summary>
+    public int IgnoredJunkFiles { get; set; }
     public long UploadBytes => Actions.Where(a => a.Kind == CloudActionKind.Upload ||
                                                   (a.Kind == CloudActionKind.Conflict && a.Resolution != CloudConflictPolicy.PreferRemote))
                                       .Sum(a => a.SizeBytes);
@@ -175,7 +178,8 @@ public sealed class CloudSyncPlan
     public bool IsEmpty => UploadCount == 0 && DownloadCount == 0 && ConflictCount == 0;
     public string Summary =>
         $"上传 {UploadCount} · 下载 {DownloadCount} · 冲突 {ConflictCount} · 已同步 {SkippedCount}" +
-        $"（本地 {LocalFileCount} 个 / 云端 {RemoteFileCount} 个）";
+        $"（本地 {LocalFileCount} 个 / 云端 {RemoteFileCount} 个）" +
+        (IgnoredJunkFiles > 0 ? $" · 已忽略系统文件 {IgnoredJunkFiles} 个" : "");
 }
 
 public sealed class CloudTransferResult

@@ -19,7 +19,77 @@ public sealed class CloudSyncService : ICloudSyncService
     /// <summary>允许同步的文件类型（媒体 + 边车）；用扩展名过滤而不是靠目录结构。</summary>
     private static readonly HashSet<string> SyncExtensions = BuildExtensions();
 
+    /// <summary>同步时忽略的系统垃圾文件名（Windows 缩略图缓存、macOS 索引文件等）。</summary>
+    private static readonly HashSet<string> JunkFileNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".DS_Store", "Thumbs.db", "ehthumbs.db", "desktop.ini", ".directory", "Icon", "_$folder$",
+    };
+
+    /// <summary>同步时忽略的目录名（NAS / 系统生成的索引目录）。</summary>
+    private static readonly HashSet<string> JunkDirNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "@eaDir", "#recycle", "$RECYCLE.BIN", "__MACOSX", ".Trashes", ".Spotlight-V100",
+        ".fseventsd", ".TemporaryItems", "node_modules", ".git", ".svn", ".vs",
+    };
+
+    /// <summary>额外排除的绝对目录（App 自己的缓存/数据目录，避免把缩略图缓存当素材同步）。</summary>
+    private static readonly List<string> ExcludedDirectories = new();
+
+    /// <summary>注册一个"不要同步"的目录（通常是缩略图缓存目录）。</summary>
+    public static void ExcludeDirectory(string? directory)
+    {
+        if (string.IsNullOrWhiteSpace(directory)) return;
+        try
+        {
+            var full = Path.GetFullPath(directory).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            lock (ExcludedDirectories)
+            {
+                if (!ExcludedDirectories.Contains(full, StringComparer.OrdinalIgnoreCase))
+                    ExcludedDirectories.Add(full);
+            }
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// 是否是"不该同步"的垃圾文件：
+    /// - macOS AppleDouble（`._DSC01172.jpg`）、以 '.' 开头的隐藏文件/目录；
+    /// - Windows 缩略图缓存（Thumbs.db / desktop.ini）、NAS 索引目录（@eaDir / #recycle …）。
+    /// </summary>
+    public static bool IsJunkRelativePath(string relativePath)
+    {
+        var path = relativePath.Replace('\\', '/');
+        foreach (var segment in path.Split('/', StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (segment.StartsWith("._", StringComparison.Ordinal)) return true;   // macOS AppleDouble
+            if (segment.StartsWith('.')) return true;                              // 隐藏文件 / 隐藏目录
+            if (JunkDirNames.Contains(segment)) return true;
+        }
+
+        return JunkFileNames.Contains(Path.GetFileName(path));
+    }
+
+    /// <summary>绝对路径是否落在被排除的目录里（App 缓存 / 数据目录）。</summary>
+    public static bool IsExcludedDirectory(string absolutePath)
+    {
+        if (ExcludedDirectories.Count == 0) return false;
+        var full = absolutePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        lock (ExcludedDirectories)
+        {
+            foreach (var excluded in ExcludedDirectories)
+            {
+                if (full.Equals(excluded, StringComparison.OrdinalIgnoreCase) ||
+                    full.StartsWith(excluded + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+        }
+        return false;
+    }
+
     private readonly Func<CloudTarget, ICloudStorage>? _storageFactory;
+
+    /// <summary>最近一次本机扫描时被忽略的垃圾文件数。</summary>
+    private int _ignoredJunk;
 
     /// <summary>
     /// <paramref name="storageFactory"/> 可注入自定义适配器（测试/未来加 S3、FTP 等）；
@@ -72,6 +142,7 @@ public sealed class CloudSyncService : ICloudSyncService
         progress?.Report(new CloudSyncProgress { Phase = "扫描本地目录" });
         var local = await Task.Run(() => ScanLocal(target, ct), ct).ConfigureAwait(false);
         plan.LocalFileCount = local.Count;
+        plan.IgnoredJunkFiles = _ignoredJunk;
 
         await using var storage = CreateStorage(target);
         progress?.Report(new CloudSyncProgress { Phase = $"连接云端（{target.DisplayKind}）" });
@@ -87,6 +158,16 @@ public sealed class CloudSyncService : ICloudSyncService
         {
             throw new IOException($"读取云端失败：{ex.Message}", ex);
         }
+
+        // 云端也过滤：早期版本可能已经把 ._xxx / Thumbs.db 之类传上去了，比对时直接忽略（不会主动删除）
+        var junkOnRemote = 0;
+        remote = remote.Where(e =>
+        {
+            if (e.IsDirectory) return false;
+            if (IsJunkRelativePath(e.RelativePath)) { junkOnRemote++; return false; }
+            return true;
+        }).ToList();
+        plan.IgnoredJunkFiles += junkOnRemote;
 
         if (target.Extensions is { Count: > 0 })
         {
@@ -184,8 +265,9 @@ public sealed class CloudSyncService : ICloudSyncService
                 : CloudConflictPolicy.PreferLocal,
         };
 
-    private static Dictionary<string, LocalFileInfo> ScanLocal(CloudTarget target, CancellationToken ct)
+    private Dictionary<string, LocalFileInfo> ScanLocal(CloudTarget target, CancellationToken ct)
     {
+        _ignoredJunk = 0;
         var root = Path.GetFullPath(target.LocalFolderPath);
         var result = new Dictionary<string, LocalFileInfo>(StringComparer.OrdinalIgnoreCase);
         var dirs = new Stack<string>();
@@ -205,7 +287,9 @@ public sealed class CloudSyncService : ICloudSyncService
             foreach (var sub in subs)
             {
                 var name = Path.GetFileName(sub);
-                if (name.StartsWith('.')) continue;
+                if (name.StartsWith('.')) { _ignoredJunk++; continue; }
+                if (JunkDirNames.Contains(name)) { _ignoredJunk++; continue; }
+                if (IsExcludedDirectory(sub)) { _ignoredJunk++; continue; }
                 dirs.Push(sub);
             }
 
@@ -216,12 +300,16 @@ public sealed class CloudSyncService : ICloudSyncService
             foreach (var file in files)
             {
                 ct.ThrowIfCancellationRequested();
+
+                // 系统垃圾 / 隐藏文件（._DSC01172.jpg、Thumbs.db、桌面缓存…）一律不同步
+                var rel = Path.GetRelativePath(root, file).Replace('\\', '/');
+                if (IsJunkRelativePath(rel)) { _ignoredJunk++; continue; }
+
                 var ext = Path.GetExtension(file);
                 if (allowed is not null ? !allowed.Contains(ext) : !SyncExtensions.Contains(ext)) continue;
                 try
                 {
                     var fi = new FileInfo(file);
-                    var rel = Path.GetRelativePath(root, file).Replace('\\', '/');
                     result[rel] = new LocalFileInfo(fi.Length, fi.LastWriteTimeUtc);
                 }
                 catch { }

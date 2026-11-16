@@ -70,6 +70,7 @@ public static partial class Program
             await Section("自定义类别", async () => await CheckCustomCategories(s));
             await Section("文件整理 / 群组作者 / 云同步来源", async () => await CheckOrganize(s, tempData));
             await Section("缓存清理", async () => await CheckCacheCleanup(s, tempData));
+            await Section("云同步过滤", async () => await CheckCloudJunkFilter(s, tempData));
             await Section("设置持久化", async () => await CheckSettings(s, tempData));
             await Section("AI 客户端(dry-run)", async () => await CheckAi(s));
             var aiUrl = ArgValue(args, "--ai-url");
