@@ -479,6 +479,37 @@
                             </StackPanel>
                         </Button>
                     </Grid>
+
+                    <!-- 后台全库预热：低并发把整库缩略图生成并落盘，之后滚动都走 0ms 缓存命中 -->
+                    <StackPanel Spacing="6">
+                        <Grid ColumnSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{x:Bind ViewModel.WarmupText, Mode=OneWay}"
+                                       Style="{ThemeResource AppCaptionTextStyle}"
+                                       VerticalAlignment="Center" TextWrapping="Wrap" />
+                            <Button Grid.Column="1" Style="{ThemeResource AppSubtleButtonStyle}"
+                                    AutomationProperties.AutomationId="WarmupButton"
+                                    Padding="12,2,12,2" MinHeight="30" Click="Warmup_Click"
+                                    ToolTipService.ToolTip="后台低优先级生成整库缩略图（可随时停止，下次继续）">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE896;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                                    <TextBlock Text="{x:Bind ViewModel.WarmupButtonText, Mode=OneWay}"
+                                               Style="{ThemeResource AppCaptionTextStyle}" />
+                                </StackPanel>
+                            </Button>
+                        </Grid>
+                        <ProgressBar Value="{x:Bind ViewModel.WarmupProgress, Mode=OneWay}"
+                                     Maximum="100"
+                                     Height="4"
+                                     Visibility="{x:Bind ViewModel.WarmupProgressVisibility, Mode=OneWay}" />
+                        <TextBlock Style="{ThemeResource AppMicroTextStyle}"
+                                   Foreground="{ThemeResource TextTertiaryBrush}"
+                                   TextWrapping="Wrap"
+                                   Text="预热只生成缩略图，不改素材；第二次打开或滚回已预热区间都是 0ms 命中。" />
+                    </StackPanel>
                 </StackPanel>
             </uic:SectionCard>
 

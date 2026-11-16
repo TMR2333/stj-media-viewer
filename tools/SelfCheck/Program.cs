@@ -62,6 +62,7 @@ public static partial class Program
             await Section("索引库查询", async () => await CheckStore(s));
             await Section("缩略图与图像分析", async () => await CheckThumbnails(s));
             await Section("图像解码完整性", async () => await CheckImageDecode(s));
+            await Section("缩略图预热", async () => await CheckWarmup(s));
             await Section("重复检测", async () => await CheckDuplicates(s));
             await Section("批量填写信息", async () => await CheckBatchEdit(s));
             await Section("调色筛选", async () => await CheckColorFilter(s));

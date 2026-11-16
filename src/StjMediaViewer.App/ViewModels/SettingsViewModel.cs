@@ -295,6 +295,13 @@ public sealed partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _cacheText = "";
 
+    // ---------------- 缩略图预热 ----------------
+    [ObservableProperty] private string _warmupText = "缩略图预热：未开始";
+    [ObservableProperty] private double _warmupProgress;
+    [ObservableProperty] private Visibility _warmupProgressVisibility = Visibility.Collapsed;
+    [ObservableProperty] private string _warmupButtonText = "后台预热整个库";
+    [ObservableProperty] private bool _warmupRunning;
+
     [ObservableProperty]
     private bool _isClearingCache;
 
@@ -796,6 +803,71 @@ public sealed partial class SettingsViewModel : ObservableObject
             Log.Warn("读取缓存大小失败", ex);
             CacheText = "缓存大小未知";
         }
+    }
+
+    // ---------------------------------------------------------------- 缩略图预热
+
+    /// <summary>开始/停止后台全库预热。</summary>
+    public void ToggleWarmup()
+    {
+        var warmup = AppServices.Warmup;
+        if (warmup.IsRunning)
+        {
+            warmup.Cancel();
+            WarmupRunning = false;
+            WarmupText = $"缩略图预热：已停止（{warmup.Done}/{Math.Max(warmup.Total, warmup.Done)}）";
+            WarmupButtonText = "继续预热";
+            WarmupProgressVisibility = Visibility.Collapsed;
+            return;
+        }
+
+        var dispatcher = App.MainWindow?.DispatcherQueue;
+        warmup.ProgressChanged -= OnWarmupProgress;
+        warmup.ProgressChanged += OnWarmupProgress;
+        warmup.Finished -= OnWarmupFinished;
+        warmup.Finished += OnWarmupFinished;
+
+        if (!warmup.Start()) return;
+        WarmupRunning = true;
+        WarmupButtonText = "停止预热";
+        WarmupProgressVisibility = Visibility.Visible;
+        WarmupProgress = 0;
+        WarmupText = "缩略图预热：准备中…";
+        AppEvents.SetStatus("已开始后台预热缩略图（低优先级，不抢前台）");
+    }
+
+    private void OnWarmupProgress(object? sender, EventArgs e)
+    {
+        var warmup = AppServices.Warmup;
+        var total = Math.Max(warmup.Total, 1);
+        var done = warmup.Done;
+        var failed = warmup.Failed;
+
+        var dispatcher = App.MainWindow?.DispatcherQueue;
+        void Apply()
+        {
+            WarmupProgress = Math.Clamp(done * 100.0 / total, 0, 100);
+            WarmupText = $"缩略图预热：{done}/{warmup.Total}" + (failed > 0 ? $"（失败 {failed}）" : "");
+        }
+
+        if (dispatcher is null) Apply();
+        else dispatcher.TryEnqueue(Apply);
+    }
+
+    private void OnWarmupFinished(object? sender, EventArgs e)
+    {
+        var warmup = AppServices.Warmup;
+        var dispatcher = App.MainWindow?.DispatcherQueue;
+        void Apply()
+        {
+            WarmupRunning = false;
+            WarmupButtonText = "后台预热整个库";
+            WarmupProgressVisibility = Visibility.Collapsed;
+            WarmupText = $"缩略图预热：完成 {warmup.Done}/{warmup.Total}" + (warmup.Failed > 0 ? $"（失败 {warmup.Failed}）" : "");
+            AppEvents.SetStatus($"缩略图预热完成：{warmup.Done} 张已就绪");
+        }
+        if (dispatcher is null) Apply();
+        else dispatcher.TryEnqueue(Apply);
     }
 
     public async Task ClearCacheAsync()

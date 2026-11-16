@@ -61,6 +61,9 @@ public static class AppServices
     // ---- LUT 调色 ----
     public static ILutService Luts { get; private set; } = null!;
 
+    // ---- 后台缩略图预热 ----
+    public static ThumbnailWarmup Warmup { get; private set; } = null!;
+
     /// <summary>密码加解密（DPAPI）：UI 只碰明文，落盘一律密文。</summary>
     public static class Secrets
     {
@@ -156,6 +159,7 @@ public static class AppServices
         Verify = new FileVerificationService();
         Transcode = new TranscodeService(Ffmpeg);
         Luts = new LutService(Settings, Decoder, Encoder);
+        Warmup = new ThumbnailWarmup(Store, Thumbnails, Luts);
         Cloud = new CloudSyncService();
         CloudAuto = new CloudAutoSyncService(Settings, Cloud);
 
@@ -194,6 +198,7 @@ public static class AppServices
         Verify = new FallbackVerificationService();
         Transcode = new FallbackTranscodeService();
         Luts = new FallbackLutService();
+        Warmup = new ThumbnailWarmup(Store, Thumbnails, Luts);
         Cloud = new FallbackCloudSyncService();
         CloudAuto = new CloudAutoSyncService(Settings, Cloud);
         return Task.CompletedTask;

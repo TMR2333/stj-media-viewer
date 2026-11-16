@@ -142,6 +142,12 @@ public sealed partial class SettingsPage : Page
 
     private async void ClearCache_Click(object sender, RoutedEventArgs e) => await ViewModel.ClearCacheAsync();
 
+    private void Warmup_Click(object sender, RoutedEventArgs e)
+    {
+        try { ViewModel.ToggleWarmup(); }
+        catch (Exception ex) { Core.Util.Log.Warn("启动缩略图预热失败", ex); }
+    }
+
     private async void SaveAll_Click(object sender, RoutedEventArgs e) => await ViewModel.SaveAsync();
 
     private void OpenLogFolder_Click(object sender, RoutedEventArgs e) => OpenFolder(ViewModel.AppDataPath, "stj-media-viewer.log");
