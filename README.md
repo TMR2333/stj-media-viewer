@@ -504,4 +504,8 @@ powershell -ExecutionPolicy Bypass -File tools/release.ps1 -Version 1.0.2 -Notes
 ```
 
 - 仓库：<https://gitcode.com/TMR2333/stj-media-viewer>
+- 发行版：<https://gitcode.com/TMR2333/stj-media-viewer/releases>
+  - v1.0.1：安装包 + 便携版（Release 附件直下）
+
+**每次更新都会：**改版本号 → 构建 → 提交 → 打 tag → 推送 → 建发行版并上传安装包/便携版。
 

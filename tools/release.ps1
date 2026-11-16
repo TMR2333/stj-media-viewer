@@ -63,23 +63,49 @@ try {
     }
 
     if ($env:GITCODE_TOKEN) {
-        Write-Host "[6/6] create GitCode release"
+        Write-Host "[6/7] create GitCode release"
         $repo = 'TMR2333/stj-media-viewer'
-        $body = @{
-            tag_name = "v$Version"
+        $api = "https://api.gitcode.com/api/v5/repos/$repo"
+        $tag = "v$Version"
+        $payload = @{
+            tag_name = $tag
             name     = "STJ Media Viewer v$Version"
             body     = if ($Notes) { $Notes } else { "STJ Media Viewer v$Version" }
+            target_commitish = 'master'
             prerelease = $false
         } | ConvertTo-Json -Depth 4
-        $uri = "https://api.gitcode.com/api/v5/repos/$repo/releases?access_token=$($env:GITCODE_TOKEN)"
+
+        # GitCode 的 JSON 接口会把裸 UTF-8 当本地代码页解码 -> 中文变乱码。
+        # 统一转义成 \uXXXX（纯 ASCII 请求体）后中文显示正常。
+        $escaped = [regex]::Replace($payload, '[^\x00-\x7F]', {
+            param($m) '\u{0:x4}' -f ([int][char]$m.Value)
+        })
         try {
-            $resp = Invoke-RestMethod -Method Post -Uri $uri -Body $body -ContentType 'application/json; charset=utf-8'
-            Write-Host ("release created: " + $resp.tag_name + " id=" + $resp.id)
+            $resp = Invoke-RestMethod -Method Post `
+                -Uri "$api/releases?access_token=$($env:GITCODE_TOKEN)" `
+                -Body ([System.Text.Encoding]::ASCII.GetBytes($escaped)) `
+                -ContentType 'application/json'
+            Write-Host ("release: " + $resp.tag_name)
         } catch {
             Write-Warning "release create failed: $($_.Exception.Message)"
         }
+
+        Write-Host "[7/7] upload release assets"
+        foreach ($file in Get-ChildItem (Join-Path $root 'dist') -Filter '*.exe' -ErrorAction SilentlyContinue) {
+            try {
+                $encodedName = [uri]::EscapeDataString($file.Name)
+                $info = Invoke-RestMethod -Method Get `
+                    -Uri "$api/releases/$tag/upload_url?access_token=$($env:GITCODE_TOKEN)&file_name=$encodedName"
+                $headers = @{}
+                $info.headers.PSObject.Properties | ForEach-Object { $headers[$_.Name] = [string]$_.Value }
+                $null = Invoke-WebRequest -Method Put -Uri $info.url -InFile $file.FullName -Headers $headers -TimeoutSec 3600
+                Write-Host ("  uploaded: " + $file.Name)
+            } catch {
+                Write-Warning ("  upload failed: " + $file.Name + " -> " + $_.Exception.Message)
+            }
+        }
     } else {
-        Write-Host "[6/6] GITCODE_TOKEN not set -> release skipped"
+        Write-Host "[6/7] GITCODE_TOKEN not set -> release skipped"
     }
 
     Write-Host "done: v$Version"
