@@ -29,4 +29,13 @@
   <ItemGroup>
     <Content Include="Assets\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+
+  <!-- WinUI 3 已知问题：dotnet publish 不会带走根目录的 App.xbf / MainWindow.xbf，
+       缺了它们发布版会在启动时直接崩（0xC00000FD）。这里补一份到发布目录。 -->
+  <Target Name="CopyXbfToPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <_XbfToCopy Include="$(TargetDir)*.xbf" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_XbfToCopy)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

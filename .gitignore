@@ -8,3 +8,7 @@ tools/ffmpeg/
 __pycache__/
 tools/SampleLibrary/out/
 .spike/
+dist/
+tools/Installer/payload.zip
+tools/Installer/bin/
+tools/Installer/obj/

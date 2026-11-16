@@ -297,6 +297,33 @@ ffmpeg 是可选的：把 `ffmpeg.exe` 放到 `tools/ffmpeg/bin/`（或 PATH）�
 
 想现场量化：设 `STJ_TRACE_THUMB=1` 启动，日志里会有 `[thumb] gen/hit/path-hit` 每张的耗时；`STJ_TRACE_DECODE=1` 还能看到 WIC 分段耗时。
 
+## 3.2 安装包与绿色版
+
+![安装后运行](shots/final-packaged.png)
+
+两个交付物（`dist/` 目录，构建脚本 `tools/Installer/build-installer.ps1` 一键重出）：
+
+| 产物 | 大小 | 说明 |
+| --- | --- | --- |
+| `STJMediaViewer-Setup.exe` | ≈132 MB | 安装包（单文件，**不需要管理员权限**）。双击 → 确认 → 安装 → 可直接启动；也可 `Setup.exe /S` 静默安装 |
+| `STJMediaViewer-1.0.0-portable-win-x64.zip` | ≈96 MB | 绿色版：解压到任意目录，双击 `StjMediaViewer.exe` 即用（自包含 .NET 10 + Windows App SDK 运行时，目标机不用装任何依赖） |
+
+**安装包做什么**：
+
+1. 释放 441 个文件到 `%LOCALAPPDATA%\Programs\StjMediaViewer`（用户目录，不走 UAC）；
+2. 创建开始菜单快捷方式 `STJ Media Viewer`；
+3. 注册 HKCU 卸载项 → Windows「应用和功能」里可直接卸载（`Setup.exe /uninstall`）；
+4. 安装前自动结束正在运行的旧实例；覆盖安装不会残留旧 DLL。
+
+**卸载**：开始菜单右键卸载，或 `Setup.exe /uninstall`（`/S /uninstall` 静默）。只删程序文件，**索引库 / 缩略图缓存 / 设置保留在** `%LOCALAPPDATA%\StjMediaViewer`（卸载时会提示，需彻底清理可手动删除该目录）。
+
+**技术要点（踩过的坑）**：
+
+- WinUI 3 `dotnet publish` 不会自动带走根目录的 `App.xbf` / `MainWindow.xbf`，缺了它们发布版启动即崩（`0xC00000FD`）→ 在 `StjMediaViewer.App.csproj` 里加了 `CopyXbfToPublish` 目标补上；
+- 安装器是自研单文件 exe（内嵌 96 MB zip 载荷），用 `HKCU` 卸载项 + `IShellLink` 建快捷方式，全程无管理员权限、无外部安装框架依赖；
+- 快捷方式 / 卸载项写入失败（组策略或受限环境）不影响安装完成，只记日志；安装日志写在安装包同目录的 `stj-setup.log`；
+- 发布只保留 `zh-Hans` / `en` 框架资源，日期选择器等系统控件保持中文。
+
 ## 4. 工程与验证
 
 ```
