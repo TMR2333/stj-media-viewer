@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using Microsoft.UI.Composition.SystemBackdrops;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
@@ -120,7 +121,38 @@ public sealed class WindowChromeService : IWindowChromeService
     {
         if (_window is null) return;
         ApplyBackdrop();
+        ApplyCaptionTheme();
         ApplyTitleBarColors();
+    }
+
+    // =====================================================================================
+    //  系统标题栏底色（DWM）：不管 AppWindowTitleBar 定制是否生效，
+    //  都让系统绘制的标题栏跟随 App 自己的明暗模式（否则浅色 App + 深色系统会出现黑条）。
+    // =====================================================================================
+
+    private const int DwmwaUseImmersiveDarkMode = 20;       // Win11 20H1+
+    private const int DwmwaUseImmersiveDarkModeBefore20H1 = 19;
+
+    [DllImport("dwmapi.dll", PreserveSig = true)]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
+
+    private void ApplyCaptionTheme()
+    {
+        if (_window is null) return;
+        try
+        {
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(_window);
+            if (hwnd == IntPtr.Zero) return;
+
+            var useDark = IsDarkTheme() ? 1 : 0;
+            var hr = DwmSetWindowAttribute(hwnd, DwmwaUseImmersiveDarkMode, ref useDark, sizeof(int));
+            if (hr != 0)
+                DwmSetWindowAttribute(hwnd, DwmwaUseImmersiveDarkModeBefore20H1, ref useDark, sizeof(int));
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("设置系统标题栏明暗失败", ex);
+        }
     }
 
     private void ApplyBackdrop()
@@ -212,8 +244,8 @@ public sealed class WindowChromeService : IWindowChromeService
             titleBar.ForegroundColor = palette.Foreground;
             titleBar.InactiveForegroundColor = palette.InactiveForeground;
 
-            titleBar.ButtonBackgroundColor = transparent;
-            titleBar.ButtonInactiveBackgroundColor = transparent;
+            titleBar.ButtonBackgroundColor = palette.Background;
+            titleBar.ButtonInactiveBackgroundColor = palette.Background;
             titleBar.ButtonForegroundColor = palette.Foreground;
             titleBar.ButtonInactiveForegroundColor = palette.InactiveForeground;
             titleBar.ButtonHoverBackgroundColor = palette.Hover;
@@ -253,9 +285,14 @@ public sealed class WindowChromeService : IWindowChromeService
             var hover = dark ? DarkHover : LightHover;
             var pressed = dark ? DarkPressed : LightPressed;
 
-            // Fluent：透明标题栏，让 Mica / Acrylic 透出来
+            // 标题栏底色用和顶栏一致的实色：透明标题栏在"App 浅色 + 系统深色"时
+            // 会透出深色 Mica，出现黑条，所以这里始终给实色（浅色白 / 深色 #202024）。
+            var background = dark
+                ? Color.FromArgb(255, 0x20, 0x20, 0x24)
+                : Color.FromArgb(255, 0xFF, 0xFF, 0xFF);
+
             return new TitleBarColors(
-                Transparent,
+                background,
                 foreground,
                 inactive,
                 hover,
