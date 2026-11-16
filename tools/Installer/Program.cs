@@ -1,7 +1,9 @@
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Security.Principal;
 using System.Text;
 using Microsoft.Win32;
 
@@ -18,8 +20,11 @@ namespace StjMediaViewer.Installer;
 ///
 ///   2) 便携版：解压到用户目录并直接启动，不写注册表、不建快捷方式
 ///        STJMediaViewer-Portable.exe            解压到 %LOCALAPPDATA%\StjMediaViewerPortable 并启动
-///        STJMediaViewer-Portable.exe /S         同上（无提示）
 ///        STJMediaViewer-Portable.exe /D=<dir>   解压到指定目录并启动
+///
+/// 权限策略：默认 asInvoker（装用户目录不需要管理员）；当目标目录不可写
+/// （例如 C:\Program Files）时，安装器会主动请求 UAC 提升，提权后以机器级
+/// 作用域写「所有用户」开始菜单快捷方式与 HKLM 卸载项。
 /// </summary>
 internal static class Program
 {
@@ -28,6 +33,10 @@ internal static class Program
     private const string Version = "1.0.0";
     private const string Publisher = "Stjarna Perspective";
     private const string ExeName = "StjMediaViewer.exe";
+    private const string UninstallSubKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\" + AppId;
+
+    /// <summary>true = 以管理员身份运行（或提权后重启的本进程），使用机器级作用域。</summary>
+    private static bool _machineWide;
 
     private static string DefaultInstallDir =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -37,15 +46,15 @@ internal static class Program
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "StjMediaViewerPortable");
 
-    private static string StartMenuLink =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Programs),
-            $"{AppName}.lnk");
+    private static string StartMenuDirectory => _machineWide
+        ? Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms)
+        : Environment.GetFolderPath(Environment.SpecialFolder.Programs);
 
-    private static string DesktopLink =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
-            $"{AppName}.lnk");
+    private static string DesktopDirectory => _machineWide
+        ? Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory)
+        : Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
 
-    private const string UninstallKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\" + AppId;
+    private static string StartMenuLink => Path.Combine(StartMenuDirectory, $"{AppName}.lnk");
 
     private static readonly string[] LogPaths =
     {
@@ -56,12 +65,13 @@ internal static class Program
     [STAThread]
     private static int Main(string[] args)
     {
-        Log($"start args=[{string.Join(" | ", args)}] exe={Environment.ProcessPath}");
+        _machineWide = IsAdministrator() || HasArg(args, "/elevated");
+        Log($"start args=[{string.Join(" | ", args)}] exe={Environment.ProcessPath} " +
+            $"admin={_machineWide} user={Environment.UserName}");
 
         var silent = HasArg(args, "/S") || HasArg(args, "/silent");
         var uninstall = HasArg(args, "/uninstall");
         var explicitDir = ArgValue(args, "/D");
-        // 便携版 = 文件名里带 portable 的那个 exe（同一个二进制，改名即换模式）
         var portable = HasArg(args, "/portable") ||
                        (Environment.ProcessPath?.Contains("portable", StringComparison.OrdinalIgnoreCase) ?? false);
 
@@ -88,7 +98,8 @@ internal static class Program
                 Log($"EnableVisualStyles skipped: {ex.GetType().Name}: {ex.Message}");
                 try { Application.SetCompatibleTextRenderingDefault(false); } catch { }
             }
-            using var form = new InstallerForm(explicitDir ?? DefaultInstallDir);
+
+            using var form = new InstallerForm(explicitDir ?? DefaultInstallDir, _machineWide);
             if (form.ShowDialog() != DialogResult.OK) return 0;
 
             var dir = form.SelectedDirectory;
@@ -112,7 +123,12 @@ internal static class Program
 
     private static int Install(bool silent, string targetDir, bool desktopShortcut)
     {
-        Log($"install -> {targetDir} (silent={silent}, desktop={desktopShortcut})");
+        Log($"install -> {targetDir} (silent={silent}, desktop={desktopShortcut}, admin={_machineWide})");
+
+        // 目标目录不可写（Program Files / 受策略保护的位置）时先请求提权，
+        // 不能干等着写文件失败再报错。
+        var elevated = EnsureWritableOrElevate(targetDir, silent, out var exitCode);
+        if (!elevated) return exitCode;
 
         StopRunningApp();
         Directory.CreateDirectory(targetDir);
@@ -121,13 +137,100 @@ internal static class Program
 
         TryStep("start menu shortcut", () => CreateShortcut(StartMenuLink, TargetExeIn(targetDir)));
         if (desktopShortcut)
-            TryStep("desktop shortcut", () => CreateShortcut(DesktopLink, TargetExeIn(targetDir)));
+            TryStep("desktop shortcut", () =>
+                CreateShortcut(Path.Combine(DesktopDirectory, $"{AppName}.lnk"), TargetExeIn(targetDir)));
         TryStep("uninstall registry entry", () => RegisterUninstallEntry(targetDir));
 
         if (!silent && Question($"安装完成：{targetDir}\n\n现在启动 {AppName} 吗？"))
             StartApp(targetDir);
 
         return 0;
+    }
+
+    /// <summary>检查目标目录是否可写；不可写则按需请求 UAC 提权后重启安装器。</summary>
+    private static bool EnsureWritableOrElevate(string targetDir, bool silent, out int exitCode)
+    {
+        exitCode = 0;
+        if (IsDirectoryWritable(targetDir)) return true;
+        if (_machineWide)
+        {
+            // 已经是管理员还不让写：目标位置被 ACL/策略锁死，换目录吧。
+            Log($"not writable even elevated: {targetDir}");
+            if (!silent) Error($"没有写入权限：{targetDir}\n\n请换一个可写目录（例如“文档”或桌面）。");
+            exitCode = 1;
+            return false;
+        }
+
+        if (!silent &&
+            !Question($"这个目录需要管理员权限才能写入：\n{targetDir}\n\n" +
+                      "要以管理员身份继续安装吗？（会弹出 UAC 确认；取消则换一个目录）"))
+        {
+            exitCode = 0;   // 用户选择不装，正常退出
+            return false;
+        }
+
+        Log("requesting elevation");
+        exitCode = ElevateAndRelaunch($"/S /elevated /D=\"{targetDir}\"");
+        return false;
+    }
+
+    private static int ElevateAndRelaunch(string arguments)
+    {
+        try
+        {
+            var startInfo = new ProcessStartInfo(Environment.ProcessPath ?? "")
+            {
+                UseShellExecute = true,
+                Verb = "runas",
+                Arguments = arguments,
+                WorkingDirectory = AppContext.BaseDirectory,
+            };
+            Process.Start(startInfo);
+            Log("elevated instance started");
+            return 0;
+        }
+        catch (Win32Exception ex) when (ex.NativeErrorCode == 1223)
+        {
+            Log("elevation cancelled by user");
+            Info("已取消管理员授权，安装未进行。\n可以换一个不需要管理员权限的目录（例如“文档”或桌面）。");
+            return 2;
+        }
+        catch (Exception ex)
+        {
+            Log($"elevation failed: {ex.Message}");
+            Error($"请求管理员权限失败：{ex.Message}\n\n请换一个可写目录，或右键安装包选择「以管理员身份运行」。");
+            return 1;
+        }
+    }
+
+    private static bool IsDirectoryWritable(string dir)
+    {
+        try
+        {
+            Directory.CreateDirectory(dir);
+            var probe = Path.Combine(dir, $".stj-write-probe-{Guid.NewGuid():N}");
+            using (var stream = File.Create(probe)) { stream.WriteByte(0); }
+            File.Delete(probe);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log($"write probe failed: {dir}: {ex.GetType().Name}");
+            return false;
+        }
+    }
+
+    private static bool IsAdministrator()
+    {
+        try
+        {
+            using var identity = WindowsIdentity.GetCurrent();
+            return new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static string TargetExeIn(string dir) => Path.Combine(dir, ExeName);
@@ -147,6 +250,7 @@ internal static class Program
 
         if (!upToDate)
         {
+            if (!EnsureWritableOrElevate(targetDir, silent, out var exitCode)) return exitCode;
             StopRunningApp();
             Directory.CreateDirectory(targetDir);
             ExtractPayload(targetDir, silent);
@@ -220,7 +324,8 @@ internal static class Program
 
     private static void RegisterUninstallEntry(string installDir)
     {
-        using var key = Registry.CurrentUser.CreateSubKey(UninstallKey);
+        var root = _machineWide ? Registry.LocalMachine : Registry.CurrentUser;
+        using var key = root.CreateSubKey(UninstallSubKey);
         key.SetValue("DisplayName", AppName);
         key.SetValue("DisplayVersion", Version);
         key.SetValue("Publisher", Publisher);
@@ -251,14 +356,7 @@ internal static class Program
 
     private static int Uninstall(bool silent, string? explicitDir)
     {
-        var installDir = explicitDir ?? DefaultInstallDir;
-        try
-        {
-            using var key = Registry.CurrentUser.OpenSubKey(UninstallKey);
-            if (explicitDir is null && key?.GetValue("InstallLocation") is string location && location.Length > 0)
-                installDir = location;
-        }
-        catch { }
+        var installDir = explicitDir ?? FindInstalledDirectory() ?? DefaultInstallDir;
 
         if (!Directory.Exists(installDir))
         {
@@ -272,23 +370,86 @@ internal static class Program
 
         StopRunningApp();
 
-        try { File.Delete(StartMenuLink); } catch { }
-        try { File.Delete(DesktopLink); } catch { }
-        try { Registry.CurrentUser.DeleteSubKeyTree(UninstallKey, throwOnMissingSubKey: false); } catch { }
-
-        try
+        // 用户级 / 机器级两套快捷方式与卸载项都清掉
+        foreach (var dir in new[]
+                 {
+                     Environment.GetFolderPath(Environment.SpecialFolder.Programs),
+                     Environment.GetFolderPath(Environment.SpecialFolder.CommonPrograms),
+                 })
         {
-            Directory.Delete(installDir, recursive: true);
+            try { File.Delete(Path.Combine(dir, $"{AppName}.lnk")); } catch { }
         }
-        catch (Exception ex)
+        foreach (var dir in new[]
+                 {
+                     Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+                     Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory),
+                 })
         {
-            Log($"uninstall failed: {ex.Message}");
-            if (!silent) Error($"删除安装目录失败：{ex.Message}\n请手动删除：{installDir}");
+            try { File.Delete(Path.Combine(dir, $"{AppName}.lnk")); } catch { }
+        }
+        foreach (var root in new[] { Registry.CurrentUser, Registry.LocalMachine })
+        {
+            try { root.DeleteSubKeyTree(UninstallSubKey, throwOnMissingSubKey: false); } catch { }
+        }
+
+        // 目录可能因权限删不掉：能删则删，删不掉就提示（不静默失败）
+        var removed = TryDeleteDirectory(installDir);
+        if (!removed)
+        {
+            Log($"directory delete failed: {installDir}");
+            if (!_machineWide && IsAdministrator() == false)
+            {
+                if (!silent &&
+                    Question($"安装目录需要管理员权限才能删除：\n{installDir}\n\n以管理员身份重新卸载吗？"))
+                    return ElevateAndRelaunch($"/S /elevated /uninstall /D=\"{installDir}\"");
+            }
+
+            if (!silent) Error($"删除安装目录失败，请手动删除：\n{installDir}");
             return 1;
         }
 
         if (!silent) Info("已卸载。感谢使用。");
         return 0;
+    }
+
+    private static bool TryDeleteDirectory(string dir)
+    {
+        try
+        {
+            Directory.Delete(dir, recursive: true);
+            return true;
+        }
+        catch
+        {
+            try
+            {
+                foreach (var file in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories))
+                {
+                    try { File.SetAttributes(file, FileAttributes.Normal); } catch { }
+                }
+                Directory.Delete(dir, recursive: true);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
+
+    private static string? FindInstalledDirectory()
+    {
+        foreach (var root in new[] { Registry.CurrentUser, Registry.LocalMachine })
+        {
+            try
+            {
+                using var key = root.OpenSubKey(UninstallSubKey);
+                if (key?.GetValue("InstallLocation") is string location && location.Length > 0)
+                    return location;
+            }
+            catch { }
+        }
+        return null;
     }
 
     // =====================================================================

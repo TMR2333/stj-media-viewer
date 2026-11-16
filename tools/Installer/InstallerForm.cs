@@ -14,10 +14,13 @@ internal sealed class InstallerForm : Form
 
     public bool CreateDesktopShortcut => _desktopCheck.Checked;
 
-    public InstallerForm(string defaultDirectory)
+    private readonly bool _elevated;
+
+    public InstallerForm(string defaultDirectory, bool elevated = false)
     {
+        _elevated = elevated;
         Text = "STJ Media Viewer 安装程序";
-        ClientSize = new Size(600, 258);
+        ClientSize = new Size(600, 270);
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -40,17 +43,27 @@ internal sealed class InstallerForm : Form
             ForeColor = Color.FromArgb(96, 96, 104),
         };
 
+        var scopeText = new Label
+        {
+            Text = _elevated
+                ? "当前以管理员身份运行：可安装到 Program Files 等受保护目录，快捷方式装给所有用户。"
+                : "当前为普通权限：默认装到你的用户目录（不需要 UAC）。选到受保护目录时会在安装前请求管理员授权。",
+            Location = new Point(22, 74),
+            Size = new Size(560, 18),
+            ForeColor = _elevated ? Color.FromArgb(0, 120, 60) : Color.FromArgb(96, 96, 104),
+        };
+
         var pathLabel = new Label
         {
             Text = "安装位置",
-            Location = new Point(22, 88),
+            Location = new Point(22, 98),
             AutoSize = true,
         };
 
         _pathBox = new TextBox
         {
             Text = defaultDirectory,
-            Location = new Point(24, 110),
+            Location = new Point(24, 120),
             Size = new Size(452, 26),
             Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right,
         };
@@ -58,7 +71,7 @@ internal sealed class InstallerForm : Form
         var browse = new Button
         {
             Text = "浏览…",
-            Location = new Point(484, 109),
+            Location = new Point(484, 119),
             Size = new Size(88, 28),
             Anchor = AnchorStyles.Top | AnchorStyles.Right,
         };
@@ -67,7 +80,7 @@ internal sealed class InstallerForm : Form
         _desktopCheck = new CheckBox
         {
             Text = "创建桌面快捷方式",
-            Location = new Point(24, 148),
+            Location = new Point(24, 158),
             AutoSize = true,
             Checked = false,
         };
@@ -76,7 +89,7 @@ internal sealed class InstallerForm : Form
         {
             Text = "卸载：Windows 设置 → 应用 → 已安装的应用（或再次运行本安装程序 → /uninstall）。\n" +
                    "用户数据（索引库、缩略图缓存、设置）保存在 %LOCALAPPDATA%\\StjMediaViewer，卸载不会删除。",
-            Location = new Point(24, 176),
+            Location = new Point(24, 186),
             Size = new Size(552, 40),
             ForeColor = Color.FromArgb(96, 96, 104),
         };
@@ -84,7 +97,7 @@ internal sealed class InstallerForm : Form
         var install = new Button
         {
             Text = "安装",
-            Location = new Point(392, 218),
+            Location = new Point(392, 228),
             Size = new Size(90, 30),
             DialogResult = DialogResult.None,
         };
@@ -93,7 +106,7 @@ internal sealed class InstallerForm : Form
         var cancel = new Button
         {
             Text = "取消",
-            Location = new Point(486, 218),
+            Location = new Point(486, 228),
             Size = new Size(90, 30),
             DialogResult = DialogResult.Cancel,
         };
@@ -103,7 +116,7 @@ internal sealed class InstallerForm : Form
 
         Controls.AddRange(new Control[]
         {
-            title, subtitle, pathLabel, _pathBox, browse, _desktopCheck, hint, install, cancel,
+            title, subtitle, scopeText, pathLabel, _pathBox, browse, _desktopCheck, hint, install, cancel,
         });
     }
 
