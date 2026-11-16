@@ -7,10 +7,10 @@
     Background="{ThemeResource AppTransparentBrush}">
 
     <ScrollViewer VerticalScrollMode="Enabled" VerticalScrollBarVisibility="Auto"
-                  HorizontalContentAlignment="Left"
+                  HorizontalContentAlignment="Stretch"
                   Background="{ThemeResource AppSurfaceBrush}"
                   Padding="{ThemeResource AppPagePadding}">
-        <StackPanel MaxWidth="1060" MinWidth="1012" HorizontalAlignment="Left" Spacing="16">
+        <StackPanel MaxWidth="1760" HorizontalAlignment="Left" Spacing="16">
 
             <!-- ============ 品牌区 ============ -->
             <Border Background="{ThemeResource AppSurfaceAltBrush}"

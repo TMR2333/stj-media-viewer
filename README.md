@@ -337,7 +337,7 @@ ffmpeg 是可选的：把 `ffmpeg.exe` 放到 `tools/ffmpeg/bin/`（或 PATH）�
 | 产物 | 大小 | 说明 |
 | --- | --- | --- |
 | `STJMediaViewer-Setup.exe` | ≈143 MB | **安装包**，带图形界面：可**自定义安装目录**、可选创建桌面快捷方式；装到用户目录，不需要管理员权限 |
-| `STJMediaViewer-1.0.0-portable.exe` | ≈143 MB | **便携版**：单文件，双击后解压到 `%LOCALAPPDATA%\StjMediaViewerPortable` 并直接启动；不写注册表、不建快捷方式 |
+| `STJMediaViewer-1.0.1-portable.exe` | ≈143 MB | **便携版**：单文件，双击后解压到 `%LOCALAPPDATA%\StjMediaViewerPortable` 并直接启动；不写注册表、不建快捷方式 |
 
 > 旧的 `*-portable-win-x64.zip` 已废弃：压缩包里的 exe 直接双击容易踩「没解压就在压缩包里运行 / SmartScreen 拦截」，
 > 现在改成**单文件便携 exe**，双击即用。
@@ -368,8 +368,8 @@ STJMediaViewer-Setup.exe                      交互式安装（选目录）
 STJMediaViewer-Setup.exe /S                   静默安装到默认目录
 STJMediaViewer-Setup.exe /S /D=D:\Apps\STJ  静默安装到指定目录
 STJMediaViewer-Setup.exe /uninstall           卸载（/S 静默；/D= 指定安装目录）
-STJMediaViewer-1.0.0-portable.exe            便携版：解压 + 启动
-STJMediaViewer-1.0.0-portable.exe /D=D:\STJ 便携版解压到指定目录
+STJMediaViewer-1.0.1-portable.exe            便携版：解压 + 启动
+STJMediaViewer-1.0.1-portable.exe /D=D:\STJ 便携版解压到指定目录
 ```
 
 **卸载**：Windows 设置 → 应用 → 已安装的应用（或 `Setup.exe /uninstall`）。
@@ -470,3 +470,38 @@ dotnet build tools/SelfCheck/StjMediaViewer.SelfCheck.csproj
 | [Fluent 2 设计规范](https://fluent2.microsoft.design/) · [WinUI 3 文档](https://learn.microsoft.com/windows/apps/winui/winui3/) | 界面设计语言与控件规范 | — |
 
 > 界面字体使用系统内置的 Segoe UI Variable / Segoe Fluent Icons，不额外分发第三方字体。
+
+### 3.4 响应式布局（窗口尺寸变化实时重排）
+
+![大窗口](shots/resp-wide.png)
+
+以前内容页把内容锁死在 1060～1240 DIP 并且强制 `MinWidth`：窗口放大后右边一大片空白，
+缩小后内容被裁切 —— 看起来像"控件没有针对可变大小重绘"。现在：
+
+| 区域 | 行为 |
+| --- | --- |
+| 内容页（设置 / 云同步 / 导入 / AI 队列 / 关于） | 随窗口拉伸，上限 1760 DIP 后保持左对齐；窗口变化立即重排 |
+| 素材库左侧筛选栏 | 窗口 < 1000 DIP 自动收起；工具条「筛选」可手动开合 |
+| 素材库右侧检视面板 | 窗口 < 1280 DIP 自动收起；「检视面板」可手动开合 |
+| 素材网格 | 卡片数量随可用宽度自动增减（虚拟化面板不变） |
+| 云同步状态 | 状态文本更新回到 UI 线程（修掉后台线程改 UI 的 `0x8001010E`） |
+
+小窗口（1000×700）自动收起两侧面板：
+
+![小窗口](shots/resp-narrow.png)
+
+### 3.5 版本号与发行流程
+
+当前版本 **v1.0.1**，历史见 [CHANGELOG.md](CHANGELOG.md)。
+
+- 规则：每次对外更新都 **+1 修订号**（`1.0.1` → `1.0.2` → …），同步改应用/安装器/便携版/macOS Info.plist；
+- 每次发版：`git tag v<版本>` + 推送到 GitCode + 创建发行版（Release）；
+- 一键脚本（版本、构建、提交、打标签、推送、创建发行版）：
+
+```powershell
+$env:GITCODE_TOKEN = "<你的 GitCode 访问令牌>"
+powershell -ExecutionPolicy Bypass -File tools/release.ps1 -Version 1.0.2 -Notes "本次更新内容"
+```
+
+- 仓库：<https://gitcode.com/TMR2333/stj-media-viewer>
+

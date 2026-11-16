@@ -7,7 +7,8 @@
     xmlns:vm="using:StjMediaViewer.App.ViewModels"
     xmlns:views="using:StjMediaViewer.App.Views"
     Background="{ThemeResource AppTransparentBrush}"
-    NavigationCacheMode="Required">
+    NavigationCacheMode="Required"
+    SizeChanged="Page_SizeChanged">
 
     <Page.Resources>
         <!-- ================= 列表容器：去掉默认内边距，卡片自己控制留白 ================= -->
@@ -508,6 +509,12 @@
                     </StackPanel>
 
                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <ToggleButton x:Name="FilterToggle"
+                                  Style="{StaticResource CompactToggleStyle}"
+                                  Content="筛选"
+                                  IsChecked="True"
+                                  Click="FilterToggle_Click"
+                                  VerticalAlignment="Center" />
                     <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="12,2,12,2" MinHeight="30"
                             Click="BatchEdit_Click"
                             ToolTipService.ToolTip="给选中的素材批量填日期 / 城市 / 分类等信息">
@@ -537,13 +544,14 @@
              ================================================================== -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="248" />
+                <ColumnDefinition x:Name="FilterColumn" Width="248" />
                 <ColumnDefinition Width="*" />
                 <ColumnDefinition x:Name="InspectorColumn" Width="348" />
             </Grid.ColumnDefinitions>
 
             <!-- 左侧筛选栏 -->
-            <Border Grid.Column="0"
+            <Border x:Name="FilterHost"
+                    Grid.Column="0"
                     Background="{ThemeResource AppSurfaceBrush}"
                     BorderBrush="{ThemeResource AppDividerBrush}"
                     BorderThickness="0,0,1,0">

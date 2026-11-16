@@ -12,8 +12,8 @@
     -->
     <Grid Background="{ThemeResource AppWindowBackgroundBrush}">
         <ScrollViewer VerticalScrollMode="Enabled" VerticalScrollBarVisibility="Auto"
-                  HorizontalContentAlignment="Left" Padding="24,18,24,24">
-            <StackPanel Spacing="16" MaxWidth="1240" MinWidth="1180" HorizontalAlignment="Left">
+                  HorizontalContentAlignment="Stretch" Padding="24,18,24,24">
+            <StackPanel Spacing="16" MaxWidth="1760" HorizontalAlignment="Left">
 
                 <!-- ============ 标题 ============ -->
                 <Grid>

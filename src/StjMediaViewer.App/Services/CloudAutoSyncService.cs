@@ -1,3 +1,4 @@
+using Microsoft.UI.Dispatching;
 using StjMediaViewer.Core.Abstractions;
 using StjMediaViewer.Core.Models;
 using StjMediaViewer.Core.Util;
@@ -20,10 +21,14 @@ public sealed class CloudAutoSyncService : IDisposable
     private Task? _loop;
     private bool _disposed;
 
+    /// <summary>创建时所在线程（UI 线程）的调度器，用来把后台状态更新搬回 UI。</summary>
+    private readonly DispatcherQueue? _ui;
+
     public CloudAutoSyncService(ISettingsService settings, ICloudSyncService cloud)
     {
         _settings = settings;
         _cloud = cloud;
+        _ui = DispatcherQueue.GetForCurrentThread();
     }
 
     public bool IsRunning { get; private set; }

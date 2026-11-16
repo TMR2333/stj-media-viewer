@@ -47,7 +47,8 @@ public sealed partial class LibraryPage : Page
     {
         AttachEvents();
         ApplyDensity(_density);
-        ApplyInspectorVisibility(_inspectorVisible);
+        // 首次布局后按当前窗口尺寸决定三栏开合（之前用固定 true，会在窄窗口把检视面板顶出来）
+        ApplyResponsiveLayout(WindowWidth);
 
         if (!_initializedOnce)
         {
@@ -308,12 +309,67 @@ public sealed partial class LibraryPage : Page
         Frame.Navigate(typeof(BatchEditPage));
     }
 
+    // ==================================================================================
+    //  自适应布局：窗口尺寸变化时实时重排（不依赖页面切换/重启）
+    // ==================================================================================
+    private bool _filterVisible = true;
+    private bool _filterAutoHidden;
+    private bool _inspectorAutoHidden;
+
+    /// <summary>宽度断点：< 1000 收起筛选栏，< 1280 收起检视面板；变宽后恢复用户自己的选择。</summary>
+    private void Page_SizeChanged(object sender, SizeChangedEventArgs e) => ApplyResponsiveLayout(WindowWidth);
+
+    /// <summary>窗口内容宽度（DIP）。页面被三栏分割后 ActualWidth 会骗人，所以用 XamlRoot。</summary>
+    private double WindowWidth => XamlRoot?.Size.Width ?? ActualWidth;
+
+    private void ApplyResponsiveLayout(double width)
+    {
+        // 只改"当前渲染状态"，不动用户偏好（否则自动收起会把偏好也改掉，变宽后回不来）。
+        bool wantFilterHidden = width < 1000;
+        if (wantFilterHidden != _filterAutoHidden)
+        {
+            _filterAutoHidden = wantFilterHidden;
+            RenderFilterVisibility(wantFilterHidden ? false : _filterVisible);
+        }
+
+        bool wantInspectorHidden = width < 1280;
+        if (wantInspectorHidden != _inspectorAutoHidden)
+        {
+            _inspectorAutoHidden = wantInspectorHidden;
+            RenderInspectorVisibility(wantInspectorHidden ? false : _inspectorVisible);
+        }
+    }
+
+    private void FilterToggle_Click(object sender, RoutedEventArgs e)
+    {
+        _filterVisible = FilterToggle.IsChecked == true;
+        ApplyFilterVisibility(_filterVisible);
+    }
+
+    private void ApplyFilterVisibility(bool visible)
+    {
+        _filterVisible = visible;
+        RenderFilterVisibility(visible);
+    }
+
+    private void RenderFilterVisibility(bool visible)
+    {
+        FilterToggle.IsChecked = visible;
+        FilterHost.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
+        FilterColumn.Width = visible ? new GridLength(248) : new GridLength(0);
+    }
+
     private void InspectorToggle_Click(object sender, RoutedEventArgs e) =>
         ApplyInspectorVisibility(InspectorToggle.IsChecked == true);
 
     private void ApplyInspectorVisibility(bool visible)
     {
         _inspectorVisible = visible;
+        RenderInspectorVisibility(visible);
+    }
+
+    private void RenderInspectorVisibility(bool visible)
+    {
         InspectorToggle.IsChecked = visible;
         InspectorHost.Visibility = visible ? Visibility.Visible : Visibility.Collapsed;
         InspectorColumn.Width = visible ? new GridLength(348) : new GridLength(0);
