@@ -79,6 +79,8 @@ public static partial class Program
             await Section("外部存储设备", async () => await CheckDevices(s));
             await Section("JPG+RAW 配对导入", async () => await CheckImport(s, tempData));
             await Section("导入/导出核验", async () => await CheckVerifyPairs(s, tempData));
+            await Section("云同步（本地挂载目录）", async () => await CheckCloudLocalSync(s, tempData));
+            await Section("WebDAV 云同步", async () => await CheckWebDav(s));
             await Section("视频编码与转码", async () => await CheckTranscode(s, libraryPath, tempData));
             await Section("LUT 调色", async () => await CheckLuts(s, tempData));
             if (!quick) await Section("性能: 1000 条 upsert", async () => await CheckPerf(s));

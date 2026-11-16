@@ -269,6 +269,7 @@ public sealed partial class ShellPage : Page
         "lut" => typeof(LutPage),
         "batch" => typeof(BatchEditPage),
         "duplicates" => typeof(DuplicatesPage),
+        "cloud" => typeof(CloudPage),
         "aiqueue" => typeof(AiQueuePage),
         "settings" => typeof(SettingsPage),
         "about" => typeof(AboutPage),

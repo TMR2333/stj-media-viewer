@@ -193,6 +193,13 @@ public sealed class JsonSettingsService : ISettingsService
 
     // ---------------------------- 规范化 / 迁移 ----------------------------
 
+    /// <summary>早期版本自带过的示例云同步目标 id；读设置时静默清掉，避免界面上一直挂着一个"自带实例"。</summary>
+    private static readonly HashSet<string> DemoCloudTargetIds = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "demo-nutstore",
+        "demo-nas",
+    };
+
     private static AppSettings Normalize(AppSettings s)
     {
         s.Ai ??= new AiSettings();
@@ -224,6 +231,10 @@ public sealed class JsonSettingsService : ISettingsService
         ai.MaxRetries = Math.Clamp(ai.MaxRetries, 0, 8);
         ai.DailyCallLimit = Math.Max(0, ai.DailyCallLimit);
         ai.ExtraHeaders ??= new Dictionary<string, string>();
+
+        // 清理自带示例同步目标（只删这两个固定 id，不动用户自己建的目标）
+        s.CloudTargets ??= new List<CloudTarget>();
+        s.CloudTargets.RemoveAll(t => t is not null && DemoCloudTargetIds.Contains(t.Id));
 
         s.Grid.CardSize = Math.Clamp(s.Grid.CardSize <= 0 ? 220 : s.Grid.CardSize, 80, 640);
         s.Grid.ThumbnailQuality = Math.Clamp(s.Grid.ThumbnailQuality <= 0 ? 320 : s.Grid.ThumbnailQuality, 96, 2048);

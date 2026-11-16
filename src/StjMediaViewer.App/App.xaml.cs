@@ -74,6 +74,17 @@ public partial class App : Application
             AppServices.WindowChrome.Configure(MainWindow);
             await AppServices.Design.ApplySavedAsync();
 
+            // 云同步后台调度：目标就绪后开始轮询 + 监听本地变更（自动同步只有目标开了 AutoSync 才真正跑）
+            try
+            {
+                AppServices.CloudAuto.RefreshTargets();
+                if (AppServices.Settings.Current.CloudAutoSyncEnabled) AppServices.CloudAuto.Start();
+            }
+            catch (Exception cloudEx)
+            {
+                Core.Util.Log.Warn("启动云同步调度失败", cloudEx);
+            }
+
             ScreenCapture.ScheduleIfRequested(MainWindow);
         }
         catch (Exception ex)

@@ -187,7 +187,20 @@
 - 语义：文本字段**留空 = 不改动**；要清空已有值就写上内容再删掉（提交空串），自检覆盖了"未勾选字段保持不变 / 空值清空 / 空 patch 不写库"三种情况。
 - 实现：`IAssetStore.ApplyBatchEditAsync(ids, BatchEditPatch)` 在**单个事务**里用一条动态 UPDATE 写完所有字段（含关键词 JSON 合并），并刷新 `captured_day` / `city_source` 等派生列；写完同时失效缩略图缓存并刷新图库。
 
-### 2.7 视频编码识别与转码 / 压缩
+### 2.7 云同步（坚果云 / Nextcloud / 群晖 NAS / 任意挂载目录）
+
+![云同步页](shots/final-cloud.png)
+
+- **不预置示例目标**：云同步页初始是空的，只保留你自己创建的目标（早期版本写入的 `demo-nutstore` / `demo-nas` 示例会被自动清掉）。
+- **两种接入方式**：`WebDAV`（坚果云、Nextcloud/ownCloud、群晖 DSM、威联通 QTS，自定义地址/账号/应用密码/云端子目录）与`本地挂载目录`（OneDrive、坚果云客户端目录、SMB 映射盘、已挂载 NAS）；同步路径、方向、冲突策略都可在界面里改。
+- **双向 / 单向**：双向（两边互补）、仅上传（本地→云端）、仅下载（云端→本地，云端照片自动落到本地图库目录）；默认**永不删除**任何一端的文件，只补齐缺失与传输变更。
+- **冲突策略**：较新者胜（默认）/ 本地优先 / 云端优先 / 两边都保留（本地另存 `xxx (本地 时间戳).jpg`、云端另存 `xxx (云端 时间戳).jpg`）。
+- **先预览再执行**：差异计划（上传 x / 下载 y / 冲突 z + 逐条明细）→ 演练（dry-run，不落盘）→ 正式执行；进度条 + 逐文件失败明细。
+- **自动同步**：后台按轮询间隔（默认 5 分钟）检查，本地目录变化由 `FileSystemWatcher` 5 秒抖动合并触发；同一目标不会并发跑两轮；传输后可逐文件哈希核验（本地目录目标用 SHA-256 双边比对，WebDAV 用大小 + 回列校验）。
+- **凭据安全**：WebDAV 密码用 Windows DPAPI（当前用户域）加密后存 settings.json，明文不落盘。
+- 实现细节：`Core/Cloud/` 里 `ICloudStorage` 把协议抹平（`WebDavCloudStorage` 用 `PROPFIND Depth:1` 逐层下钻 + Basic 认证 + 分段 URL 编码；`LocalFolderCloudStorage` 走文件系统），`CloudSyncService` 只做一次"本地索引 ↔ 云端条目"比对再分发动作，所以以后加 S3/FTP 只需再写一个适配器。
+
+### 2.8 视频编码识别与转码 / 压缩
 
 - **编码显示**：视频卡片与检视面板显示归一化编码（`avc1/h264/x264` → **H.264 / AVC**，`hev1/hvc1/hevc` → **H.265 / HEVC**，另有 AV1 / VP9 / ProRes / DNxHR / Dolby Vision / MPEG-4/2 等），一眼看出是否需要转码。
 - **探测**：不依赖 ffprobe —— 直接解析 `ffmpeg -i` 的流信息，拿到编码、分辨率、码率、时长、帧率、位深、像素格式、HDR（HLG/PQ）、音轨、旋转。
@@ -197,7 +210,7 @@
 - **执行与校验**：实时进度（已处理时长、倍速、剩余 ETA）、完成后**重新解析输出**确认编码/分辨率正确，并给出"体积从 x 到 y、减少 z%"；输出文件名自动带 `_hevc1080p` 之类的后缀，避免覆盖原件。
 - **批处理**：`ITranscodeService.TranscodeManyAsync` 支持批量（进度按文件数加权），供后续"选中多个视频一起压"使用。
 
-### 2.7.1 视频 LUT 与自动调色
+### 2.8.1 视频 LUT 与自动调色
 
 ![视频 LUT](shots/final-lut.png)
 
@@ -210,7 +223,7 @@
 - **缓存按 LUT 分桶**：缩略图缓存键带 LUT 哈希（`..._320_lut1e38023.jpg`），切换 LUT 不会互相覆盖，也不会重复解码。
 - 实现：`Core/Color/` 下 `CubeLut`（解析 + 三线性插值）、`LutApplier`（BGRA 帧调色）、`BuiltInLuts`（公式生成）、`LutCatalog`（分类 / Sony 自动匹配）、`LutService`（目录扫描、导入、预渲染）。自检 19 项覆盖生成、解析、应用、分类与自动匹配。
 
-### 2.8 画廊视图（Apple Photos / Camera Raw 风格）
+### 2.9 画廊视图（Apple Photos / Camera Raw 风格）
 
 ![画廊视图](shots/final-gallery.png)
 
@@ -220,7 +233,7 @@
 - **复用现有能力**：数据源是素材库的**当前筛选条件**（搜索 / 分面 / 分组都继承），右侧内嵌同一个检视面板（元数据 + 手工分类 + 保存 / AI / XMP），视频可直接转码压缩，快速编辑立即落库。
 - 解码只取当前一张（2400px），切换时取消上一张请求；胶片带缩略图走同一套磁盘缓存，4000+ 张的库翻页也不掉帧。
 
-### 2.9 关于页
+### 2.10 关于页
 
 品牌署名 **Stjarna PERSPECTIVE 出品 / co-worked with DeepSeek Harness**，含 logo、版本与环境信息（.NET / Windows 版本 / 构建日期）、技术栈与第三方许可清单，以及四张项目表情包（随仓库分发）。
 
@@ -325,7 +338,7 @@ ffmpeg 是可选的：把 `ffmpeg.exe` 放到 `tools/ffmpeg/bin/`（或 PATH）�
 | 产物 | 大小 | 说明 |
 | --- | --- | --- |
 | `STJMediaViewer-Setup.exe` | ≈143 MB | **安装包**，带图形界面：可**自定义安装目录**、可选创建桌面快捷方式；装到用户目录，不需要管理员权限 |
-| `STJMediaViewer-1.0.2-portable.exe` | ≈143 MB | **便携版**：单文件，双击后解压到 `%LOCALAPPDATA%\StjMediaViewerPortable` 并直接启动；不写注册表、不建快捷方式 |
+| `STJMediaViewer-1.0.3-portable.exe` | ≈143 MB | **便携版**：单文件，双击后解压到 `%LOCALAPPDATA%\StjMediaViewerPortable` 并直接启动；不写注册表、不建快捷方式 |
 
 > 旧的 `*-portable-win-x64.zip` 已废弃：压缩包里的 exe 直接双击容易踩「没解压就在压缩包里运行 / SmartScreen 拦截」，
 > 现在改成**单文件便携 exe**，双击即用。
@@ -356,8 +369,8 @@ STJMediaViewer-Setup.exe                      交互式安装（选目录）
 STJMediaViewer-Setup.exe /S                   静默安装到默认目录
 STJMediaViewer-Setup.exe /S /D=D:\Apps\STJ  静默安装到指定目录
 STJMediaViewer-Setup.exe /uninstall           卸载（/S 静默；/D= 指定安装目录）
-STJMediaViewer-1.0.2-portable.exe            便携版：解压 + 启动
-STJMediaViewer-1.0.2-portable.exe /D=D:\STJ 便携版解压到指定目录
+STJMediaViewer-1.0.3-portable.exe            便携版：解压 + 启动
+STJMediaViewer-1.0.3-portable.exe /D=D:\STJ 便携版解压到指定目录
 ```
 
 **卸载**：Windows 设置 → 应用 → 已安装的应用（或 `Setup.exe /uninstall`）。
@@ -468,10 +481,11 @@ dotnet build tools/SelfCheck/StjMediaViewer.SelfCheck.csproj
 
 | 区域 | 行为 |
 | --- | --- |
-| 内容页（设置 / 导入 / AI 队列 / 关于） | 随窗口拉伸，上限 1760 DIP 后保持左对齐；窗口变化立即重排 |
+| 内容页（设置 / 云同步 / 导入 / AI 队列 / 关于） | 随窗口拉伸，上限 1760 DIP 后保持左对齐；窗口变化立即重排 |
 | 素材库左侧筛选栏 | 窗口 < 1000 DIP 自动收起；工具条「筛选」可手动开合 |
 | 素材库右侧检视面板 | 窗口 < 1280 DIP 自动收起；「检视面板」可手动开合 |
 | 素材网格 | 卡片数量随可用宽度自动增减（虚拟化面板不变） |
+| 云同步状态 | 状态文本更新回到 UI 线程（修掉后台线程改 UI 的 `0x8001010E`） |
 
 小窗口（1000×700）自动收起两侧面板：
 
@@ -479,20 +493,20 @@ dotnet build tools/SelfCheck/StjMediaViewer.SelfCheck.csproj
 
 ### 3.5 版本号与发行流程
 
-当前版本 **v1.0.2**，历史见 [CHANGELOG.md](CHANGELOG.md)。
+当前版本 **v1.0.3**，历史见 [CHANGELOG.md](CHANGELOG.md)。
 
-- 规则：每次对外更新都 **+1 修订号**（`1.0.1` → `1.0.2` → …），同步改应用/安装器/便携版/macOS Info.plist；
+- 规则：每次对外更新都 **+1 修订号**（`1.0.2` → `1.0.3` → …），同步改应用/安装器/便携版/macOS Info.plist；
 - 每次发版：`git tag v<版本>` + 推送到 GitCode + 创建发行版（Release）；
 - 一键脚本（版本、构建、提交、打标签、推送、创建发行版）：
 
 ```powershell
 $env:GITCODE_TOKEN = "<你的 GitCode 访问令牌>"
-powershell -ExecutionPolicy Bypass -File tools/release.ps1 -Version 1.0.2 -Notes "本次更新内容"
+powershell -ExecutionPolicy Bypass -File tools/release.ps1 -Version 1.0.4 -Notes "本次更新内容"
 ```
 
 - 仓库：<https://gitcode.com/TMR2333/stj-media-viewer>
 - 发行版：<https://gitcode.com/TMR2333/stj-media-viewer/releases>
-  - v1.0.2：安装包 + 便携版（Release 附件直下）
+  - v1.0.3：安装包 + 便携版（Release 附件直下）
 
 **每次更新都会：**改版本号 → 构建 → 提交 → 打 tag → 推送 → 建发行版并上传安装包/便携版。
 

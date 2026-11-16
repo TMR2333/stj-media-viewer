@@ -181,7 +181,7 @@
                         <TextBlock Style="{ThemeResource AppCaptionTextStyle}"
                                    Foreground="{ThemeResource TextSecondaryBrush}"
                                    TextWrapping="Wrap"
-                                   Text="stj-media-viewer 是一个 Windows 原生（WinUI 3）素材管理工具：递归扫描媒体库、解析元数据、按九个维度自动 / 人工 / AI 分类，提供画廊视图、时间线、重复项、导入核验与转码压缩。" />
+                                   Text="stj-media-viewer 是一个 Windows 原生（WinUI 3）素材管理工具：递归扫描媒体库、解析元数据、按九个维度自动 / 人工 / AI 分类，提供画廊视图、时间线、重复项、导入核验、转码压缩与云同步。" />
                         <TextBlock Style="{ThemeResource AppCaptionTextStyle}"
                                    Foreground="{ThemeResource TextSecondaryBrush}"
                                    TextWrapping="Wrap"
