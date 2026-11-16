@@ -297,6 +297,22 @@ ffmpeg 是可选的：把 `ffmpeg.exe` 放到 `tools/ffmpeg/bin/`（或 PATH）�
 
 想现场量化：设 `STJ_TRACE_THUMB=1` 启动，日志里会有 `[thumb] gen/hit/path-hit` 每张的耗时；`STJ_TRACE_DECODE=1` 还能看到 WIC 分段耗时。
 
+## 3.3 macOS 版（SwiftUI 原生）
+
+Windows 主版本用 WinUI 3；macOS 版是独立的 SwiftUI 原生应用，见 [`macos/README.md`](macos/README.md)。
+
+- **当前阶段 P1 = 只读素材库浏览器**：读同一份 `catalog.db` + 缩略图缓存，原生三栏界面、
+  筛选/搜索/排序、检视面板、拖出到其他软件；不做写库与导入（P2–P5 见路线图）。
+- **产物是 `.dmg`**，但**必须在 macOS 上构建**（Windows 无法编译出 Mach-O / 无法签名）：
+  ```bash
+  bash macos/scripts/build-dmg.sh          # 产出 macos/dist/STJMediaViewer-1.0.0-macos-arm64-x86_64.dmg
+  ```
+  没有 Mac 就走 GitHub Actions：`.github/workflows/macos-dmg.yml`（`macos-14` runner），
+  push 后到 Actions 下载 `STJMediaViewer-macos-dmg` 构件。
+- 签名/公证：设置 `CODESIGN_IDENTITY` + `NOTARY_PROFILE` 后脚本自动 codesign + notarytool + staple；
+  不设置则 ad-hoc 签名（用户首次打开需右键 → 打开）。
+- 可行性盘点与取舍（Core 可复用 ~90%、三条路线对比）见 [`docs/macos-port.md`](docs/macos-port.md)。
+
 ## 3.2 安装包与绿色版
 
 ![安装后运行](shots/final-packaged.png)

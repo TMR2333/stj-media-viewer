@@ -76,7 +76,16 @@ C#/.NET 同一套语言、同一个 Core，Windows 与 macOS 共用一份业务�
    ```
    （或 `create-dmg` 带背景图/图标布局的精致版）
 
-## 4. 建议的下一步
+## 4. 当前进展（已选路线 B：SwiftUI 原生）
+
+- **P1 只读浏览器已落地**：`macos/`（SwiftUI + SwiftPM），读同一份 `catalog.db` + 缩略图缓存，
+  原生三栏界面、筛选/搜索/排序、拖出、Quick Look 兜底。
+- **dmg 构建链路已备好**：`macos/scripts/build-dmg.sh`（swift build → .app → 签名 → dmg → 可选公证）
+  与 `.github/workflows/macos-dmg.yml`（`macos-14` runner，push 后直接下载 dmg 构件）。
+- 本仓库的 Windows 构建环境**无法检验 Swift 代码**（没有 macOS SDK / SwiftUI），
+  编译验证以 CI 或 Mac 上的 `swift build` 为准；P1 之后按 `macos/README.md` 的路线图推进 P2–P5。
+
+## 5. 建议的下一步
 
 告诉我选哪条路线，我可以立刻开始：
 
