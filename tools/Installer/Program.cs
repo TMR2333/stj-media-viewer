@@ -30,7 +30,7 @@ internal static class Program
 {
     private const string AppName = "STJ Media Viewer";
     private const string AppId = "StjMediaViewer";
-    private const string Version = "1.3.1";
+    private const string Version = "1.3.2";
     private const string Publisher = "Stjarna Perspective";
     private const string ExeName = "StjMediaViewer.exe";
     private const string UninstallSubKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\" + AppId;
@@ -123,6 +123,9 @@ internal static class Program
 
     private static int Install(bool silent, string targetDir, bool desktopShortcut)
     {
+        // 自定义目录统一补上自己的子目录（`D:\Apps` → `D:\Apps\STJ Media Viewer`），
+        // 不把一堆程序文件散落在用户选的目录里。默认目录（已经是自己的目录）保持不变。
+        targetDir = InstallerForm.NormalizeInstallDirectory(targetDir);
         Log($"install -> {targetDir} (silent={silent}, desktop={desktopShortcut}, admin={_machineWide})");
 
         // 目标目录不可写（Program Files / 受策略保护的位置）时先请求提权，
@@ -354,9 +357,27 @@ internal static class Program
     //  卸载
     // =====================================================================
 
+    private static string ResolveUninstallDirectory(string dir)
+    {
+        try
+        {
+            var full = Path.GetFullPath(dir);
+            // 用户可能传的是"上级目录"（安装时自动建了子目录），优先删真正的安装目录
+            var child = Path.Combine(full, InstallerForm.AppDirectoryName);
+            if (Directory.Exists(child) && File.Exists(Path.Combine(child, ExeName))) return child;
+            var legacyChild = Path.Combine(full, AppId);
+            if (Directory.Exists(legacyChild) && File.Exists(Path.Combine(legacyChild, ExeName))) return legacyChild;
+            return full;
+        }
+        catch
+        {
+            return dir;
+        }
+    }
+
     private static int Uninstall(bool silent, string? explicitDir)
     {
-        var installDir = explicitDir ?? FindInstalledDirectory() ?? DefaultInstallDir;
+        var installDir = ResolveUninstallDirectory(explicitDir ?? FindInstalledDirectory() ?? DefaultInstallDir);
 
         if (!Directory.Exists(installDir))
         {
