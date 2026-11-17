@@ -22,7 +22,12 @@ public sealed partial class BatchEditPage : Page
         try
         {
             // 导入页跳过来时带着刚导入的素材 id
-            if (BatchEditViewModel.PendingIds.Count > 0)
+            if (BatchEditViewModel.PendingAssets is { } pending)
+            {
+                BatchEditViewModel.PendingAssets = null;
+                await ViewModel.LoadAsync(pending);
+            }
+            else if (BatchEditViewModel.PendingIds.Count > 0)
             {
                 var ids = BatchEditViewModel.PendingIds.ToList();
                 BatchEditViewModel.PendingIds.Clear();

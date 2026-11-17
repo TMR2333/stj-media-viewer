@@ -549,6 +549,14 @@
                         </StackPanel>
                     </Button>
                     <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="12,2,12,2" MinHeight="30"
+                            Click="SelectAll_Click"
+                            ToolTipService.ToolTip="全选当前清单（Cmd/Ctrl+A）">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE8B3;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                            <TextBlock Text="全选" Style="{ThemeResource AppCaptionTextStyle}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="12,2,12,2" MinHeight="30"
                             Click="BatchEdit_Click"
                             ToolTipService.ToolTip="给选中的素材批量填日期 / 城市 / 分类等信息">
                         <StackPanel Orientation="Horizontal" Spacing="6">
@@ -569,6 +577,55 @@
                            Style="{ThemeResource AppMicroTextStyle}"
                            Visibility="{x:Bind ViewModel.ActiveFilterSummaryVisibility, Mode=OneWay}"
                            TextTrimming="CharacterEllipsis" />
+
+                <!-- 选中单个影像合集时：合集级的编辑入口（批量编辑 / 元数据 / 重命名 / 删除） -->
+                <Border x:Name="CollectionBanner"
+                        Background="{ThemeResource AppSurfaceRaisedBrush}"
+                        BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{ThemeResource AppRadiusMedium}"
+                        Padding="10,6"
+                        Visibility="{x:Bind ViewModel.CollectionBannerVisibility, Mode=OneWay}">
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Grid.Column="0" Glyph="&#xE8F1;" FontSize="{ThemeResource AppFontCaptionSize}"
+                                  Foreground="{ThemeResource AccentBrush}" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{x:Bind ViewModel.CollectionBannerText, Mode=OneWay}"
+                                   Style="{ThemeResource AppCaptionTextStyle}"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" />
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
+                            <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="10,2,10,2" MinHeight="28"
+                                    Click="CollectionSelectAll_Click"
+                                    ToolTipService.ToolTip="选中这个合集里的全部素材">
+                                <TextBlock Text="全选" Style="{ThemeResource AppMicroTextStyle}" />
+                            </Button>
+                            <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="10,2,10,2" MinHeight="28"
+                                    Click="CollectionBatchEdit_Click"
+                                    ToolTipService.ToolTip="把这个合集里的全部素材带进批量填写">
+                                <TextBlock Text="批量编辑" Style="{ThemeResource AppMicroTextStyle}" />
+                            </Button>
+                            <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="10,2,10,2" MinHeight="28"
+                                    Click="CollectionMetadata_Click"
+                                    ToolTipService.ToolTip="查看合集内素材的元数据（打开检视面板）">
+                                <TextBlock Text="查看元数据" Style="{ThemeResource AppMicroTextStyle}" />
+                            </Button>
+                            <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="10,2,10,2" MinHeight="28"
+                                    Click="CollectionRename_Click">
+                                <TextBlock Text="重命名" Style="{ThemeResource AppMicroTextStyle}" />
+                            </Button>
+                            <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="10,2,10,2" MinHeight="28"
+                                    Click="CollectionDelete_Click">
+                                <TextBlock Text="删除" Style="{ThemeResource AppMicroTextStyle}" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
             </StackPanel>
         </Border>
 

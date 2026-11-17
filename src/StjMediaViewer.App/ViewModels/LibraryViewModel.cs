@@ -277,6 +277,67 @@ public sealed partial class LibraryViewModel : ObservableObject
 
     public string ScopeTitle => LibraryScopeRules.Title(Scope);
 
+    // ---------------- 影像合集横幅（筛选到单个合集时出现操作入口） ----------------
+    [ObservableProperty] private string _collectionBannerText = "";
+    [ObservableProperty] private Visibility _collectionBannerVisibility = Visibility.Collapsed;
+
+    /// <summary>当前筛选的单个合集 id（没选中或选了多个时为 null）。</summary>
+    public string? ActiveCollectionId { get; private set; }
+
+    /// <summary>当前单个合集的素材数（分面计数）。</summary>
+    public int ActiveCollectionCount { get; private set; }
+
+    private void RefreshCollectionBanner(FacetCounts facets)
+    {
+        var selected = CollectionGroup.SelectedIds.ToList();
+        if (selected.Count == 1)
+        {
+            ActiveCollectionId = selected[0];
+            var name = Collections.FirstOrDefault(c => c.Id == ActiveCollectionId)?.DisplayName ?? "合集";
+            ActiveCollectionCount = facets.ByCollection.TryGetValue(ActiveCollectionId, out var n) ? n : 0;
+            CollectionBannerText = $"影像合集：{name} · {ActiveCollectionCount} 张";
+            CollectionBannerVisibility = Visibility.Visible;
+        }
+        else
+        {
+            ActiveCollectionId = null;
+            ActiveCollectionCount = 0;
+            CollectionBannerText = "";
+            CollectionBannerVisibility = Visibility.Collapsed;
+        }
+    }
+
+    /// <summary>取某个合集里的全部素材（批量编辑 / 查看元数据用）。</summary>
+    public async Task<IReadOnlyList<MediaAsset>> LoadCollectionAssetsAsync(string collectionId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(collectionId)) return Array.Empty<MediaAsset>();
+        try
+        {
+            return await AppServices.Store.QueryAsync(BuildFacetlessQuery(collectionId), ct);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("读取合集素材失败", ex);
+            return Array.Empty<MediaAsset>();
+        }
+    }
+
+    private static AssetQuery BuildFacetlessQuery(string collectionId) => new()
+    {
+        Collections = { collectionId },
+        Limit = 0,
+        SortBy = AssetSortKeys.CapturedAt,
+        Descending = true,
+    };
+
+    /// <summary>全选当前网格里已加载的素材（筛选到合集时通常就是全部成员）。</summary>
+    public int SelectAllLoaded()
+    {
+        if (Items.Count == 0) return 0;
+        SetSelection(Items.ToList());
+        return Items.Count;
+    }
+
     public void Initialize()
     {
         _ = EnsureCollectionsLoadedAsync(CancellationToken.None);
@@ -592,6 +653,20 @@ public sealed partial class LibraryViewModel : ObservableObject
             group.UpdateCounts(target.ToDictionary(t => t.Id, t => t.Count, StringComparer.OrdinalIgnoreCase));
     }
 
+    /// <summary>打开某个影像合集（= 只选这个合集筛选）。</summary>
+    public void OpenCollection(string collectionId)
+    {
+        if (string.IsNullOrWhiteSpace(collectionId)) return;
+        _suppressRefresh = true;
+        try
+        {
+            foreach (var o in CollectionGroup.Options)
+                o.SetSelectedSilently(string.Equals(o.Id, collectionId, StringComparison.Ordinal));
+        }
+        finally { _suppressRefresh = false; }
+        RequestRefresh(immediate: true);
+    }
+
     /// <summary>打开某个合并组（= 选中该组合集筛选）。</summary>
     public void OpenMergeGroup(string groupId)
     {
@@ -699,6 +774,7 @@ public sealed partial class LibraryViewModel : ObservableObject
                 .Where(kv => mergeNames.ContainsKey(kv.Key))
                 .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
             SyncOptions(MergeGroupGroup, mergeCounts, key => mergeNames[key]);
+            RefreshCollectionBanner(facets);
             SyncOptions(CollectionGroup, collectionCounts, key => collectionNames[key],
                 unsetCount: facets.CollectionUnsetCount, unsetDisplay: "未加入合集");
             Log.Info($"[collections] group options={CollectionGroup.Options.Count}, vis={CollectionGroup.GroupVisibility}");

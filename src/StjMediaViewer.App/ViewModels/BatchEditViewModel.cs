@@ -19,6 +19,9 @@ public sealed partial class BatchEditViewModel : ObservableObject
     /// <summary>跨页面传递：导入完成后把新素材 id 带过来。</summary>
     public static List<string> PendingIds { get; } = new();
 
+    /// <summary>跨页面传递：直接带素材对象（例如「批量编辑某个影像合集」），优先于选择集。</summary>
+    public static IReadOnlyList<MediaAsset>? PendingAssets { get; set; }
+
     public ObservableCollection<BatchAssetItem> Items { get; } = new();
 
     [ObservableProperty] private string _summaryText = "还没有选择素材";

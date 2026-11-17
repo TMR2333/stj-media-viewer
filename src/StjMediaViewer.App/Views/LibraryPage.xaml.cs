@@ -93,6 +93,27 @@ public sealed partial class LibraryPage : Page
             });
         }
 
+        // 截图用：STJ_DEMO_COLLECTION_OPEN=1 打开第一个影像合集（看合集横幅）
+        //          =meta 打开后顺便看元数据；=batch 打开后进批量编辑
+        var collectionDemo = Environment.GetEnvironmentVariable("STJ_DEMO_COLLECTION_OPEN");
+        if (!string.IsNullOrEmpty(collectionDemo))
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(2600);
+                DispatcherQueue.TryEnqueue(async () =>
+                {
+                    await ViewModel.RefreshCollectionsAsync();
+                    var first = ViewModel.Collections.FirstOrDefault();
+                    if (first is null) return;
+                    ViewModel.OpenCollection(first.Id);
+                    await Task.Delay(1500);
+                    if (collectionDemo == "meta") CollectionMetadata_Click(this, new RoutedEventArgs());
+                    else if (collectionDemo == "batch") CollectionBatchEdit_Click(this, new RoutedEventArgs());
+                });
+            });
+        }
+
         // 截图用：STJ_DEMO_COLLECTION_FILTER=1 展开「影像合集」分组并滚到它
         if (Environment.GetEnvironmentVariable("STJ_DEMO_COLLECTION_FILTER") == "1")
         {
@@ -478,6 +499,100 @@ public sealed partial class LibraryPage : Page
 
     private void Duplicates_Click(object sender, RoutedEventArgs e) => Frame.Navigate(typeof(DuplicatesPage));
 
+    // ==================================================================================
+    //  影像合集：合集级编辑入口（批量编辑 / 查看元数据 / 重命名 / 删除 / 全选）
+    // ==================================================================================
+    private void SelectAll_Click(object sender, RoutedEventArgs e)
+    {
+        var count = ViewModel.SelectAllLoaded();
+        AppEvents.SetStatus(count > 0 ? $"已全选 {count} 张" : "当前清单为空");
+    }
+
+    private async void CollectionSelectAll_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.ActiveCollectionId is not { } id) return;
+        var assets = await ViewModel.LoadCollectionAssetsAsync(id);
+        if (assets.Count == 0) { AppEvents.SetStatus("这个合集里还没有素材"); return; }
+
+        // 只选中当前网格里已经加载到的那些（不在页内的用临时卡片补齐，供批量填写使用）
+        var ids = assets.Select(a => a.Id).ToHashSet(StringComparer.Ordinal);
+        var cards = ViewModel.Items.Where(i => ids.Contains(i.Id)).ToList();
+        ViewModel.SetSelection(cards);
+        AppEvents.SetStatus($"已选中合集内 {cards.Count} / {assets.Count} 张");
+    }
+
+    private async void CollectionBatchEdit_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.ActiveCollectionId is not { } id) return;
+        var assets = await ViewModel.LoadCollectionAssetsAsync(id);
+        if (assets.Count == 0) { AppEvents.SetStatus("这个合集里还没有素材"); return; }
+        BatchEditViewModel.PendingAssets = assets;
+        Frame.Navigate(typeof(BatchEditPage));
+    }
+
+    private async void CollectionMetadata_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.ActiveCollectionId is not { } id) return;
+        var assets = await ViewModel.LoadCollectionAssetsAsync(id);
+        if (assets.Count == 0) { AppEvents.SetStatus("这个合集里还没有素材"); return; }
+
+        var ids = assets.Select(a => a.Id).ToHashSet(StringComparer.Ordinal);
+        var cards = ViewModel.Items.Where(i => ids.Contains(i.Id)).ToList();
+        if (cards.Count > 0)
+        {
+            ViewModel.SetSelection(cards);
+            InspectorToggle.IsChecked = true;
+            InspectorViewModel.Shared.Show(cards[0].Asset);
+            ApplyInspectorVisibility(true);
+            AppEvents.SetStatus($"检视面板：{cards[0].Asset.FileName}（合集共 {assets.Count} 张）");
+        }
+        else
+        {
+            AppEvents.SetStatus("合集素材不在当前清单里：先清空筛选或切到对应素材库");
+        }
+    }
+
+    private async void CollectionRename_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.ActiveCollectionId is not { } id) return;
+        var current = ViewModel.Collections.FirstOrDefault(c => c.Id == id);
+        var box = new TextBox { Text = current?.DisplayName ?? "", PlaceholderText = "合集名称", MinWidth = 320 };
+        var dialog = new ContentDialog
+        {
+            Title = "重命名影像合集",
+            Content = box,
+            PrimaryButtonText = "保存",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = XamlRoot,
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        await AppServices.Store.RenameCollectionAsync(id, box.Text);
+        AppEvents.SetStatus($"合集已重命名为「{box.Text}」");
+        await ViewModel.RefreshCollectionsAsync();
+    }
+
+    private async void CollectionDelete_Click(object sender, RoutedEventArgs e)
+    {
+        if (ViewModel.ActiveCollectionId is not { } id) return;
+        var current = ViewModel.Collections.FirstOrDefault(c => c.Id == id);
+        var confirm = new ContentDialog
+        {
+            Title = "删除影像合集",
+            Content = $"确定删除「{current?.DisplayName ?? "这个合集"}」吗？\n只删合集归类，不会删除素材文件。",
+            PrimaryButtonText = "删除",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Close,
+            XamlRoot = XamlRoot,
+        };
+        if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
+
+        await AppServices.Store.DeleteCollectionAsync(id);
+        ViewModel.CollectionGroup.Clear();
+        AppEvents.SetStatus("合集已删除（素材都还在）");
+        await ViewModel.RefreshCollectionsAsync();
+    }
+
     private void BatchEdit_Click(object sender, RoutedEventArgs e)
     {
         if (ViewModel.SelectedItems.Count == 0)
@@ -780,6 +895,10 @@ public sealed partial class LibraryPage : Page
     {
         switch (e.Key)
         {
+            case VirtualKey.A when IsCtrlDown():
+                SelectAll_Click(sender, e);
+                e.Handled = true;
+                break;
             case VirtualKey.Space:
             case VirtualKey.Enter:
                 var item = AssetList.SelectedItem as AssetCardItem
@@ -795,6 +914,16 @@ public sealed partial class LibraryPage : Page
                 e.Handled = true;
                 break;
         }
+    }
+
+    private static bool IsCtrlDown()
+    {
+        try
+        {
+            var state = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(Windows.System.VirtualKey.Control);
+            return state.HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
+        }
+        catch { return false; }
     }
 
     private void OpenPreview(AssetCardItem item)
@@ -936,6 +1065,8 @@ public sealed partial class LibraryPage : Page
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
                 row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
                 var box = new TextBox { Text = group.DisplayName, MinHeight = 30 };
                 Grid.SetColumn(box, 0);
@@ -975,7 +1106,7 @@ public sealed partial class LibraryPage : Page
                     listPanel.Children.Remove(row);
                     await ViewModel.RefreshMergeGroupsAsync();
                 };
-                Grid.SetColumn(deleteButton, 4);
+                Grid.SetColumn(deleteButton, 6);
                 row.Children.Add(deleteButton);
 
                 listPanel.Children.Add(row);
@@ -1087,6 +1218,26 @@ public sealed partial class LibraryPage : Page
                 Grid.SetColumn(countText, 1);
                 row.Children.Add(countText);
 
+                var openButton = new Button { Content = "打开", MinHeight = 28 };
+                openButton.Click += (_, _) =>
+                {
+                    ViewModel.OpenCollection(collection.Id);
+                    AppEvents.SetStatus($"已打开影像合集「{collection.DisplayName}」");
+                };
+                Grid.SetColumn(openButton, 2);
+                row.Children.Add(openButton);
+
+                var batchButton = new Button { Content = "批量编辑", MinHeight = 28 };
+                batchButton.Click += async (_, _) =>
+                {
+                    var assets = await ViewModel.LoadCollectionAssetsAsync(collection.Id);
+                    if (assets.Count == 0) { AppEvents.SetStatus("这个合集里还没有素材"); return; }
+                    BatchEditViewModel.PendingAssets = assets;
+                    Frame.Navigate(typeof(BatchEditPage));
+                };
+                Grid.SetColumn(batchButton, 3);
+                row.Children.Add(batchButton);
+
                 var addButton = new Button { Content = "加入所选", IsEnabled = targets.Count > 0, MinHeight = 28 };
                 addButton.Click += async (_, _) =>
                 {
@@ -1096,7 +1247,7 @@ public sealed partial class LibraryPage : Page
                     collection.AssetCount += added;
                     countText.Text = $"{collection.AssetCount} 张";
                 };
-                Grid.SetColumn(addButton, 2);
+                Grid.SetColumn(addButton, 4);
                 row.Children.Add(addButton);
 
                 var removeButton = new Button { Content = "移出所选", IsEnabled = targets.Count > 0, MinHeight = 28 };
@@ -1108,7 +1259,7 @@ public sealed partial class LibraryPage : Page
                     collection.AssetCount = Math.Max(0, collection.AssetCount - removed);
                     countText.Text = $"{collection.AssetCount} 张";
                 };
-                Grid.SetColumn(removeButton, 3);
+                Grid.SetColumn(removeButton, 5);
                 row.Children.Add(removeButton);
 
                 var deleteButton = new Button { Content = "删除", MinHeight = 28 };
