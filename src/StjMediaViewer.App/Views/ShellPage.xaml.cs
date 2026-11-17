@@ -76,6 +76,17 @@ public sealed partial class ShellPage : Page
         if (!AppServices.Settings.Current.OnboardingCompleted)
             ShowOnboarding();
 
+        // 调试用：STJ_DEMO_SWITCH_VIEW=library-video 自动切到指定侧边栏项（截图验收用）
+        var demoSwitch = Environment.GetEnvironmentVariable("STJ_DEMO_SWITCH_VIEW");
+        if (!string.IsNullOrEmpty(demoSwitch))
+        {
+            _ = DispatcherQueue.TryEnqueue(async () =>
+            {
+                await Task.Delay(2500);
+                SyncNavSelection(demoSwitch);
+            });
+        }
+
         // 调试用：STJ_DEMO_SEARCH=<词> 预设搜索词 / STJ_DEMO_SORT=<sortKey> 预设排序（截图验收用）
         var demoSearch = Environment.GetEnvironmentVariable("STJ_DEMO_SEARCH");
         if (!string.IsNullOrEmpty(demoSearch))
@@ -246,8 +257,16 @@ public sealed partial class ShellPage : Page
         {
             PlaceholderHost.Visibility = Visibility.Collapsed;
             if (ContentFrame.CurrentSourcePageType != pageType)
+            {
                 ContentFrame.Navigate(pageType, viewId,
                     new Microsoft.UI.Xaml.Media.Animation.EntranceNavigationTransitionInfo());
+            }
+            else if (ContentFrame.Content is LibraryPage libraryPage &&
+                     viewId is "library" or "library-photo" or "library-video")
+            {
+                // 照片库 ↔ 视频库 是同一个页面类型：不重建页面，只换媒体类型范围
+                libraryPage.ApplyNavScope(viewId);
+            }
             return;
         }
 
