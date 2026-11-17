@@ -124,6 +124,15 @@ public sealed partial class SettingsPage : Page
             await ViewModel.RescanAsync(item);
     }
 
+    private async void LoadDeviceAliases_Click(object sender, RoutedEventArgs e)
+        => await ViewModel.LoadDeviceAliasesAsync();
+
+    private async void SaveDeviceAliases_Click(object sender, RoutedEventArgs e)
+        => await ViewModel.SaveDeviceAliasesAsync();
+
+    private void ResetDeviceAliases_Click(object sender, RoutedEventArgs e)
+        => ViewModel.ResetDeviceAliases();
+
     private async void RelocateLibrary_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.DataContext is not LibraryItemViewModel item) return;
@@ -162,18 +171,47 @@ public sealed partial class SettingsPage : Page
     // ==================================================================================
     private async void ReloadFfmpeg_Click(object sender, RoutedEventArgs e) => await ViewModel.ReloadFfmpegAsync();
 
-    /// <summary>截图/验收用：STJ_DEMO_SETTINGS_CACHE=1 时滚到缓存区。</summary>
+    /// <summary>截图/验收用：STJ_DEMO_SETTINGS_CACHE=1 滚到缓存区；STJ_DEMO_SETTINGS_DEVICES=1 滚到设备名称区。</summary>
     private void ApplyDemoScroll()
     {
-        if (Environment.GetEnvironmentVariable("STJ_DEMO_SETTINGS_CACHE") != "1") return;
+        var cache = Environment.GetEnvironmentVariable("STJ_DEMO_SETTINGS_CACHE") == "1";
+        var devices = Environment.GetEnvironmentVariable("STJ_DEMO_SETTINGS_DEVICES") == "1";
+        if (!cache && !devices) return;
+
         DispatcherQueue.TryEnqueue(async () =>
         {
-            await Task.Delay(1200);
-            if (FindScrollViewer(this) is { } scroll)
+            await Task.Delay(1600);
+            if (FindScrollViewer(this) is not { } scroll) return;
+            if (cache)
             {
                 scroll.ChangeView(null, scroll.ScrollableHeight, null);
+                return;
+            }
+
+            // 设备名称卡片：按"设备"标题找到它在滚动内容里的位置
+            if (FindTextBlock(this, "设备名称") is { } heading && scroll.Content is UIElement content)
+            {
+                try
+                {
+                    var transform = heading.TransformToVisual(content);
+                    var offset = transform.TransformPoint(new Windows.Foundation.Point(0, 0)).Y;
+                    scroll.ChangeView(null, Math.Max(0, offset - 40), null, true);
+                }
+                catch { }
             }
         });
+    }
+
+    private static TextBlock? FindTextBlock(DependencyObject root, string text)
+    {
+        var count = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChildrenCount(root);
+        for (int i = 0; i < count; i++)
+        {
+            var child = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetChild(root, i);
+            if (child is TextBlock tb && tb.Text == text) return tb;
+            if (FindTextBlock(child, text) is { } found) return found;
+        }
+        return null;
     }
 
     private static ScrollViewer? FindScrollViewer(DependencyObject root)

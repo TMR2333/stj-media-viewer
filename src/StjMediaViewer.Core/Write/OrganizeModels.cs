@@ -110,6 +110,9 @@ public sealed class OrganizeOptions
     /// <summary>本地整理时：素材 id → 自定义类别值（只在一级/二级用到自定义类别时需要）。</summary>
     public IReadOnlyDictionary<string, string>? CustomValuesByAssetId { get; set; }
 
+    /// <summary>自定义设备名（"设备"维度分文件夹时用别名）。</summary>
+    public IReadOnlyDictionary<string, string>? DeviceAliases { get; set; }
+
     /// <summary>「细分位置」的聚类半径（米）：半径内的照片归一个文件夹。</summary>
     public double GeoRadiusMeters { get; set; } = 500;
 

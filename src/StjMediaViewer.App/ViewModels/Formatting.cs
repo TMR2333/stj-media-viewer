@@ -1,4 +1,5 @@
 using System.Globalization;
+using StjMediaViewer.App.Services;
 using StjMediaViewer.Core.Models;
 
 namespace StjMediaViewer.App.ViewModels;
@@ -145,7 +146,7 @@ public static class Formatting
     public static string StarsEmpty(int rating) => new string('\u2606', 5 - Math.Clamp(rating, 0, 5));
 
     /// <summary>设备显示名（与 AssetQuery.Devices 的匹配口径一致，用 DisplayDevice）。</summary>
-    public static string Device(MediaAsset asset) => asset.DisplayDevice;
+    public static string Device(MediaAsset asset) => AppServices.DeviceAlias(asset.DeviceKey);
 
     public static string KindGlyph(MediaKind kind) => kind switch
     {

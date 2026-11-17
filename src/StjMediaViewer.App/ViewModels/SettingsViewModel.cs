@@ -409,6 +409,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             RuntimeSummary = BuildRuntimeSummary();
 
             await RefreshLibrariesAsync();
+            await LoadDeviceAliasesAsync();
             await RefreshToolStatusAsync();
             await RefreshCacheSizeAsync();
         }
@@ -643,6 +644,73 @@ public sealed partial class SettingsViewModel : ObservableObject
     // ==================================================================================
     //  媒体库
     // ==================================================================================
+    // ==================================================================================
+    //  设备名称（自定义设备名）
+    // ==================================================================================
+    public ObservableCollection<DeviceAliasRow> DeviceAliases { get; } = new();
+
+    [ObservableProperty] private string _deviceAliasStatus = "";
+    [ObservableProperty] private Visibility _deviceAliasEmptyVisibility = Visibility.Collapsed;
+
+    /// <summary>读出全库设备（按素材量降序），并带上已保存的自定义名称。</summary>
+    public async Task LoadDeviceAliasesAsync()
+    {
+        try
+        {
+            var facets = await AppServices.Store.GetFacetsAsync(new Core.Models.AssetQuery());
+            var aliases = AppServices.Settings.Current.DeviceAliases;
+
+            DeviceAliases.Clear();
+            foreach (var (deviceKey, count) in facets.ByDevice.OrderByDescending(kv => kv.Value))
+            {
+                var alias = aliases is not null && aliases.TryGetValue(deviceKey, out var saved) ? saved : "";
+                DeviceAliases.Add(new DeviceAliasRow(deviceKey, count, alias ?? ""));
+            }
+            DeviceAliasEmptyVisibility = DeviceAliases.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("加载设备名称失败", ex);
+            DeviceAliasStatus = $"加载失败：{ex.Message}";
+        }
+    }
+
+    /// <summary>保存自定义设备名：空值 / 与原名相同 = 删除别名。</summary>
+    public async Task SaveDeviceAliasesAsync()
+    {
+        try
+        {
+            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var row in DeviceAliases)
+            {
+                var alias = (row.Alias ?? "").Trim();
+                if (alias.Length == 0 || string.Equals(alias, row.Key, StringComparison.OrdinalIgnoreCase)) continue;
+                map[row.Key] = alias;
+            }
+
+            var settings = AppServices.Settings.Current;
+            settings.DeviceAliases = map;
+            await AppServices.Settings.SaveAsync();
+
+            // 界面立即刷新（筛选面板 / 卡片 / 检视面板都用新名字）
+            LibraryViewModel.Shared.RequestRefresh();
+            DeviceAliasStatus = map.Count == 0 ? "已清空自定义名称" : $"已保存 {map.Count} 个设备名称";
+            AppEvents.SetStatus(DeviceAliasStatus);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("保存设备名称失败", ex);
+            DeviceAliasStatus = $"保存失败：{ex.Message}";
+            AppEvents.SetError(DeviceAliasStatus);
+        }
+    }
+
+    public void ResetDeviceAliases()
+    {
+        foreach (var row in DeviceAliases) row.Alias = "";
+        DeviceAliasStatus = "已清空，点「保存名称」生效";
+    }
+
     public async Task RefreshLibrariesAsync()
     {
         try
@@ -993,4 +1061,22 @@ public sealed partial class SettingsViewModel : ObservableObject
             Log.Warn("重新探测 ffmpeg 失败", ex);
         }
     }
+}
+
+/// <summary>设置里的一个设备（可改名）。</summary>
+public sealed partial class DeviceAliasRow : ObservableObject
+{
+    public DeviceAliasRow(string key, int count, string alias)
+    {
+        Key = key;
+        Count = count;
+        Alias = alias;
+    }
+
+    /// <summary>设备标识（device_key，素材库筛选用的就是它）。</summary>
+    public string Key { get; }
+    public int Count { get; }
+    public string CountText => $"{Count} 张";
+
+    [ObservableProperty] private string _alias;
 }

@@ -24,9 +24,9 @@ public sealed partial class AssetCardItem : ObservableObject
     // ---------------- 文本 ----------------
     public string Id => Asset.Id;
     public string FileName => Asset.FileName;
-    public string DeviceText => Asset.DisplayDevice;
+    public string DeviceText => Formatting.Device(Asset);
     public string DateText => Formatting.Date(Asset.CapturedAt ?? Asset.FileModified);
-    public string DeviceDateText => $"{Asset.DisplayDevice} · {DateText}";
+    public string DeviceDateText => $"{Formatting.Device(Asset)} · {DateText}";
     public string SizeText => Formatting.FileSize(Asset.SizeBytes);
     public string DurationText => Formatting.Duration(Asset.DurationSeconds);
     public string FormatText => string.IsNullOrWhiteSpace(Asset.FormatCode) ? "—" : Asset.FormatCode.ToUpperInvariant();
@@ -36,7 +36,7 @@ public sealed partial class AssetCardItem : ObservableObject
     public string KindName => Formatting.KindName(Asset.Kind);
     public string DimensionsText => Formatting.Dimensions(Asset.Width, Asset.Height);
     public string TooltipText =>
-        $"{Asset.FileName}\n{Asset.DisplayDevice} · {DateText}\n{DimensionsText} · {SizeText}\n" +
+        $"{Asset.FileName}\n{Formatting.Device(Asset)} · {DateText}\n{DimensionsText} · {SizeText}\n" +
         $"主题 {ThemeText} · 影调 {ToneText}";
 
     // ---------------- 评分 ----------------

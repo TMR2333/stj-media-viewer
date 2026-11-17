@@ -30,6 +30,10 @@ public sealed partial class LibraryViewModel : ObservableObject
     {
         KindGroup = new FilterGroupViewModel(FilterGroupKind.Kind, "媒体类型", true);
         FormatGroup = new FilterGroupViewModel(FilterGroupKind.Format, "文件格式", true);
+        FrequentDeviceGroup = new FilterGroupViewModel(FilterGroupKind.Device, "常用设备", true)
+        {
+            IsExpanded = true,   // 快捷入口：默认展开
+        };
         DeviceGroup = new FilterGroupViewModel(FilterGroupKind.Device, "拍摄设备", true);
         YearGroup = new FilterGroupViewModel(FilterGroupKind.Year, "拍摄年份", false);
         MonthGroup = new FilterGroupViewModel(FilterGroupKind.Month, "拍摄月份", false);
@@ -43,7 +47,7 @@ public sealed partial class LibraryViewModel : ObservableObject
 
         Groups = new ObservableCollection<FilterGroupViewModel>
         {
-            KindGroup, FormatGroup, DeviceGroup, YearGroup, MonthGroup, CityGroup,
+            KindGroup, FormatGroup, FrequentDeviceGroup, DeviceGroup, YearGroup, MonthGroup, CityGroup,
             PostProcessGroup, RawJpgGroup, LogGroup, ThemeGroup, ToneGroup, OriginGroup,
         };
         foreach (var g in Groups) g.SelectionChanged += OnGroupSelectionChanged;
@@ -57,6 +61,9 @@ public sealed partial class LibraryViewModel : ObservableObject
 
     public FilterGroupViewModel KindGroup { get; }
     public FilterGroupViewModel FormatGroup { get; }
+    /// <summary>常用设备快捷筛选：拍片量 &gt; 100 的设备。</summary>
+    public FilterGroupViewModel FrequentDeviceGroup { get; }
+
     public FilterGroupViewModel DeviceGroup { get; }
     public FilterGroupViewModel YearGroup { get; }
     public FilterGroupViewModel MonthGroup { get; }
@@ -317,6 +324,7 @@ public sealed partial class LibraryViewModel : ObservableObject
 
         foreach (var id in FormatGroup.SelectedIds) q.Formats.Add(id);
         foreach (var id in DeviceGroup.SelectedIds) q.Devices.Add(id);
+        foreach (var id in FrequentDeviceGroup.SelectedIds) q.Devices.Add(id);
         foreach (var id in CityGroup.SelectedIds) q.Cities.Add(id);
 
         // 「来自 xx 云同步」：__unset__ = 本地文件（没有来源标记）
@@ -478,7 +486,10 @@ public sealed partial class LibraryViewModel : ObservableObject
             // 否则启动时库还是空的（或还没跑 AI 分类），之后新出现的主题/城市/设备
             // 永远不会进到筛选面板里（表现为"拍摄主题不能筛选"）。
             SyncOptions(FormatGroup, facets.ByFormat, static key => key);
-            SyncOptions(DeviceGroup, facets.ByDevice, static key => key);
+            SyncOptions(DeviceGroup, facets.ByDevice, key => AppServices.DeviceAlias(key));
+            var frequent = DeviceNames.Frequent(facets.ByDevice);
+            SyncOptions(FrequentDeviceGroup, frequent.ToDictionary(kv => kv.Key, kv => kv.Value),
+                key => AppServices.DeviceAlias(key));
             SyncOptions(CityGroup, facets.ByCity, static key => key);
             SyncOptions(YearGroup, facets.ByYear, static key => key, descendingKeys: true);
             SyncOptions(ThemeGroup, facets.ByTheme, key => Vocabularies.ThemeDisplay(key, "zh-CN"),

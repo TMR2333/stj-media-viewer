@@ -426,6 +426,67 @@
             </uic:SectionCard>
 
             <!-- ==================================================================
+                 设备名称
+                 ================================================================== -->
+            <uic:SectionCard Header="设备名称" Subtitle="给设备起个好记的名字；素材量超过 100 张的设备会自动进素材库的「常用设备」快捷筛选"
+                             Glyph="&#xE7F4;">
+                <StackPanel Spacing="10">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Style="{ThemeResource AppSubtleButtonStyle}" Click="LoadDeviceAliases_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE72C;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                                <TextBlock Text="刷新设备列表" Style="{ThemeResource AppCaptionTextStyle}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Background="{ThemeResource AccentSubtleBrush}"
+                                BorderBrush="{ThemeResource AccentBorderBrush}"
+                                Style="{ThemeResource AppSubtleButtonStyle}"
+                                Click="SaveDeviceAliases_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE74E;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                                <TextBlock Text="保存名称" Style="{ThemeResource AppCaptionTextStyle}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{ThemeResource AppSubtleButtonStyle}" Click="ResetDeviceAliases_Click">
+                            <TextBlock Text="清空输入" Style="{ThemeResource AppCaptionTextStyle}" />
+                        </Button>
+                        <TextBlock Text="{x:Bind ViewModel.DeviceAliasStatus, Mode=OneWay}"
+                                   Style="{ThemeResource AppMicroTextStyle}"
+                                   Foreground="{ThemeResource TextTertiaryBrush}" VerticalAlignment="Center" />
+                    </StackPanel>
+
+                    <ItemsControl ItemsSource="{x:Bind ViewModel.DeviceAliases, Mode=OneWay}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:DeviceAliasRow">
+                                <Grid ColumnSpacing="10" Padding="0,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="260" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" Spacing="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{x:Bind Key}" Style="{ThemeResource AppCaptionTextStyle}"
+                                                   Foreground="{ThemeResource TextSecondaryBrush}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                    </StackPanel>
+                                    <TextBox Grid.Column="1" Text="{x:Bind Alias, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                             PlaceholderText="自定义名称（留空 = 用原设备名）" MinHeight="30" />
+                                    <TextBlock Grid.Column="2" Text="{x:Bind CountText}"
+                                               Style="{ThemeResource AppMicroTextStyle}"
+                                               Foreground="{ThemeResource TextTertiaryBrush}"
+                                               VerticalAlignment="Center" MinWidth="64" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock Text="还没有任何设备信息（导入素材、跑一次扫描后会在这里出现）。"
+                               Style="{ThemeResource AppCaptionTextStyle}"
+                               Visibility="{x:Bind ViewModel.DeviceAliasEmptyVisibility, Mode=OneWay}" />
+                </StackPanel>
+            </uic:SectionCard>
+
+            <!-- ==================================================================
                  工具链
                  ================================================================== -->
             <uic:SectionCard Header="工具链与缓存" Subtitle="ffmpeg 用于视频抽帧与代理；城市库用于离线反查 GPS" Glyph="&#xE90F;">

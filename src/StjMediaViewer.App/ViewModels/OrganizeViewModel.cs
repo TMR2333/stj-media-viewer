@@ -196,6 +196,7 @@ public sealed partial class OrganizeViewModel : ObservableObject
         CustomDimensionName = string.IsNullOrWhiteSpace(CustomDimension) ? null : CustomDimension.Trim(),
         RootPath = IsCloudSource ? null : (string.IsNullOrWhiteSpace(RootPath) ? null : RootPath.Trim()),
         GeoRadiusMeters = GeoRadiusMeters > 0 ? GeoRadiusMeters : 500,
+        DeviceAliases = AppServices.Settings.Current.DeviceAliases,
         GeoPlaceResolver = ResolveGeoPlace,
         ConflictPolicy = SelectedConflictIndex switch
         {

@@ -47,12 +47,12 @@ public sealed class OrganizerService
     // =================================================================================
 
     /// <summary>按维度算出一个素材该进的文件夹名。</summary>
-    public static string CategoryFor(MediaAsset asset, OrganizeDimension dimension, string? customValue = null, string? geoValue = null)
+    public static string CategoryFor(MediaAsset asset, OrganizeDimension dimension, string? customValue = null, string? geoValue = null, IReadOnlyDictionary<string, string>? deviceAliases = null)
     {
         var captured = asset.CapturedAt ?? asset.FileModified;
         return dimension switch
         {
-            OrganizeDimension.Device => Blank(asset.DisplayDevice) ? "未标注设备" : asset.DisplayDevice,
+            OrganizeDimension.Device => DeviceNames.Display(asset.DeviceKey ?? asset.DisplayDevice, deviceAliases),
             OrganizeDimension.CameraMake => Blank(asset.CameraMake) ? "未标注品牌" : asset.CameraMake!,
             OrganizeDimension.Year => captured.ToString("yyyy", CultureInfo.InvariantCulture),
             OrganizeDimension.YearMonth => captured.ToString("yyyy-MM", CultureInfo.InvariantCulture),
@@ -90,9 +90,9 @@ public sealed class OrganizerService
         string? customValue = null,
         string? geoValue = null)
     {
-        var parts = new List<string> { CategoryFor(asset, options.Primary, customValue, geoValue) };
+        var parts = new List<string> { CategoryFor(asset, options.Primary, customValue, geoValue, options.DeviceAliases) };
         if (options.Secondary is { } secondary && secondary != options.Primary)
-            parts.Add(CategoryFor(asset, secondary, customValue, geoValue));
+            parts.Add(CategoryFor(asset, secondary, customValue, geoValue, options.DeviceAliases));
         return string.Join('/', parts.Where(p => !string.IsNullOrWhiteSpace(p)).Select(SanitizeFolder));
     }
 

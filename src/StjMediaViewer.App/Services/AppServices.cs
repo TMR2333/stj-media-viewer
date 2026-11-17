@@ -272,6 +272,10 @@ public static class AppServices
         return Task.CompletedTask;
     }
 
+    /// <summary>设备显示名（自定义名称优先，没设置就用 device_key）。</summary>
+    public static string DeviceAlias(string? deviceKey)
+        => Core.Models.DeviceNames.Display(deviceKey, Settings?.Current?.DeviceAliases);
+
     /// <summary>设置变更后重新执行一遍按设置初始化的部分（当前只有 ffmpeg 路径）。</summary>
     public static void ReinitializeTools()
     {

@@ -341,7 +341,7 @@ public sealed partial class InspectorViewModel : ObservableObject
         Groups.Add(tech);
 
         var shot = new MetaGroup("拍摄");
-        shot.Add("设备", a.DisplayDevice, ClassDimension.Device, a);
+        shot.Add("设备", AppServices.DeviceAlias(a.DeviceKey), ClassDimension.Device, a);
         shot.Add("厂商", a.CameraMake);
         shot.Add("机型", a.CameraModel);
         shot.Add("镜头", a.LensModel);
