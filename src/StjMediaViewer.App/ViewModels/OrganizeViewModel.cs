@@ -27,6 +27,7 @@ public sealed partial class OrganizeViewModel : ObservableObject
     public ObservableCollection<OrganizeSourceOption> Sources { get; } = new();
     public ObservableCollection<string> DimensionChoices { get; } = new();
     public ObservableCollection<string> SecondaryChoices { get; } = new();
+    public ObservableCollection<string> TertiaryChoices { get; } = new();
     public ObservableCollection<OrganizePreviewRow> PreviewRows { get; } = new();
 
     private OrganizePlan? _localPlan;
@@ -36,11 +37,13 @@ public sealed partial class OrganizeViewModel : ObservableObject
     {
         DimensionChoices.Add("不分类");
         SecondaryChoices.Add("不分类");
+        TertiaryChoices.Add("不分类");
         foreach (var dimension in OrganizeDimensions.All)
         {
             var label = dimension.Display();
             DimensionChoices.Add(label);
             SecondaryChoices.Add(label);
+            TertiaryChoices.Add(label);
         }
 
         SelectedPrimaryIndex = 1;   // 默认「拍摄设备」
@@ -78,6 +81,7 @@ public sealed partial class OrganizeViewModel : ObservableObject
     // ---------------- 分类规则 ----------------
     [ObservableProperty] private int _selectedPrimaryIndex = 1;
     [ObservableProperty] private int _selectedSecondaryIndex;
+    [ObservableProperty] private int _selectedTertiaryIndex;
     [ObservableProperty] private string _customDimension = "";
     [ObservableProperty] private string _rootPath = "";
     [ObservableProperty] private int _selectedConflictIndex;
@@ -104,13 +108,15 @@ public sealed partial class OrganizeViewModel : ObservableObject
 
     public Visibility CustomDimensionVisibility =>
         SelectedPrimaryIndex > 0 && DimensionAt(SelectedPrimaryIndex) == OrganizeDimension.CustomCategory ||
-        SelectedSecondaryIndex > 0 && DimensionAt(SelectedSecondaryIndex) == OrganizeDimension.CustomCategory
+        SelectedSecondaryIndex > 0 && DimensionAt(SelectedSecondaryIndex) == OrganizeDimension.CustomCategory ||
+        SelectedTertiaryIndex > 0 && DimensionAt(SelectedTertiaryIndex) == OrganizeDimension.CustomCategory
             ? Visibility.Visible
             : Visibility.Collapsed;
 
     public Visibility GeoOptionsVisibility =>
         (SelectedPrimaryIndex > 0 && DimensionAt(SelectedPrimaryIndex) == OrganizeDimension.GeoArea) ||
-        (SelectedSecondaryIndex > 0 && DimensionAt(SelectedSecondaryIndex) == OrganizeDimension.GeoArea)
+        (SelectedSecondaryIndex > 0 && DimensionAt(SelectedSecondaryIndex) == OrganizeDimension.GeoArea) ||
+        (SelectedTertiaryIndex > 0 && DimensionAt(SelectedTertiaryIndex) == OrganizeDimension.GeoArea)
             ? Visibility.Visible
             : Visibility.Collapsed;
 
@@ -123,6 +129,12 @@ public sealed partial class OrganizeViewModel : ObservableObject
     }
 
     partial void OnSelectedSecondaryIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(CustomDimensionVisibility));
+        OnPropertyChanged(nameof(GeoOptionsVisibility));
+    }
+
+    partial void OnSelectedTertiaryIndexChanged(int value)
     {
         OnPropertyChanged(nameof(CustomDimensionVisibility));
         OnPropertyChanged(nameof(GeoOptionsVisibility));
@@ -193,6 +205,7 @@ public sealed partial class OrganizeViewModel : ObservableObject
     {
         Primary = SelectedPrimaryIndex > 0 ? DimensionAt(SelectedPrimaryIndex) : OrganizeDimension.Device,
         Secondary = SelectedSecondaryIndex > 0 ? DimensionAt(SelectedSecondaryIndex) : null,
+        Tertiary = SelectedTertiaryIndex > 0 ? DimensionAt(SelectedTertiaryIndex) : null,
         CustomDimensionName = string.IsNullOrWhiteSpace(CustomDimension) ? null : CustomDimension.Trim(),
         RootPath = IsCloudSource ? null : (string.IsNullOrWhiteSpace(RootPath) ? null : RootPath.Trim()),
         GeoRadiusMeters = GeoRadiusMeters > 0 ? GeoRadiusMeters : 500,
@@ -225,7 +238,9 @@ public sealed partial class OrganizeViewModel : ObservableObject
     }
 
     private bool NeedsCustom(OrganizeOptions options) =>
-        options.Primary == OrganizeDimension.CustomCategory || options.Secondary == OrganizeDimension.CustomCategory;
+        options.Primary == OrganizeDimension.CustomCategory ||
+        options.Secondary == OrganizeDimension.CustomCategory ||
+        options.Tertiary == OrganizeDimension.CustomCategory;
 
     [RelayCommand]
     private async Task PreviewAsync()

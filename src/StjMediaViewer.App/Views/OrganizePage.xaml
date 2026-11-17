@@ -99,6 +99,13 @@
                                 <ComboBox Width="200" ItemsSource="{x:Bind ViewModel.SecondaryChoices, Mode=OneWay}"
                                           SelectedIndex="{x:Bind ViewModel.SelectedSecondaryIndex, Mode=TwoWay}" />
                             </StackPanel>
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="三级目录（可选）" Style="{ThemeResource AppMicroTextStyle}"
+                                           Foreground="{ThemeResource TextTertiaryBrush}" />
+                                <ComboBox Width="200" ItemsSource="{x:Bind ViewModel.TertiaryChoices, Mode=OneWay}"
+                                          SelectedIndex="{x:Bind ViewModel.SelectedTertiaryIndex, Mode=TwoWay}"
+                                          ToolTipService.ToolTip="例：设备 / 年份 / 月份 三级；同一维度重复选只保留一层" />
+                            </StackPanel>
                             <StackPanel Spacing="4" Visibility="{x:Bind ViewModel.CustomDimensionVisibility, Mode=OneWay}">
                                 <TextBlock Text="自定义类别维度" Style="{ThemeResource AppMicroTextStyle}"
                                            Foreground="{ThemeResource TextTertiaryBrush}" />
@@ -135,7 +142,7 @@
                                      HorizontalAlignment="Left" />
                         </StackPanel>
 
-                        <TextBlock Text="示例：一级「拍摄设备」+ 二级「拍摄年份」 → D:\照片\Sony A7 IV\2024\DSC01234.jpg；边车 .xmp 会跟着主文件一起移动。"
+                        <TextBlock Text="示例：一级「拍摄设备」+ 二级「拍摄年份」+ 三级「拍摄月份」 → D:\照片\Sony A7 IV\2024\05\DSC01234.jpg；同一维度重复选只保留一层，边车 .xmp 跟着主文件一起移动。"
                                    Style="{ThemeResource AppMicroTextStyle}"
                                    Foreground="{ThemeResource TextTertiaryBrush}" TextWrapping="Wrap" />
                     </StackPanel>

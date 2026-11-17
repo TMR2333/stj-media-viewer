@@ -83,16 +83,26 @@ public sealed class OrganizerService
         };
     }
 
-    /// <summary>一级/二级组合成一个相对目录（不含根）。</summary>
+    /// <summary>一级 / 二级 / 三级组合成一个相对目录（不含根）。同一维度重复选只出现一次。</summary>
     public static string CategoryPathFor(
         MediaAsset asset,
         OrganizeOptions options,
         string? customValue = null,
         string? geoValue = null)
     {
-        var parts = new List<string> { CategoryFor(asset, options.Primary, customValue, geoValue, options.DeviceAliases) };
-        if (options.Secondary is { } secondary && secondary != options.Primary)
-            parts.Add(CategoryFor(asset, secondary, customValue, geoValue, options.DeviceAliases));
+        var used = new HashSet<OrganizeDimension>();
+        var parts = new List<string>();
+
+        void Add(OrganizeDimension? dimension)
+        {
+            if (dimension is not { } d || !used.Add(d)) return;
+            parts.Add(CategoryFor(asset, d, customValue, geoValue, options.DeviceAliases));
+        }
+
+        Add(options.Primary);
+        Add(options.Secondary);
+        Add(options.Tertiary);
+
         return string.Join('/', parts.Where(p => !string.IsNullOrWhiteSpace(p)).Select(SanitizeFolder));
     }
 

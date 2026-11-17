@@ -42,6 +42,28 @@ public static partial class Program
         if (assets.Count == 0) return;
 
         var organizer = new OrganizerService(tempData);
+
+        // 三级目录：设备 / 年月 / 月份 → 三个目录层级；重复维度只保留一层
+        var threeLevel = OrganizerService.CategoryPathFor(assets[0], new OrganizeOptions
+        {
+            Primary = OrganizeDimension.Device,
+            Secondary = OrganizeDimension.YearMonth,
+            Tertiary = OrganizeDimension.Month,
+        });
+        Check("整理：三级目录生成三段路径",
+              threeLevel.Count(c => c == '/') == 2,
+              threeLevel);
+
+        var deduped = OrganizerService.CategoryPathFor(assets[0], new OrganizeOptions
+        {
+            Primary = OrganizeDimension.Year,
+            Secondary = OrganizeDimension.Year,
+            Tertiary = OrganizeDimension.Month,
+        });
+        Check("整理：同一维度重复选只保留一层",
+              deduped.Count(c => c == '/') == 1,
+              deduped);
+
         var options = new OrganizeOptions { Primary = OrganizeDimension.Device };
         var rootMap = new Dictionary<string, string>(StringComparer.Ordinal) { [lib.Id] = tempLib };
 

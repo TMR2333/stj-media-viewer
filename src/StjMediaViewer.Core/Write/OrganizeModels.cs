@@ -96,6 +96,9 @@ public sealed class OrganizeOptions
     /// <summary>二级分类维度（可选，会变成 "一级/二级/文件名"）。</summary>
     public OrganizeDimension? Secondary { get; set; }
 
+    /// <summary>三级分类维度（可选，会变成 "一级/二级/三级/文件名"）。</summary>
+    public OrganizeDimension? Tertiary { get; set; }
+
     /// <summary>当维度是「自定义类别」时用哪个维度名（项目 / 客户 / 场地……）。</summary>
     public string? CustomDimensionName { get; set; }
 
