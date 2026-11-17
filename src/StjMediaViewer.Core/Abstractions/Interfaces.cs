@@ -75,6 +75,18 @@ public interface IAssetStore
     Task<IReadOnlyList<MediaAsset>> GetByIdsAsync(IEnumerable<string> ids, CancellationToken ct = default);
     Task<IReadOnlyList<(string Id, string FullPath, long SizeBytes, DateTimeOffset FileModified)>> ListAllPathsAsync(string? libraryId, CancellationToken ct = default);
     Task<int> CountAllAsync(CancellationToken ct = default);
+    // ---------- 影像合集（用户自建的多对多归类，不动素材文件） ----------
+    Task<IReadOnlyList<Collection>> GetCollectionsAsync(CancellationToken ct = default);
+    Task<Collection> CreateCollectionAsync(string name, string? description = null, CancellationToken ct = default);
+    Task RenameCollectionAsync(string collectionId, string name, CancellationToken ct = default);
+    Task DeleteCollectionAsync(string collectionId, CancellationToken ct = default);
+    /// <summary>把素材加进合集（已在里面就跳过），返回新增条数。</summary>
+    Task<int> AddToCollectionAsync(string collectionId, IEnumerable<string> assetIds, CancellationToken ct = default);
+    /// <summary>把素材移出合集，返回移除条数。</summary>
+    Task<int> RemoveFromCollectionAsync(string collectionId, IEnumerable<string> assetIds, CancellationToken ct = default);
+    /// <summary>合集 id → 素材数。</summary>
+    Task<IReadOnlyDictionary<string, int>> GetCollectionCountsAsync(CancellationToken ct = default);
+
     Task SaveLibraryRootsAsync(IEnumerable<LibraryRoot> roots, CancellationToken ct = default);
     Task<IReadOnlyList<LibraryRoot>> LoadLibraryRootsAsync(CancellationToken ct = default);
 }

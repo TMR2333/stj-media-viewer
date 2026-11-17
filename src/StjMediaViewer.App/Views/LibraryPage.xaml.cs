@@ -64,6 +64,37 @@ public sealed partial class LibraryPage : Page
         if (Environment.GetEnvironmentVariable("STJ_DEMO_ONLY_RAW") == "1")
             ViewModel.OnlyRaw = true;
 
+        // 截图用：STJ_DEMO_COLLECTION_FILTER=1 展开「影像合集」分组并滚到它
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_COLLECTION_FILTER") == "1")
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(2600);
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    ViewModel.FrequentDeviceGroup.IsExpanded = false;
+                    ViewModel.DeviceGroup.IsExpanded = false;
+                    ViewModel.CollectionGroup.IsExpanded = true;
+                    FilterScroll.ChangeView(null, 300, null, true);
+                });
+            });
+        }
+
+        // 截图用：STJ_DEMO_COLLECTIONS=1 打开影像合集对话框（带 3 张选中素材）
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_COLLECTIONS") == "1")
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(2800);
+                DispatcherQueue.TryEnqueue(async () =>
+                {
+                    var pick = ViewModel.Items.Take(3).ToList();
+                    if (pick.Count > 0) ViewModel.SetSelection(pick);
+                    await ShowCollectionsDialogAsync(pick.Select(p => p.Asset).ToList());
+                });
+            });
+        }
+
         // 截图用：STJ_DEMO_MARQUEE=1 模拟一次框选（画框 + 选中框内卡片）
         if (Environment.GetEnvironmentVariable("STJ_DEMO_MARQUEE") == "1")
         {
@@ -772,6 +803,155 @@ public sealed partial class LibraryPage : Page
     // ==================================================================================
     //  右键菜单
     // ==================================================================================
+    // ==================================================================================
+    //  影像合集：创建 / 重命名 / 删除 / 加入 / 移出
+    // ==================================================================================
+    private async void Collections_Click(object sender, RoutedEventArgs e)
+        => await ShowCollectionsDialogAsync(ViewModel.SelectedItems.Select(i => i.Asset).ToList());
+
+    private async Task ShowCollectionsDialogAsync(IReadOnlyList<MediaAsset> targets)
+    {
+        try
+        {
+            IReadOnlyList<Collection> collections = await AppServices.Store.GetCollectionsAsync();
+            var panel = new StackPanel { Spacing = 10, MinWidth = 460 };
+
+            // —— 新建合集 ——
+            var createRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            var nameBox = new TextBox { PlaceholderText = "新合集名称，例如「2026 婚礼精选」", Width = 280 };
+            var createButton = new Button { Content = "创建合集" };
+            createRow.Children.Add(nameBox);
+            createRow.Children.Add(createButton);
+            panel.Children.Add(new TextBlock
+            {
+                Text = targets.Count > 0
+                    ? $"管理影像合集；当前选中 {targets.Count} 张素材，可直接加入。"
+                    : "管理影像合集：新建 / 重命名 / 删除；在素材库选中素材后可一键加入。",
+                TextWrapping = TextWrapping.Wrap,
+                Style = (Style)Application.Current.Resources["AppCaptionTextStyle"],
+            });
+            panel.Children.Add(createRow);
+
+            var listPanel = new StackPanel { Spacing = 6 };
+            panel.Children.Add(listPanel);
+
+            void BuildRow(Collection collection)
+            {
+                var row = new Grid { ColumnSpacing = 8 };
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                var box = new TextBox { Text = collection.Name, Tag = collection.Id, MinHeight = 30 };
+                Grid.SetColumn(box, 0);
+                row.Children.Add(box);
+
+                var countText = new TextBlock
+                {
+                    Text = $"{collection.AssetCount} 张",
+                    Style = (Style)Application.Current.Resources["AppMicroTextStyle"],
+                    Foreground = (Brush)Application.Current.Resources["TextTertiaryBrush"],
+                    VerticalAlignment = VerticalAlignment.Center,
+                    MinWidth = 56,
+                };
+                Grid.SetColumn(countText, 1);
+                row.Children.Add(countText);
+
+                var addButton = new Button { Content = "加入所选", IsEnabled = targets.Count > 0, MinHeight = 28 };
+                addButton.Click += async (_, _) =>
+                {
+                    var added = await AppServices.Store.AddToCollectionAsync(collection.Id, targets.Select(t => t.Id));
+                    AppEvents.SetStatus($"已把 {added} 张素材加入「{collection.Name}」");
+                    await ViewModel.RefreshCollectionsAsync();
+                    collection.AssetCount += added;
+                    countText.Text = $"{collection.AssetCount} 张";
+                };
+                Grid.SetColumn(addButton, 2);
+                row.Children.Add(addButton);
+
+                var removeButton = new Button { Content = "移出所选", IsEnabled = targets.Count > 0, MinHeight = 28 };
+                removeButton.Click += async (_, _) =>
+                {
+                    var removed = await AppServices.Store.RemoveFromCollectionAsync(collection.Id, targets.Select(t => t.Id));
+                    AppEvents.SetStatus($"已从「{collection.Name}」移出 {removed} 张素材");
+                    await ViewModel.RefreshCollectionsAsync();
+                    collection.AssetCount = Math.Max(0, collection.AssetCount - removed);
+                    countText.Text = $"{collection.AssetCount} 张";
+                };
+                Grid.SetColumn(removeButton, 3);
+                row.Children.Add(removeButton);
+
+                var deleteButton = new Button { Content = "删除", MinHeight = 28 };
+                deleteButton.Click += async (_, _) =>
+                {
+                    var confirm = new ContentDialog
+                    {
+                        Title = "删除合集",
+                        Content = $"确定删除「{collection.Name}」吗？\n只删合集归类，不会删除素材文件。",
+                        PrimaryButtonText = "删除",
+                        CloseButtonText = "取消",
+                        DefaultButton = ContentDialogButton.Close,
+                        XamlRoot = XamlRoot,
+                    };
+                    if (await confirm.ShowAsync() != ContentDialogResult.Primary) return;
+                    await AppServices.Store.DeleteCollectionAsync(collection.Id);
+                    AppEvents.SetStatus($"已删除合集「{collection.Name}」");
+                    await ViewModel.RefreshCollectionsAsync();
+                    listPanel.Children.Remove(row);
+                };
+                Grid.SetColumn(deleteButton, 4);
+                row.Children.Add(deleteButton);
+
+                listPanel.Children.Add(row);
+            }
+
+            foreach (var collection in collections) BuildRow(collection);
+
+            createButton.Click += async (_, _) =>
+            {
+                var created = await AppServices.Store.CreateCollectionAsync(nameBox.Text);
+                nameBox.Text = "";
+                AppEvents.SetStatus($"已创建合集「{created.Name}」");
+                created.AssetCount = 0;
+                BuildRow(created);
+                await ViewModel.RefreshCollectionsAsync();
+            };
+
+            var dialog = new ContentDialog
+            {
+                Title = "影像合集",
+                Content = new ScrollViewer { Content = panel, MaxHeight = 460, VerticalScrollBarVisibility = ScrollBarVisibility.Auto },
+                PrimaryButtonText = "保存名称",
+                CloseButtonText = "关闭",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = XamlRoot,
+            };
+
+            var result = await dialog.ShowAsync();
+            if (result == ContentDialogResult.Primary)
+            {
+                foreach (var child in listPanel.Children)
+                {
+                    if (child is not Grid row || row.Children.Count == 0) continue;
+                    if (row.Children[0] is not TextBox box || box.Tag is not string id) continue;
+                    var original = collections.FirstOrDefault(c => c.Id == id);
+                    if (original is not null && !string.Equals(original.Name, box.Text, StringComparison.Ordinal))
+                        await AppServices.Store.RenameCollectionAsync(id, box.Text);
+                }
+                AppEvents.SetStatus("合集名称已保存");
+            }
+
+            await ViewModel.RefreshCollectionsAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("影像合集对话框失败", ex);
+            AppEvents.SetError($"影像合集操作失败：{ex.Message}");
+        }
+    }
+
     private void ShowContextMenu(AssetCardItem item, Windows.Foundation.Point position)
     {
         var flyout = new MenuFlyout();
@@ -810,6 +990,10 @@ public sealed partial class LibraryPage : Page
         pickMenu.Items.Add(rejectItem);
         pickMenu.Items.Add(clearPickItem);
         flyout.Items.Add(pickMenu);
+
+        var collectionItem = new MenuFlyoutItem { Text = "加入影像合集…" };
+        collectionItem.Click += async (_, _) => await ShowCollectionsDialogAsync(TargetAssets(item));
+        flyout.Items.Add(collectionItem);
 
         flyout.Items.Add(new MenuFlyoutSeparator());
 

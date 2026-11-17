@@ -340,6 +340,17 @@ internal sealed class FallbackAssetStore : IAssetStore
         if (q.Kinds.Count > 0) src = src.Where(a => q.Kinds.Contains(a.Kind));
         if (q.Formats.Count > 0) src = src.Where(a => q.Formats.Contains(a.FormatCode, StringComparer.OrdinalIgnoreCase));
         if (q.Devices.Count > 0) src = src.Where(a => q.Devices.Contains(a.DisplayDevice, StringComparer.OrdinalIgnoreCase));
+        if (q.Collections.Count > 0)
+        {
+            var withUnset = q.Collections.Contains("__unset__");
+            var ids = q.Collections.Where(c => c != "__unset__").ToHashSet(StringComparer.Ordinal);
+            src = src.Where(a =>
+            {
+                var inAny = _collectionAssets.Any(kv => ids.Contains(kv.Key) && kv.Value.Contains(a.Id));
+                var inNone = !_collectionAssets.Any(kv => kv.Value.Contains(a.Id));
+                return inAny || (withUnset && inNone);
+            });
+        }
         if (q.Cities.Count > 0) src = src.Where(a => a.City is not null && q.Cities.Contains(a.City));
         if (q.Themes.Count > 0) src = src.Where(a => a.Theme is not null && q.Themes.Contains(a.Theme));
         if (q.Tones.Count > 0) src = src.Where(a => a.Tone is not null && q.Tones.Contains(a.Tone));
@@ -400,6 +411,8 @@ internal sealed class FallbackAssetStore : IAssetStore
             ByKind = all.GroupBy(a => a.Kind.ToString()).ToDictionary(g => g.Key, g => g.Count()),
             ByFormat = all.GroupBy(a => a.FormatCode).ToDictionary(g => g.Key, g => g.Count()),
             ByDevice = all.GroupBy(a => a.DisplayDevice).ToDictionary(g => g.Key, g => g.Count()),
+            ByCollection = _collectionAssets.ToDictionary(kv => kv.Key, kv => kv.Value.Count, StringComparer.Ordinal),
+            CollectionUnsetCount = _assets.Count(a => !_collectionAssets.Any(kv => kv.Value.Contains(a.Id))),
             ByCity = all.Where(a => a.City is not null).GroupBy(a => a.City!).ToDictionary(g => g.Key, g => g.Count()),
             ByTheme = all.Where(a => a.Theme is not null).GroupBy(a => a.Theme!).ToDictionary(g => g.Key, g => g.Count()),
             ByTone = all.Where(a => a.Tone is not null).GroupBy(a => a.Tone!).ToDictionary(g => g.Key, g => g.Count()),
@@ -457,6 +470,66 @@ internal sealed class FallbackAssetStore : IAssetStore
     }
 
     public Task<int> CountAllAsync(CancellationToken ct = default) => Task.FromResult(_assets.Count);
+
+    // ---------- 影像合集（演示模式：内存实现） ----------
+    private readonly List<Collection> _collections = new();
+    private readonly Dictionary<string, HashSet<string>> _collectionAssets = new(StringComparer.Ordinal);
+
+    public Task<IReadOnlyList<Collection>> GetCollectionsAsync(CancellationToken ct = default)
+    {
+        foreach (var c in _collections)
+            c.AssetCount = _collectionAssets.TryGetValue(c.Id, out var set) ? set.Count : 0;
+        return Task.FromResult<IReadOnlyList<Collection>>(_collections.ToList());
+    }
+
+    public Task<Collection> CreateCollectionAsync(string name, string? description = null, CancellationToken ct = default)
+    {
+        var collection = new Collection
+        {
+            Id = Guid.NewGuid().ToString("N")[..12],
+            Name = string.IsNullOrWhiteSpace(name) ? "新合集" : name.Trim(),
+            Description = description,
+            CreatedAt = DateTimeOffset.Now,
+            SortOrder = _collections.Count,
+        };
+        _collections.Add(collection);
+        _collectionAssets[collection.Id] = new HashSet<string>(StringComparer.Ordinal);
+        return Task.FromResult(collection);
+    }
+
+    public Task RenameCollectionAsync(string collectionId, string name, CancellationToken ct = default)
+    {
+        var c = _collections.FirstOrDefault(x => x.Id == collectionId);
+        if (c is not null) c.Name = string.IsNullOrWhiteSpace(name) ? "未命名合集" : name.Trim();
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteCollectionAsync(string collectionId, CancellationToken ct = default)
+    {
+        _collections.RemoveAll(c => c.Id == collectionId);
+        _collectionAssets.Remove(collectionId);
+        return Task.CompletedTask;
+    }
+
+    public Task<int> AddToCollectionAsync(string collectionId, IEnumerable<string> assetIds, CancellationToken ct = default)
+    {
+        if (!_collectionAssets.TryGetValue(collectionId, out var set)) return Task.FromResult(0);
+        int added = 0;
+        foreach (var id in assetIds) if (set.Add(id)) added++;
+        return Task.FromResult(added);
+    }
+
+    public Task<int> RemoveFromCollectionAsync(string collectionId, IEnumerable<string> assetIds, CancellationToken ct = default)
+    {
+        if (!_collectionAssets.TryGetValue(collectionId, out var set)) return Task.FromResult(0);
+        int removed = 0;
+        foreach (var id in assetIds) if (set.Remove(id)) removed++;
+        return Task.FromResult(removed);
+    }
+
+    public Task<IReadOnlyDictionary<string, int>> GetCollectionCountsAsync(CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyDictionary<string, int>>(
+            _collectionAssets.ToDictionary(kv => kv.Key, kv => kv.Value.Count, StringComparer.Ordinal));
 
     public Task SaveLibraryRootsAsync(IEnumerable<LibraryRoot> roots, CancellationToken ct = default)
     {

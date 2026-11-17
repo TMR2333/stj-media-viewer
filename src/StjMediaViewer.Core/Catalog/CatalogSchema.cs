@@ -17,6 +17,8 @@ internal static class CatalogSchema
     public const string TableLibraries = "libraries";
     public const string TableMeta = "meta";
     public const string TableAssetCustom = "asset_custom";
+    public const string TableCollections = "collections";
+    public const string TableCollectionAssets = "collection_assets";
 
     /// <summary>建表 + 索引 + PRAGMA。可重复执行（幂等）。</summary>
     public static void Apply(SqliteConnection conn)
@@ -33,6 +35,8 @@ internal static class CatalogSchema
         Execute(conn, DdlLibraries);
         Execute(conn, DdlMeta);
         Execute(conn, DdlAssetCustom);
+        Execute(conn, DdlCollections);
+        Execute(conn, DdlCollectionAssets);
 
         // 迁移：v1 老库补 JPG/RAW 分组列（幂等）
         EnsureColumn(conn, TableAssets, "group_id", "TEXT");
@@ -230,4 +234,22 @@ internal static class CatalogSchema
         cmd.CommandText = sql;
         cmd.ExecuteNonQuery();
     }
+
+    private const string DdlCollections = @"
+        CREATE TABLE IF NOT EXISTS collections (
+            id              TEXT PRIMARY KEY,
+            name            TEXT NOT NULL DEFAULT '',
+            description     TEXT,
+            created_at      TEXT,
+            sort_order      INTEGER NOT NULL DEFAULT 0
+        );";
+
+    private const string DdlCollectionAssets = @"
+        CREATE TABLE IF NOT EXISTS collection_assets (
+            collection_id   TEXT NOT NULL,
+            asset_id        TEXT NOT NULL,
+            added_at        TEXT,
+            PRIMARY KEY (collection_id, asset_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_collection_assets_asset ON collection_assets(asset_id);";
 }

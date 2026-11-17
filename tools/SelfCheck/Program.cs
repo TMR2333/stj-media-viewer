@@ -79,6 +79,7 @@ public static partial class Program
             await Section("视频预览代理", async () => await CheckVideoProxy(s, tempData));
             await Section("自定义设备名 / 常用设备", async () => await CheckDeviceAliases(s, tempData));
             await Section("预览编辑（旋转/翻转）", async () => await CheckPreviewEdits(s, tempData));
+            await Section("影像合集", async () => await CheckCollections(s, tempData));
             await Section("设置持久化", async () => await CheckSettings(s, tempData));
             await Section("AI 客户端(dry-run)", async () => await CheckAi(s));
             var aiUrl = ArgValue(args, "--ai-url");

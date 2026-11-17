@@ -34,6 +34,7 @@ public sealed partial class LibraryViewModel : ObservableObject
         {
             IsExpanded = true,   // 快捷入口：默认展开
         };
+        CollectionGroup = new FilterGroupViewModel(FilterGroupKind.Collection, "影像合集", true);
         DeviceGroup = new FilterGroupViewModel(FilterGroupKind.Device, "拍摄设备", true);
         YearGroup = new FilterGroupViewModel(FilterGroupKind.Year, "拍摄年份", false);
         MonthGroup = new FilterGroupViewModel(FilterGroupKind.Month, "拍摄月份", false);
@@ -47,7 +48,7 @@ public sealed partial class LibraryViewModel : ObservableObject
 
         Groups = new ObservableCollection<FilterGroupViewModel>
         {
-            KindGroup, FormatGroup, FrequentDeviceGroup, DeviceGroup, YearGroup, MonthGroup, CityGroup,
+            KindGroup, FormatGroup, FrequentDeviceGroup, DeviceGroup, CollectionGroup, YearGroup, MonthGroup, CityGroup,
             PostProcessGroup, RawJpgGroup, LogGroup, ThemeGroup, ToneGroup, OriginGroup,
         };
         foreach (var g in Groups) g.SelectionChanged += OnGroupSelectionChanged;
@@ -63,6 +64,9 @@ public sealed partial class LibraryViewModel : ObservableObject
     public FilterGroupViewModel FormatGroup { get; }
     /// <summary>常用设备快捷筛选：拍片量 &gt; 100 的设备。</summary>
     public FilterGroupViewModel FrequentDeviceGroup { get; }
+
+    /// <summary>影像合集筛选（用户自建的素材分组）。</summary>
+    public FilterGroupViewModel CollectionGroup { get; }
 
     public FilterGroupViewModel DeviceGroup { get; }
     public FilterGroupViewModel YearGroup { get; }
@@ -184,7 +188,47 @@ public sealed partial class LibraryViewModel : ObservableObject
     // ==================================================================================
     //  初始化 / 刷新
     // ==================================================================================
-    public void Initialize() => RequestRefresh(immediate: true);
+    /// <summary>影像合集（筛选面板显示名称用）。</summary>
+    public IReadOnlyList<Collection> Collections { get; private set; } = Array.Empty<Collection>();
+
+    private bool _collectionsLoaded;
+
+    /// <summary>重新读合集列表（新建/重命名/删除/加入后调用）。</summary>
+    public async Task RefreshCollectionsAsync()
+    {
+        try
+        {
+            Collections = await AppServices.Store.GetCollectionsAsync();
+            _collectionsLoaded = true;
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("加载影像合集失败", ex);
+        }
+        RequestRefresh(immediate: true);
+    }
+
+    /// <summary>首屏刷新前保证合集名已就绪（否则筛选面板会因为没有名字而隐藏这个分组）。</summary>
+    private async Task EnsureCollectionsLoadedAsync(CancellationToken ct)
+    {
+        if (_collectionsLoaded) return;
+        try
+        {
+            Collections = await AppServices.Store.GetCollectionsAsync(ct);
+            _collectionsLoaded = true;
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            Log.Warn("加载影像合集失败", ex);
+        }
+    }
+
+    public void Initialize()
+    {
+        _ = EnsureCollectionsLoadedAsync(CancellationToken.None);
+        RequestRefresh(immediate: true);
+    }
 
     public void RequestRefresh(bool immediate = false)
     {
@@ -212,6 +256,7 @@ public sealed partial class LibraryViewModel : ObservableObject
 
             var itemsTask = AppServices.Store.QueryAsync(pageQuery, ct);
             var countTask = AppServices.Store.CountAsync(pageQuery, ct);
+            await EnsureCollectionsLoadedAsync(ct);
             var facetsTask = AppServices.Store.GetFacetsAsync(facetQuery, ct);
             await Task.WhenAll(itemsTask, countTask, facetsTask);
 
@@ -325,6 +370,7 @@ public sealed partial class LibraryViewModel : ObservableObject
         foreach (var id in FormatGroup.SelectedIds) q.Formats.Add(id);
         foreach (var id in DeviceGroup.SelectedIds) q.Devices.Add(id);
         foreach (var id in FrequentDeviceGroup.SelectedIds) q.Devices.Add(id);
+        foreach (var id in CollectionGroup.SelectedIds) q.Collections.Add(id);
         foreach (var id in CityGroup.SelectedIds) q.Cities.Add(id);
 
         // 「来自 xx 云同步」：__unset__ = 本地文件（没有来源标记）
@@ -487,6 +533,14 @@ public sealed partial class LibraryViewModel : ObservableObject
             // 永远不会进到筛选面板里（表现为"拍摄主题不能筛选"）。
             SyncOptions(FormatGroup, facets.ByFormat, static key => key);
             SyncOptions(DeviceGroup, facets.ByDevice, key => AppServices.DeviceAlias(key));
+            var collectionNames = Collections.ToDictionary(c => c.Id, c => c.DisplayName, StringComparer.Ordinal);
+            var collectionCounts = facets.ByCollection
+                .Where(kv => collectionNames.ContainsKey(kv.Key))
+                .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
+            Log.Info($"[collections] 合集 {Collections.Count} 个，分面 {facets.ByCollection.Count} 个，未加入 {facets.CollectionUnsetCount}");
+            SyncOptions(CollectionGroup, collectionCounts, key => collectionNames[key],
+                unsetCount: facets.CollectionUnsetCount, unsetDisplay: "未加入合集");
+            Log.Info($"[collections] group options={CollectionGroup.Options.Count}, vis={CollectionGroup.GroupVisibility}");
             var frequent = DeviceNames.Frequent(facets.ByDevice);
             SyncOptions(FrequentDeviceGroup, frequent.ToDictionary(kv => kv.Key, kv => kv.Value),
                 key => AppServices.DeviceAlias(key));

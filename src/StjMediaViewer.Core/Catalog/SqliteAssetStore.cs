@@ -850,6 +850,15 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
                 "SELECT origin, COUNT(*) FROM assets" + w.Sql + AndWhere(w, "origin IS NOT NULL AND origin<>''") +
                 " GROUP BY origin", w);
 
+            // 影像合集分面：合集 id → 当前筛选范围内的素材数
+            var collectionSql = "SELECT ca.collection_id, COUNT(*) FROM collection_assets ca " +
+                                "WHERE ca.asset_id IN (SELECT assets.id FROM assets" + w.Sql + ") " +
+                                "GROUP BY ca.collection_id";
+            f.ByCollection = GroupText("collection_id", collectionSql, w);
+            f.CollectionUnsetCount = (int)Scalar1(
+                "SELECT COUNT(*) FROM assets" + w.Sql +
+                AndWhere(w, "NOT EXISTS(SELECT 1 FROM collection_assets ca WHERE ca.asset_id = assets.id)"), w);
+
             f.ByPick = GroupText("is_pick",
                 "SELECT is_pick, COUNT(*) FROM assets" + w.Sql + " GROUP BY is_pick", w,
                 v => v switch { "1" => "picked", "0" => "rejected", _ => "unset" });
@@ -965,6 +974,153 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
         list.Sort(StringComparer.OrdinalIgnoreCase);
         return list;
     }
+
+    // ==================================================================== 影像合集
+
+    public Task<IReadOnlyList<Collection>> GetCollectionsAsync(CancellationToken ct = default) =>
+        RunAsync(() =>
+        {
+            using var cmd = _conn!.CreateCommand();
+            cmd.CommandText = @"
+                SELECT c.id, c.name, c.description, c.created_at, c.sort_order, COUNT(ca.asset_id)
+                FROM collections c
+                LEFT JOIN collection_assets ca ON ca.collection_id = c.id
+                GROUP BY c.id
+                ORDER BY c.sort_order, c.created_at, c.name";
+            using var r = cmd.ExecuteReader();
+            var list = new List<Collection>();
+            while (r.Read())
+            {
+                list.Add(new Collection
+                {
+                    Id = r.GetString(0),
+                    Name = r.IsDBNull(1) ? "" : r.GetString(1),
+                    Description = r.IsDBNull(2) ? null : r.GetString(2),
+                    CreatedAt = r.IsDBNull(3) || !DateTimeOffset.TryParse(r.GetString(3), out var created)
+                        ? DateTimeOffset.Now : created,
+                    SortOrder = r.IsDBNull(4) ? 0 : r.GetInt32(4),
+                    AssetCount = r.IsDBNull(5) ? 0 : r.GetInt32(5),
+                });
+            }
+            return (IReadOnlyList<Collection>)list;
+        }, ct);
+
+    public Task<Collection> CreateCollectionAsync(string name, string? description = null, CancellationToken ct = default) =>
+        RunAsync(() =>
+        {
+            var collection = new Collection
+            {
+                Id = Guid.NewGuid().ToString("N")[..12],
+                Name = string.IsNullOrWhiteSpace(name) ? "新合集" : name.Trim(),
+                Description = string.IsNullOrWhiteSpace(description) ? null : description!.Trim(),
+                CreatedAt = DateTimeOffset.Now,
+            };
+
+            using var cmd = _conn!.CreateCommand();
+            cmd.CommandText = @"
+                INSERT INTO collections(id, name, description, created_at, sort_order)
+                VALUES(@id, @name, @desc, @created,
+                       COALESCE((SELECT MAX(sort_order) + 1 FROM collections), 0))";
+            cmd.Parameters.AddWithValue("@id", collection.Id);
+            cmd.Parameters.AddWithValue("@name", collection.Name);
+            cmd.Parameters.AddWithValue("@desc", (object?)collection.Description ?? DBNull.Value);
+            cmd.Parameters.AddWithValue("@created", collection.CreatedAt.ToString("O"));
+            cmd.ExecuteNonQuery();
+            return collection;
+        }, ct);
+
+    public Task RenameCollectionAsync(string collectionId, string name, CancellationToken ct = default) =>
+        RunAsync(() =>
+        {
+            if (string.IsNullOrWhiteSpace(collectionId)) return;
+            using var cmd = _conn!.CreateCommand();
+            cmd.CommandText = "UPDATE collections SET name=@name WHERE id=@id";
+            cmd.Parameters.AddWithValue("@name", string.IsNullOrWhiteSpace(name) ? "未命名合集" : name.Trim());
+            cmd.Parameters.AddWithValue("@id", collectionId);
+            cmd.ExecuteNonQuery();
+        }, ct);
+
+    public Task DeleteCollectionAsync(string collectionId, CancellationToken ct = default) =>
+        RunAsync(() =>
+        {
+            if (string.IsNullOrWhiteSpace(collectionId)) return;
+            using var tx = _conn!.BeginTransaction();
+            using (var del = _conn.CreateCommand())
+            {
+                del.Transaction = tx;
+                del.CommandText = "DELETE FROM collection_assets WHERE collection_id=@id";
+                del.Parameters.AddWithValue("@id", collectionId);
+                del.ExecuteNonQuery();
+            }
+            using (var del = _conn.CreateCommand())
+            {
+                del.Transaction = tx;
+                del.CommandText = "DELETE FROM collections WHERE id=@id";
+                del.Parameters.AddWithValue("@id", collectionId);
+                del.ExecuteNonQuery();
+            }
+            tx.Commit();
+        }, ct);
+
+    public Task<int> AddToCollectionAsync(string collectionId, IEnumerable<string> assetIds, CancellationToken ct = default) =>
+        RunAsync(() =>
+        {
+            if (string.IsNullOrWhiteSpace(collectionId) || assetIds is null) return 0;
+            var ids = assetIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList();
+            if (ids.Count == 0) return 0;
+
+            using var tx = _conn!.BeginTransaction();
+            using var cmd = _conn.CreateCommand();
+            cmd.Transaction = tx;
+            cmd.CommandText = "INSERT OR IGNORE INTO collection_assets(collection_id, asset_id, added_at) VALUES(@c, @a, @t)";
+            cmd.Parameters.AddWithValue("@c", collectionId);
+            var pAsset = cmd.Parameters.Add("@a", SqliteType.Text);
+            cmd.Parameters.AddWithValue("@t", DateTimeOffset.Now.ToString("O"));
+            int added = 0;
+            foreach (var id in ids)
+            {
+                pAsset.Value = id;
+                added += cmd.ExecuteNonQuery();
+            }
+            tx.Commit();
+            return added;
+        }, ct);
+
+    public Task<int> RemoveFromCollectionAsync(string collectionId, IEnumerable<string> assetIds, CancellationToken ct = default) =>
+        RunAsync(() =>
+        {
+            if (string.IsNullOrWhiteSpace(collectionId) || assetIds is null) return 0;
+            var ids = assetIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList();
+            if (ids.Count == 0) return 0;
+
+            using var tx = _conn!.BeginTransaction();
+            using var cmd = _conn.CreateCommand();
+            cmd.Transaction = tx;
+            var sb = new StringBuilder("DELETE FROM collection_assets WHERE collection_id=@c AND asset_id IN (");
+            cmd.Parameters.AddWithValue("@c", collectionId);
+            for (int i = 0; i < ids.Count; i++)
+            {
+                if (i > 0) sb.Append(',');
+                sb.Append("@a").Append(i);
+                cmd.Parameters.AddWithValue("@a" + i, ids[i]);
+            }
+            sb.Append(')');
+            cmd.CommandText = sb.ToString();
+            var removed = cmd.ExecuteNonQuery();
+            tx.Commit();
+            return removed;
+        }, ct);
+
+    public Task<IReadOnlyDictionary<string, int>> GetCollectionCountsAsync(CancellationToken ct = default) =>
+        RunAsync(() =>
+        {
+            using var cmd = _conn!.CreateCommand();
+            cmd.CommandText = "SELECT collection_id, COUNT(*) FROM collection_assets GROUP BY collection_id";
+            using var r = cmd.ExecuteReader();
+            var map = new Dictionary<string, int>(StringComparer.Ordinal);
+            while (r.Read()) map[r.GetString(0)] = r.GetInt32(1);
+            return (IReadOnlyDictionary<string, int>)map;
+        }, ct);
 
     public Task<IReadOnlyList<(string Id, string FullPath, long SizeBytes, DateTimeOffset FileModified)>>
         ListAllPathsAsync(string? libraryId, CancellationToken ct = default) =>
@@ -1107,6 +1263,7 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
         if (q.Cities.Count > 0) AddIn(w, "city", q.Cities.Cast<object?>().ToList());
         // 主题/影调支持"未填写"（__unset__）伪选项：选它 = 只要还没分类的素材
         ApplyThemeFilter(w, q.Themes);
+        ApplyCollectionFilter(w, q.Collections);
         AddInOrUnset(w, "tone", q.Tones);
         if (q.ColorLabels.Count > 0) AddIn(w, "color_label", q.ColorLabels.Cast<object?>().ToList());
         if (q.RawFormats.Count > 0) AddIn(w, "raw_format", q.RawFormats.Cast<object?>().ToList());
@@ -1171,6 +1328,38 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
         // 例外：筛「只看 RAW」时必须放行非代表的 RAW 行，否则 RAW 全被折叠掉、结果永远是 0 条。
         if (q.CollapseGroups && q.IsRaw != true) w.And("is_group_cover = 1");
         return w;
+    }
+
+    /// <summary>
+    /// 影像合集筛选：命中任意选中合集的素材（多选 = 并集）；`__unset__` = 没加入任何合集。
+    /// </summary>
+    private static void ApplyCollectionFilter(Where w, List<string> selected)
+    {
+        if (selected.Count == 0) return;
+        var values = selected.Where(v => v != "__unset__").Cast<object?>().ToList();
+        bool withUnset = values.Count != selected.Count;
+
+        if (values.Count == 0)
+        {
+            if (withUnset) w.And("NOT EXISTS(SELECT 1 FROM collection_assets ca WHERE ca.asset_id = assets.id)");
+            return;
+        }
+
+        var prefix = w.NextInPrefix();
+        var sb = new StringBuilder();
+        if (withUnset) sb.Append('(');
+        sb.Append("EXISTS(SELECT 1 FROM collection_assets ca WHERE ca.asset_id = assets.id AND ca.collection_id IN (");
+        for (int i = 0; i < values.Count; i++)
+        {
+            if (i > 0) sb.Append(',');
+            var name = prefix + "_c" + i;
+            sb.Append(name);
+            w.Args.Add(new KeyValuePair<string, object?>(name, values[i]));
+        }
+        sb.Append("))");
+        if (withUnset) sb.Append(" OR NOT EXISTS(SELECT 1 FROM collection_assets ca2 WHERE ca2.asset_id = assets.id)");
+        if (withUnset) sb.Append(')');
+        w.And(sb.ToString());
     }
 
     /// <summary>
