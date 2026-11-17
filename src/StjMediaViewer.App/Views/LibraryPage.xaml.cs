@@ -1165,6 +1165,10 @@ public sealed partial class LibraryPage : Page
     // ==================================================================================
     //  影像合集：创建 / 重命名 / 删除 / 加入 / 移出
     // ==================================================================================
+    /// <summary>筛选栏的「+」：直接打开合集弹窗（新建 / 管理）。</summary>
+    private async void NewCollection_Click(object sender, RoutedEventArgs e)
+        => await ShowCollectionsDialogAsync(ViewModel.SelectedItems.Select(i => i.Asset).ToList());
+
     private async void Collections_Click(object sender, RoutedEventArgs e)
         => await ShowCollectionsDialogAsync(ViewModel.SelectedItems.Select(i => i.Asset).ToList());
 

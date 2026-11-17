@@ -549,6 +549,22 @@
                         </StackPanel>
                     </Button>
                     <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="12,2,12,2" MinHeight="30"
+                            Click="Collections_Click"
+                            ToolTipService.ToolTip="影像合集：新建 / 管理合集，把选中素材加进合集">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE8F1;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                            <TextBlock Text="合集" Style="{ThemeResource AppCaptionTextStyle}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="12,2,12,2" MinHeight="30"
+                            Click="MergeGroups_Click"
+                            ToolTipService.ToolTip="合并组：多重曝光 / 星轨 / 演示视频合并成一个大文件夹">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE8B7;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                            <TextBlock Text="合并" Style="{ThemeResource AppCaptionTextStyle}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="12,2,12,2" MinHeight="30"
                             Click="SelectAll_Click"
                             ToolTipService.ToolTip="全选当前清单（Cmd/Ctrl+A）">
                         <StackPanel Orientation="Horizontal" Spacing="6">
@@ -655,9 +671,17 @@
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBlock Text="筛选" Style="{ThemeResource AppSubtitleTextStyle}" VerticalAlignment="Center" />
                         <Button Grid.Column="1"
+                                x:Name="NewCollectionButton"
+                                Style="{ThemeResource AppIconButtonStyle}"
+                                Click="NewCollection_Click"
+                                ToolTipService.ToolTip="新建影像合集（把选中的素材一起加进去）">
+                            <FontIcon Glyph="&#xE710;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                        </Button>
+                        <Button Grid.Column="2"
                                 Style="{ThemeResource AppIconButtonStyle}"
                                 Click="ClearFilters_Click"
                                 ToolTipService.ToolTip="清空筛选">
