@@ -87,15 +87,112 @@ public sealed partial class PreviewOverlay : UserControl
             case nameof(PreviewViewModel.VideoSource):
                 HookMediaPlayer();
                 break;
+            case nameof(PreviewViewModel.RotationDegrees):
+            case nameof(PreviewViewModel.FlipHorizontal):
+            case nameof(PreviewViewModel.FlipVertical):
+                ApplyImageTransform();
+                break;
             case nameof(PreviewViewModel.Image):
                 AudioGlyph.Visibility = ViewModel.Image is null ? Visibility.Visible : Visibility.Collapsed;
                 ResetZoom();
+                // BitmapImage 是延迟解码的：内容布局完成前 ChangeView 会被忽略，
+                // 等 ImageOpened / 一小段布局时间后再适配一次。
+                if (ViewModel.Image is Microsoft.UI.Xaml.Media.Imaging.BitmapImage bmp)
+                {
+                    bmp.ImageOpened += OnPreviewImageOpened;
+                }
+                DispatcherQueue.TryEnqueue(async () =>
+                {
+                    await Task.Delay(200);
+                    ResetZoom();
+                });
                 break;
             case nameof(PreviewViewModel.Current):
             case null:
             case "":
                 ResetZoom();
                 break;
+        }
+    }
+
+    // ==================================================================================
+    //  预览编辑工具条：缩放 / 旋转 / 翻转
+    // ==================================================================================
+    private void ZoomOut_Click(object sender, RoutedEventArgs e) => ApplyZoom(ZoomScroll.ZoomFactor / 1.25);
+    private void ZoomIn_Click(object sender, RoutedEventArgs e) => ApplyZoom(ZoomScroll.ZoomFactor * 1.25);
+    private void ZoomFit_Click(object sender, RoutedEventArgs e) => ApplyZoom(ComputeFitZoom());
+    private void ZoomActual_Click(object sender, RoutedEventArgs e) => ApplyZoom(2.0);
+
+    private void ApplyZoom(double factor)
+    {
+        try
+        {
+            var target = (float)Math.Clamp(factor, (double)ZoomScroll.MinZoomFactor, (double)ZoomScroll.MaxZoomFactor);
+            ZoomScroll.ChangeView(null, null, target, true);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("缩放失败", ex);
+        }
+    }
+
+    private async void RotateLeft_Click(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.RotateAsync(-90);
+        ApplyImageTransform();
+        FitAfterRotation();
+    }
+
+    private async void RotateRight_Click(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.RotateAsync(90);
+        ApplyImageTransform();
+        FitAfterRotation();
+    }
+
+    /// <summary>旋转 90°/270° 后，如果画面超出窗口就自动缩小到能看全。</summary>
+    private void FitAfterRotation()
+    {
+        try
+        {
+            ZoomScroll.ChangeView(null, null, ComputeFitZoom(), true);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("旋转后自适应缩放失败", ex);
+        }
+    }
+
+    private async void FlipH_Click(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.ToggleFlipHorizontalAsync();
+        ApplyImageTransform();
+    }
+
+    private async void FlipV_Click(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.ToggleFlipVerticalAsync();
+        ApplyImageTransform();
+    }
+
+    private async void ResetEdits_Click(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.ResetEditsAsync();
+        ApplyImageTransform();
+    }
+
+    /// <summary>把 ViewModel 里的旋转 / 翻转同步到 Image 的渲染变换。</summary>
+    private void ApplyImageTransform()
+    {
+        try
+        {
+            ImageRotate.Angle = ViewModel.RotationDegrees % 360;
+            ImageScale.ScaleX = ViewModel.FlipHorizontal ? -1 : 1;
+            ImageScale.ScaleY = ViewModel.FlipVertical ? -1 : 1;
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("应用旋转/翻转变换失败", ex);
         }
     }
 
@@ -107,7 +204,7 @@ public sealed partial class PreviewOverlay : UserControl
         _suppressZoomText = true;
         try
         {
-            ZoomScroll.ChangeView(0, 0, 1.0f, true);
+            ZoomScroll.ChangeView(0, 0, ComputeFitZoom(), true);
             ViewModel.ZoomText = "适应";
         }
         catch
@@ -120,11 +217,44 @@ public sealed partial class PreviewOverlay : UserControl
         }
     }
 
+    private void OnPreviewImageOpened(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Microsoft.UI.Xaml.Media.Imaging.BitmapImage bmp)
+            bmp.ImageOpened -= OnPreviewImageOpened;
+        DispatcherQueue.TryEnqueue(ResetZoom);
+    }
+
+    /// <summary>按"当前旋转后的画面"算能完整显示的缩放比例（ScrollViewer 内容按图片原始像素布局）。</summary>
+    private float ComputeFitZoom()
+    {
+        try
+        {
+            if (ViewModel.Current is not { } asset || asset.Width is not > 0 || asset.Height is not > 0) return 1f;
+            double vw = ZoomScroll.ActualWidth;
+            double vh = ZoomScroll.ActualHeight;
+            if (vw <= 0 || vh <= 0) return 1f;
+
+            double w = asset.Width.Value;
+            double h = asset.Height.Value;
+            if (ViewModel.RotationDegrees % 180 == 90) (w, h) = (h, w);
+
+            var zoom = Math.Min(vw / w, vh / h);
+            return (float)Math.Clamp(zoom, 0.1, 8);
+        }
+        catch
+        {
+            return 1f;
+        }
+    }
+
     private void ZoomScroll_ViewChanged(object? sender, ScrollViewerViewChangedEventArgs e)
     {
         if (_suppressZoomText) return;
         var zoom = ZoomScroll.ZoomFactor;
-        ViewModel.ZoomText = Math.Abs(zoom - 1.0) < 0.01 ? "适应" : $"{zoom * 100:0}%";
+        var fit = ComputeFitZoom();
+        ViewModel.ZoomText = Math.Abs(zoom - fit) < Math.Max(0.005, fit * 0.01)
+            ? "适应"
+            : $"{zoom * 100:0}%";
     }
 
     private void Overlay_WheelZoom(object sender, PointerRoutedEventArgs e)
@@ -255,6 +385,60 @@ public sealed partial class PreviewOverlay : UserControl
                 TogglePlayback();
                 e.Handled = true;
                 break;
+            // 预览编辑快捷键：R 顺转 / Shift+R 逆转 / F 水平翻转 / V 垂直翻转 / 0 适应 / 1 100%
+            case VirtualKey.R:
+                if (ViewModel.CanEdit)
+                {
+                    _ = ViewModel.RotateAsync(e.KeyStatus.IsMenuKeyDown || IsShiftDown() ? -90 : 90)
+                        .ContinueWith(_ => DispatcherQueue.TryEnqueue(ApplyImageTransform));
+                    e.Handled = true;
+                }
+                break;
+            case VirtualKey.F:
+                if (ViewModel.CanEdit)
+                {
+                    _ = ViewModel.ToggleFlipHorizontalAsync()
+                        .ContinueWith(_ => DispatcherQueue.TryEnqueue(ApplyImageTransform));
+                    e.Handled = true;
+                }
+                break;
+            case VirtualKey.V:
+                if (ViewModel.CanEdit)
+                {
+                    _ = ViewModel.ToggleFlipVerticalAsync()
+                        .ContinueWith(_ => DispatcherQueue.TryEnqueue(ApplyImageTransform));
+                    e.Handled = true;
+                }
+                break;
+            case VirtualKey.Number0:
+                ApplyZoom(ComputeFitZoom());
+                e.Handled = true;
+                break;
+            case VirtualKey.Number1:
+                ApplyZoom(2.0);
+                e.Handled = true;
+                break;
+            case VirtualKey.Add:
+                ApplyZoom(ZoomScroll.ZoomFactor * 1.25);
+                e.Handled = true;
+                break;
+            case VirtualKey.Subtract:
+                ApplyZoom(ZoomScroll.ZoomFactor / 1.25);
+                e.Handled = true;
+                break;
+        }
+    }
+
+    private static bool IsShiftDown()
+    {
+        try
+        {
+            var state = Microsoft.UI.Input.InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Shift);
+            return state.HasFlag(Windows.UI.Core.CoreVirtualKeyStates.Down);
+        }
+        catch
+        {
+            return false;
         }
     }
 

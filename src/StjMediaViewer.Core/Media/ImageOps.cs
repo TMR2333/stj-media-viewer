@@ -6,7 +6,7 @@ namespace StjMediaViewer.Core.Media;
 /// 纯托管像素操作：缩放 / 灰度化。解码器已经把大图缩到目标尺寸，
 /// 这里只处理编码前的小幅缩放与 aHash 需要的定尺寸重采样，避免再走一次 WIC。
 /// </summary>
-internal static class ImageOps
+public static class ImageOps
 {
     /// <summary>等比缩放到 maxDimension 以内（只缩不放）。</summary>
     public static DecodedImage Fit(DecodedImage src, int maxDimension)
@@ -95,4 +95,65 @@ internal static class ImageOps
 
     /// <summary>按 stride 安全取一行像素（解码器可能给非紧密行）。</summary>
     public static int PixelOffset(DecodedImage img, int x, int y) => y * img.Stride + x * 4;
+
+    /// <summary>顺时针旋转 90°（BGRA 像素级）。</summary>
+    public static DecodedImage Rotate90Clockwise(DecodedImage src)
+    {
+        int w = src.Width, h = src.Height;
+        int stride = h * 4;   // 旋转后宽度 = 原高度
+        var dst = new byte[stride * w];   // 旋转后高度 = 原宽度
+        for (int y = 0; y < h; y++)
+        {
+            int srcRow = y * src.Stride;
+            for (int x = 0; x < w; x++)
+            {
+                // 目标坐标： (h-1-y, x)
+                int dstX = h - 1 - y;
+                int dstY = x;
+                int si = srcRow + x * 4;
+                int di = dstY * stride + dstX * 4;
+                dst[di] = src.Bgra[si];
+                dst[di + 1] = src.Bgra[si + 1];
+                dst[di + 2] = src.Bgra[si + 2];
+                dst[di + 3] = src.Bgra[si + 3];
+            }
+        }
+        return new DecodedImage(dst, h, w, stride);
+    }
+
+    /// <summary>水平/垂直翻转。</summary>
+    public static DecodedImage Flip(DecodedImage src, bool horizontal)
+    {
+        int w = src.Width, h = src.Height;
+        int stride = w * 4;
+        var dst = new byte[stride * h];
+        for (int y = 0; y < h; y++)
+        {
+            int srcRow = y * src.Stride;
+            int dstRow = y * stride;
+            for (int x = 0; x < w; x++)
+            {
+                int dx = horizontal ? w - 1 - x : x;
+                int dy = horizontal ? y : h - 1 - y;
+                int si = srcRow + x * 4;
+                int di = dy * stride + dx * 4;
+                dst[di] = src.Bgra[si];
+                dst[di + 1] = src.Bgra[si + 1];
+                dst[di + 2] = src.Bgra[si + 2];
+                dst[di + 3] = src.Bgra[si + 3];
+            }
+        }
+        return new DecodedImage(dst, w, h, stride);
+    }
+
+    /// <summary>按素材的预览编辑（顺时针角度 + 翻转）处理图像；没有编辑时原样返回。</summary>
+    public static DecodedImage ApplyEdits(DecodedImage src, int rotationDegrees, bool flipH, bool flipV)
+    {
+        var result = src;
+        var steps = ((rotationDegrees % 360) + 360) % 360 / 90;
+        for (int i = 0; i < steps; i++) result = Rotate90Clockwise(result);
+        if (flipH) result = Flip(result, horizontal: true);
+        if (flipV) result = Flip(result, horizontal: false);
+        return result;
+    }
 }

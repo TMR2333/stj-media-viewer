@@ -15,11 +15,23 @@ public sealed partial class AssetCardItem : ObservableObject
 
     public AssetCardItem(MediaAsset asset)
     {
-        Asset = asset;
+        _asset = asset;
         Rebuild();
     }
 
-    public MediaAsset Asset { get; private set; }
+    private MediaAsset _asset;
+
+    /// <summary>可观察：预览里做了旋转/翻转后要触发缩略图重新加载。</summary>
+    public MediaAsset Asset
+    {
+        get => _asset;
+        private set
+        {
+            if (ReferenceEquals(_asset, value)) return;
+            _asset = value;
+            OnPropertyChanged();
+        }
+    }
 
     // ---------------- 文本 ----------------
     public string Id => Asset.Id;
@@ -103,7 +115,12 @@ public sealed partial class AssetCardItem : ObservableObject
     /// <summary>基类素材对象被替换时（例如 Upsert 之后拿回新实例）重新绑定。</summary>
     public void UpdateAsset(MediaAsset asset)
     {
-        Asset = asset;
+        // 对象实例可能没变（预览编辑只改了字段），所以先清空再设回去，强制 ThumbnailImage 重载
+        var current = _asset;
+        _asset = null!;
+        OnPropertyChanged(nameof(Asset));
+        _asset = ReferenceEquals(current, asset) ? asset : asset;
+        OnPropertyChanged(nameof(Asset));
         Rebuild();
     }
 }

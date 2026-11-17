@@ -91,6 +91,13 @@ public sealed partial class LibraryPage : Page
                     if (asset is not null)
                     {
                         DispatcherQueue.TryEnqueue(() => ShellPage.Current?.ShowPreview(new[] { asset }, 0));
+
+                        // 截图用：STJ_DEMO_PREVIEW_ROTATE=90 时打开预览后自动旋转，验证工具条和变换
+                        if (int.TryParse(Environment.GetEnvironmentVariable("STJ_DEMO_PREVIEW_ROTATE"), out var rotate) && rotate != 0)
+                        {
+                            await Task.Delay(1500);
+                            DispatcherQueue.TryEnqueue(() => _ = PreviewViewModel.Shared.RotateAsync(rotate));
+                        }
                     }
                 }
                 catch (Exception ex)

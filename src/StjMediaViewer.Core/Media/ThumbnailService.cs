@@ -82,6 +82,10 @@ public sealed class ThumbnailService : IThumbnailService
                     return null;
                 }
 
+                // 预览编辑（旋转 / 翻转）先做，再 LUT，再编码
+                if (asset.HasImageEdits)
+                    image = ImageOps.ApplyEdits(image, asset.RotationDegrees, asset.FlipHorizontal, asset.FlipVertical);
+
                 // LUT 调色在编码之前做（同一帧缓存里保留"已调色"结果，切换 LUT 走不同缓存键）
                 if (lut is not null && !lut.IsIdentity)
                     image = LutApplier.Apply(image, lut);
@@ -231,7 +235,9 @@ public sealed class ThumbnailService : IThumbnailService
             }
             catch { }
         }
-        var text = $"{Path.GetFullPath(asset.FullPath).ToLowerInvariant()}|{size}|{mtime}";
+        // 预览编辑（旋转/翻转）参与缓存键：转了方向就换一份缓存
+        var edits = asset.HasImageEdits ? $"|r{asset.RotationDegrees % 360}|f{(asset.FlipHorizontal ? 1 : 0)}{(asset.FlipVertical ? 1 : 0)}" : "";
+        var text = $"{Path.GetFullPath(asset.FullPath).ToLowerInvariant()}|{size}|{mtime}{edits}";
         var hash = SHA1.HashData(Encoding.UTF8.GetBytes(text));
         return Convert.ToHexString(hash).ToLowerInvariant();
     }

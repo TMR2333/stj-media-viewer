@@ -52,6 +52,10 @@ public interface IAssetStore
     Task UpdateAssetMetaByPathAsync(string fullPath, string? creator = null, string? origin = null,
         CancellationToken ct = default);
 
+    /// <summary>只更新预览编辑（旋转角度 / 翻转），不重写整行。</summary>
+    Task UpdateImageEditsAsync(string assetId, int rotationDegrees, bool flipHorizontal, bool flipVertical,
+        CancellationToken ct = default);
+
     Task UpdateAssetPathAsync(string assetId, string fullPath, string? relativePath,
         IReadOnlyList<string>? sidecars = null, CancellationToken ct = default);
 

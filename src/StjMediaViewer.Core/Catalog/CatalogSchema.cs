@@ -45,6 +45,9 @@ internal static class CatalogSchema
         EnsureColumn(conn, TableAssets, "origin", "TEXT");
         EnsureColumn(conn, TableAssets, "creator", "TEXT");
         EnsureColumn(conn, TableAssets, "themes_json", "TEXT NOT NULL DEFAULT '[]'");
+        EnsureColumn(conn, TableAssets, "rotation_degrees", "INTEGER NOT NULL DEFAULT 0");
+        EnsureColumn(conn, TableAssets, "flip_h", "INTEGER NOT NULL DEFAULT 0");
+        EnsureColumn(conn, TableAssets, "flip_v", "INTEGER NOT NULL DEFAULT 0");
 
         // 迁移：v2 之前"不属于任何 JPG/RAW 组"的素材（视频 / 音频 / 单张图）没被标成组封面，
         // 折叠模式下这些素材会被 `is_group_cover = 1` 过滤掉 → 按"视频"筛选出现 0 条。
@@ -146,6 +149,9 @@ internal static class CatalogSchema
             has_embedded_xmp        INTEGER NOT NULL DEFAULT 0,
             theme                   TEXT,
             themes_json             TEXT NOT NULL DEFAULT '[]',
+            rotation_degrees        INTEGER NOT NULL DEFAULT 0,
+            flip_h                  INTEGER NOT NULL DEFAULT 0,
+            flip_v                  INTEGER NOT NULL DEFAULT 0,
             tone                    TEXT,
             rating                  INTEGER NOT NULL DEFAULT 0,
             color_label             TEXT,

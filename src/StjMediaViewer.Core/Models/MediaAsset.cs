@@ -156,6 +156,18 @@ public sealed class MediaAsset
     public bool IsImage => Kind == MediaKind.Image;
     public bool IsAudio => Kind == MediaKind.Audio;
 
+    /// <summary>预览编辑：顺时针旋转角度（0 / 90 / 180 / 270）。</summary>
+    public int RotationDegrees { get; set; }
+
+    /// <summary>预览编辑：水平翻转。</summary>
+    public bool FlipHorizontal { get; set; }
+
+    /// <summary>预览编辑：垂直翻转。</summary>
+    public bool FlipVertical { get; set; }
+
+    /// <summary>是否做过预览编辑（旋转/翻转）。</summary>
+    public bool HasImageEdits => RotationDegrees % 360 != 0 || FlipHorizontal || FlipVertical;
+
     public double? AspectRatio =>
         Width is > 0 && Height is > 0 ? (double)Width.Value / Height.Value : null;
 

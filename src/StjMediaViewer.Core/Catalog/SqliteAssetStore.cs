@@ -634,6 +634,22 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
         }, ct);
     }
 
+    public Task UpdateImageEditsAsync(string assetId, int rotationDegrees, bool flipHorizontal, bool flipVertical,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(assetId)) return Task.CompletedTask;
+        return RunAsync(() =>
+        {
+            using var cmd = _conn!.CreateCommand();
+            cmd.CommandText = "UPDATE assets SET rotation_degrees=@r, flip_h=@h, flip_v=@v WHERE id=@id";
+            cmd.Parameters.AddWithValue("@r", ((rotationDegrees % 360) + 360) % 360);
+            cmd.Parameters.AddWithValue("@h", flipHorizontal ? 1 : 0);
+            cmd.Parameters.AddWithValue("@v", flipVertical ? 1 : 0);
+            cmd.Parameters.AddWithValue("@id", assetId);
+            cmd.ExecuteNonQuery();
+        }, ct);
+    }
+
     public Task UpdateAssetPathAsync(string assetId, string fullPath, string? relativePath,
         IReadOnlyList<string>? sidecars = null, CancellationToken ct = default)
     {

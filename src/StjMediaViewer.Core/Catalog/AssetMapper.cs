@@ -27,7 +27,7 @@ internal static class AssetMapper
         "captured_at", "captured_ms", "captured_day", "captured_at_source",
         "latitude", "longitude", "altitude_m", "country", "province", "city", "city_source",
         "title", "caption", "creator", "copyright",
-        "keywords_json", "keywords_flat", "themes_json",
+        "keywords_json", "keywords_flat", "themes_json", "rotation_degrees", "flip_h", "flip_v",
         "post_process", "has_develop_edits", "develop_engine", "xmp_path",
         "sidecars_json", "has_embedded_xmp", "origin",
         "group_id", "is_group_cover", "group_has_raw", "group_has_jpeg", "companions_json", "lut_id",
@@ -136,6 +136,9 @@ internal static class AssetMapper
         "copyright" => N(a.Copyright),
         "keywords_json" => JsonKeywords(a.Keywords),
         "themes_json" => ThemesJson(a),
+        "rotation_degrees" => a.RotationDegrees % 360,
+        "flip_h" => a.FlipHorizontal ? 1 : 0,
+        "flip_v" => a.FlipVertical ? 1 : 0,
         "keywords_flat" => KeywordsFlat(a.Keywords),
         "post_process" => (int)a.PostProcess,
         "has_develop_edits" => a.HasDevelopEdits ? 1 : 0,
@@ -257,6 +260,9 @@ internal static class AssetMapper
         var themes = JsonToList(GetS(r, "themes_json"));
         if (themes.Count == 0 && !string.IsNullOrWhiteSpace(a.Theme)) themes.Add(a.Theme!);
         a.Themes = themes;
+        a.RotationDegrees = GetI(r, "rotation_degrees") % 360;
+        a.FlipHorizontal = GetB(r, "flip_h");
+        a.FlipVertical = GetB(r, "flip_v");
         a.Sidecars = JsonToList(GetS(r, "sidecars_json"));
         a.Origin = GetN(r, "origin");
         a.CompanionPaths = JsonToList(GetS(r, "companions_json"));

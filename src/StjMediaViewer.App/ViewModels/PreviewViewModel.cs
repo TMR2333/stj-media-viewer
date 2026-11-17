@@ -188,6 +188,8 @@ public sealed partial class PreviewViewModel : ObservableObject
         PlaceholderGlyph = Formatting.KindGlyph(asset.Kind);
         PlaceholderText = "暂无可显示的画面";
         LoadingVisibility = Visibility.Visible;
+        LoadEdits();
+        RefreshEditBar();
         _proxyAttempted = false;
         VideoStatusText = "";
         VideoStatusVisibility = Visibility.Collapsed;
@@ -267,6 +269,93 @@ public sealed partial class PreviewViewModel : ObservableObject
             ImageVisibility = Visibility.Collapsed;
             PlaceholderVisibility = Visibility.Visible;
             PlaceholderText = failText;
+        }
+    }
+
+    // ==================================================================================
+    //  预览编辑：旋转 / 翻转 / 缩放（缩放由视图层 ZoomScroll 执行，这里只给状态）
+    // ==================================================================================
+    [ObservableProperty] private int _rotationDegrees;
+    [ObservableProperty] private bool _flipHorizontal;
+    [ObservableProperty] private bool _flipVertical;
+    [ObservableProperty] private string _editSummary = "";
+    [ObservableProperty] private Visibility _editBarVisibility = Visibility.Collapsed;
+
+    /// <summary>操作栏是否显示（图片才显示旋转/翻转）。</summary>
+    public bool CanEdit => IsImage;
+
+    private void RefreshEditBar()
+    {
+        EditBarVisibility = IsImage ? Visibility.Visible : Visibility.Collapsed;
+        OnPropertyChanged(nameof(CanEdit));
+        UpdateEditSummary();
+    }
+
+    private void LoadEdits()
+    {
+        RotationDegrees = Current?.RotationDegrees % 360 ?? 0;
+        FlipHorizontal = Current?.FlipHorizontal ?? false;
+        FlipVertical = Current?.FlipVertical ?? false;
+        UpdateEditSummary();
+    }
+
+    private void UpdateEditSummary()
+    {
+        var parts = new List<string>();
+        if (RotationDegrees % 360 != 0) parts.Add($"旋转 {RotationDegrees % 360}°");
+        if (FlipHorizontal) parts.Add("水平翻转");
+        if (FlipVertical) parts.Add("垂直翻转");
+        EditSummary = parts.Count == 0 ? "未编辑" : string.Join(" · ", parts);
+    }
+
+    /// <summary>顺时针旋转（delta 可为负）。</summary>
+    public Task RotateAsync(int delta)
+    {
+        if (Current is not { IsImage: true } asset) return Task.CompletedTask;
+        RotationDegrees = ((RotationDegrees + delta) % 360 + 360) % 360;
+        return PersistEditsAsync(asset);
+    }
+
+    public Task ToggleFlipHorizontalAsync()
+    {
+        if (Current is not { IsImage: true } asset) return Task.CompletedTask;
+        FlipHorizontal = !FlipHorizontal;
+        return PersistEditsAsync(asset);
+    }
+
+    public Task ToggleFlipVerticalAsync()
+    {
+        if (Current is not { IsImage: true } asset) return Task.CompletedTask;
+        FlipVertical = !FlipVertical;
+        return PersistEditsAsync(asset);
+    }
+
+    public Task ResetEditsAsync()
+    {
+        if (Current is null) return Task.CompletedTask;
+        RotationDegrees = 0;
+        FlipHorizontal = false;
+        FlipVertical = false;
+        return PersistEditsAsync(Current);
+    }
+
+    private async Task PersistEditsAsync(MediaAsset asset)
+    {
+        UpdateEditSummary();
+        try
+        {
+            asset.RotationDegrees = RotationDegrees;
+            asset.FlipHorizontal = FlipHorizontal;
+            asset.FlipVertical = FlipVertical;
+
+            await AppServices.Store.UpdateImageEditsAsync(asset.Id, RotationDegrees, FlipHorizontal, FlipVertical);
+            AppServices.Thumbs.Invalidate(asset.Id);   // 网格缩略图按"编辑后的样子"重新生成
+            AppEvents.RaiseAssetUpdated(asset);
+            Log.Info($"[preview] 预览编辑 {asset.FileName}: 旋转 {RotationDegrees}°，翻转 H={FlipHorizontal} V={FlipVertical}");
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("保存预览编辑失败", ex);
         }
     }
 

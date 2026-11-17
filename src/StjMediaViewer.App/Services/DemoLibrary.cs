@@ -275,6 +275,19 @@ internal sealed class FallbackAssetStore : IAssetStore
         return Task.CompletedTask;
     }
 
+    public Task UpdateImageEditsAsync(string assetId, int rotationDegrees, bool flipHorizontal, bool flipVertical,
+        CancellationToken ct = default)
+    {
+        var asset = _assets.FirstOrDefault(a => a.Id == assetId);
+        if (asset is not null)
+        {
+            asset.RotationDegrees = ((rotationDegrees % 360) + 360) % 360;
+            asset.FlipHorizontal = flipHorizontal;
+            asset.FlipVertical = flipVertical;
+        }
+        return Task.CompletedTask;
+    }
+
     public Task UpdateAssetPathAsync(string assetId, string fullPath, string? relativePath,
         IReadOnlyList<string>? sidecars = null, CancellationToken ct = default)
     {
