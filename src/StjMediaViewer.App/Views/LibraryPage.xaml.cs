@@ -43,6 +43,10 @@ public sealed partial class LibraryPage : Page
     // ==================================================================================
     //  生命周期
     // ==================================================================================
+    /// <summary>侧边栏切到照片库 / 视频库时调用：只改范围，不重建整页。</summary>
+    public void ApplyNavScope(string viewId)
+        => ViewModel.SetScope(LibraryScopeRules.FromViewId(viewId));
+
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         AttachEvents();
@@ -55,6 +59,8 @@ public sealed partial class LibraryPage : Page
             _initializedOnce = true;
             SortBox.SelectedIndex = 0;
             SortOrderText.Text = ViewModel.Descending ? "降序" : "升序";
+            // 按侧边栏进入的是照片库还是视频库，先锁定媒体类型范围
+            ViewModel.SetScope(LibraryScopeRules.FromViewId(ShellViewModel.Shared.SelectedNavId));
             if (ViewModel.Items.Count == 0) ViewModel.Initialize();
         }
 

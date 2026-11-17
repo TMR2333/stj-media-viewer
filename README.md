@@ -274,6 +274,22 @@
 
 > 说明：只是**卸载/覆盖安装**不会丢媒体库；丢的是"库目录本身被删除或移动"这种情况。
 
+### 照片 / 视频分成两个库（默认开启）
+
+侧边栏把素材库拆成两个入口，各用不同图标：
+
+![照片库](shots/final-split-photos.png)
+
+![视频库](shots/final-split-videos.png)
+
+- 照片库只显示图片，视频库只显示视频/音频（分面计数、筛选都按当前库统计）；
+- **导卡自动分开导入**：导入完成后按文件类型自动切到对应库，状态条写明「照片 N 张 → 照片库，视频 M 个 → 视频库」；
+- 「设置 → 媒体库」可开关（默认开启），关掉回到单个「素材库」：
+
+![分库开关](shots/final-split-setting.png)
+
+- 只是展示分层，**不动磁盘文件、不复制素材**。
+
 ### 设备 ↔ LUT 绑定（Log 素材自动监视）
 
 ![设备 LUT 绑定](shots/final-device-lut.png)
@@ -567,7 +583,7 @@ ffmpeg 是可选的：把 `ffmpeg.exe` 放到 `tools/ffmpeg/bin/`（或 PATH）�
 | 产物 | 大小 | 说明 |
 | --- | --- | --- |
 | `STJMediaViewer-Setup.exe` | ≈143 MB | **安装包**，带图形界面：可**自定义安装目录**、可选创建桌面快捷方式；装到用户目录，不需要管理员权限 |
-| `STJMediaViewer-1.11.0-portable.exe` | ≈143 MB | **便携版**：单文件，双击后解压到 `%LOCALAPPDATA%\StjMediaViewerPortable` 并直接启动；不写注册表、不建快捷方式 |
+| `STJMediaViewer-1.12.0-portable.exe` | ≈143 MB | **便携版**：单文件，双击后解压到 `%LOCALAPPDATA%\StjMediaViewerPortable` 并直接启动；不写注册表、不建快捷方式 |
 
 > 旧的 `*-portable-win-x64.zip` 已废弃：压缩包里的 exe 直接双击容易踩「没解压就在压缩包里运行 / SmartScreen 拦截」，
 > 现在改成**单文件便携 exe**，双击即用。
@@ -598,8 +614,8 @@ STJMediaViewer-Setup.exe                      交互式安装（选目录）
 STJMediaViewer-Setup.exe /S                   静默安装到默认目录
 STJMediaViewer-Setup.exe /S /D=D:\Apps\STJ  静默安装到指定目录
 STJMediaViewer-Setup.exe /uninstall           卸载（/S 静默；/D= 指定安装目录）
-STJMediaViewer-1.11.0-portable.exe            便携版：解压 + 启动
-STJMediaViewer-1.11.0-portable.exe /D=D:\STJ 便携版解压到指定目录
+STJMediaViewer-1.12.0-portable.exe            便携版：解压 + 启动
+STJMediaViewer-1.12.0-portable.exe /D=D:\STJ 便携版解压到指定目录
 ```
 
 **卸载**：Windows 设置 → 应用 → 已安装的应用（或 `Setup.exe /uninstall`）。
@@ -722,9 +738,9 @@ dotnet build tools/SelfCheck/StjMediaViewer.SelfCheck.csproj
 
 ### 3.5 版本号与发行流程
 
-当前版本 **v1.11.0**，历史见 [CHANGELOG.md](CHANGELOG.md)。
+当前版本 **v1.12.0**，历史见 [CHANGELOG.md](CHANGELOG.md)。
 
-- 规则：每次对外更新都 **+1 版本号**（`1.10.0` → `1.11.0` → `1.11.1` → …），同步改应用/安装器/便携版/macOS Info.plist；
+- 规则：每次对外更新都 **+1 版本号**（`1.11.0` → `1.12.0` → `1.12.1` → …），同步改应用/安装器/便携版/macOS Info.plist；
 - 每次发版：`git tag v<版本>` + 推送到 GitCode + 创建发行版（Release）；
 - 一键脚本（版本、构建、提交、打标签、推送、创建发行版）：
 
@@ -735,7 +751,7 @@ powershell -ExecutionPolicy Bypass -File tools/release.ps1 -Version 1.0.4 -Notes
 
 - 仓库：<https://gitcode.com/TMR2333/stj-media-viewer>
 - 发行版：<https://gitcode.com/TMR2333/stj-media-viewer/releases>
-  - v1.11.0：安装包 + 便携版（Release 附件直下）
+  - v1.12.0：安装包 + 便携版（Release 附件直下）
 
 **每次更新都会：**改版本号 → 构建 → 提交 → 打 tag → 推送 → 建发行版并上传安装包/便携版。
 

@@ -187,7 +187,8 @@ public sealed partial class SettingsPage : Page
         var cache = Environment.GetEnvironmentVariable("STJ_DEMO_SETTINGS_CACHE") == "1";
         var devices = Environment.GetEnvironmentVariable("STJ_DEMO_SETTINGS_DEVICES") == "1";
         var luts = Environment.GetEnvironmentVariable("STJ_DEMO_SETTINGS_LUT") == "1";
-        if (!cache && !devices && !luts) return;
+        var split = Environment.GetEnvironmentVariable("STJ_DEMO_SETTINGS_SPLIT") == "1";
+        if (!cache && !devices && !luts && !split) return;
 
         DispatcherQueue.TryEnqueue(async () =>
         {
@@ -200,7 +201,8 @@ public sealed partial class SettingsPage : Page
             }
 
             // 设备名称卡片：按"设备"标题找到它在滚动内容里的位置
-            if (FindTextBlock(this, luts ? "设备 ↔ LUT 绑定" : "设备名称") is { } heading && scroll.Content is UIElement content)
+            var targetText = split ? "照片 / 视频分成两个库" : luts ? "设备 ↔ LUT 绑定" : "设备名称";
+            if (FindTextBlock(this, targetText) is { } heading && scroll.Content is UIElement content)
             {
                 try
                 {

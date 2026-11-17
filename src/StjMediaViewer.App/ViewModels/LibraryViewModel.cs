@@ -262,6 +262,21 @@ public sealed partial class LibraryViewModel : ObservableObject
         }
     }
 
+    /// <summary>当前库范围（照片库 / 视频库 / 不分库）。侧边栏切换时由 LibraryPage 设置。</summary>
+    public LibraryScope Scope { get; private set; } = LibraryScope.All;
+
+    /// <summary>切换库范围：照片库只看图片、视频库只看视频/音频。</summary>
+    public void SetScope(LibraryScope scope)
+    {
+        if (Scope == scope) return;
+        Scope = scope;
+        OnPropertyChanged(nameof(Scope));
+        OnPropertyChanged(nameof(ScopeTitle));
+        RequestRefresh(immediate: true);
+    }
+
+    public string ScopeTitle => LibraryScopeRules.Title(Scope);
+
     public void Initialize()
     {
         _ = EnsureCollectionsLoadedAsync(CancellationToken.None);
@@ -405,8 +420,16 @@ public sealed partial class LibraryViewModel : ObservableObject
             CollapseGroups = !ShowGroupCopies,
        };
 
-        foreach (var id in KindGroup.SelectedIds)
-            if (Enum.TryParse<MediaKind>(id, true, out var kind)) q.Kinds.Add(kind);
+        if (Scope != LibraryScope.All)
+        {
+            // 分库模式：媒体类型由库本身决定，不再叠加「媒体类型」筛选
+            LibraryScopeRules.Apply(q, Scope);
+        }
+        else
+        {
+            foreach (var id in KindGroup.SelectedIds)
+                if (Enum.TryParse<MediaKind>(id, true, out var kind)) q.Kinds.Add(kind);
+        }
 
         foreach (var id in FormatGroup.SelectedIds) q.Formats.Add(id);
         foreach (var id in DeviceGroup.SelectedIds) q.Devices.Add(id);
@@ -464,10 +487,16 @@ public sealed partial class LibraryViewModel : ObservableObject
     private static TimeSpan LocalOffset => TimeZoneInfo.Local.BaseUtcOffset;
 
     /// <summary>分面计数用：只保留文本，不叠加维度筛选，保证各维度计数稳定可比。</summary>
-    private AssetQuery BuildFacetQuery() => new()
+    private AssetQuery BuildFacetQuery()
     {
-        Text = string.IsNullOrWhiteSpace(SearchText) ? null : SearchText.Trim(),
-    };
+        var query = new AssetQuery
+        {
+            Text = string.IsNullOrWhiteSpace(SearchText) ? null : SearchText.Trim(),
+        };
+        // 分库模式：分面计数也只统计当前库里的类型，避免照片库显示"视频 646"
+        if (Scope != LibraryScope.All) LibraryScopeRules.Apply(query, Scope);
+        return query;
+    }
 
     // ==================================================================================
     //  分面 → 侧栏
@@ -842,9 +871,10 @@ public sealed partial class LibraryViewModel : ObservableObject
 
     private void UpdateResultText()
     {
-        ResultText = FilteredCount == TotalCount
+        var text = FilteredCount == TotalCount
             ? $"共 {TotalCount} 张素材"
             : $"筛选出 {FilteredCount} / {TotalCount} 张";
+        ResultText = Scope == LibraryScope.All ? text : $"{ScopeTitle} · {text}";
     }
 
     private void UpdateEmptyState()

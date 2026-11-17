@@ -331,6 +331,30 @@
                  ================================================================== -->
             <uic:SectionCard Header="媒体库" Subtitle="扫描本机目录并建立索引；移除只删索引，不动磁盘文件" Glyph="&#xE8B7;">
                 <StackPanel Spacing="10">
+                    <Border Background="{ThemeResource AppSurfaceBrush}"
+                            BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                            BorderThickness="1"
+                            CornerRadius="{ThemeResource AppRadiusMedium}"
+                            Padding="12,10">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="照片 / 视频分成两个库" Style="{ThemeResource AppCaptionTextStyle}" />
+                                <TextBlock Text="{x:Bind ViewModel.SplitLibraryStatus, Mode=OneWay}"
+                                           Style="{ThemeResource AppMicroTextStyle}"
+                                           Foreground="{ThemeResource TextTertiaryBrush}"
+                                           TextWrapping="Wrap" />
+                            </StackPanel>
+                            <ToggleSwitch Grid.Column="1"
+                                          OnContent="开启"
+                                          OffContent="关闭"
+                                          IsOn="{x:Bind ViewModel.SplitMediaKindLibraries, Mode=TwoWay}"
+                                          VerticalAlignment="Center" />
+                        </Grid>
+                    </Border>
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />

@@ -409,6 +409,7 @@ public sealed partial class SettingsViewModel : ObservableObject
             RuntimeSummary = BuildRuntimeSummary();
 
             await RefreshLibrariesAsync();
+            LoadSplitLibrarySetting();
             await LoadDeviceAliasesAsync();
             await LoadDeviceLutBindingsAsync();
             await RefreshToolStatusAsync();
@@ -645,6 +646,39 @@ public sealed partial class SettingsViewModel : ObservableObject
     // ==================================================================================
     //  媒体库
     // ==================================================================================
+    // ==================================================================================
+    //  照片 / 视频分库
+    // ==================================================================================
+    [ObservableProperty] private bool _splitMediaKindLibraries;
+
+    [ObservableProperty] private string _splitLibraryStatus = "";
+
+    public void LoadSplitLibrarySetting()
+    {
+        SplitMediaKindLibraries = AppServices.Settings.Current.SplitMediaKindLibraries;
+        SplitLibraryStatus = SplitMediaKindLibraries
+            ? "已开启：侧边栏显示「照片库」和「视频库」两个入口；导卡时按文件类型自动分到对应库。"
+            : "已关闭：侧边栏只有一个「素材库」，照片和视频放在一起。";
+    }
+
+    partial void OnSplitMediaKindLibrariesChanged(bool value)
+    {
+        try
+        {
+            AppServices.Settings.Current.SplitMediaKindLibraries = value;
+            _ = AppServices.Settings.SaveAsync();
+            SplitLibraryStatus = value
+                ? "已开启：侧边栏显示「照片库」和「视频库」两个入口；导卡时按文件类型自动分到对应库。"
+                : "已关闭：侧边栏只有一个「素材库」，照片和视频放在一起。";
+            StjMediaViewer.App.Views.ShellPage.Current?.RefreshLibraryNavMode();
+            AppEvents.SetStatus(value ? "照片 / 视频已分成两个库" : "已合并为一个素材库");
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("保存分库设置失败", ex);
+        }
+    }
+
     // ==================================================================================
     //  设备名称（自定义设备名）
     // ==================================================================================

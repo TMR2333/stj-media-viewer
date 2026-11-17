@@ -879,6 +879,33 @@ public sealed partial class ImportViewModel : ObservableObject
             AppEvents.SetStatus(report.Success
                 ? $"导入完成：复制 {report.FilesCopied} 个文件（{Formatting.FileSize(report.BytesCopied)}）"
                 : $"导入完成但有异常：失败 {report.FilesFailed} / 损坏 {report.FilesCorrupted} / 缺失 {report.FilesMissing}");
+
+            // 分库模式：按类型统计并自动跳到对应库
+            if (AppServices.Settings.Current.SplitMediaKindLibraries && report.FilesCopied > 0)
+            {
+                int photos = 0, videos = 0;
+                foreach (var item in report.Items)
+                {
+                    if (!string.Equals(item.Status, "Copied", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (string.IsNullOrWhiteSpace(item.DestinationPath)) continue;
+                    if (!MediaTypeCatalog.TryGet(item.DestinationPath, out var kind, out _, out _, out _, out _)) continue;
+                    if (kind == MediaKind.Image) photos++;
+                    else videos++;
+                }
+
+                if (photos + videos > 0)
+                {
+                    AppEvents.SetStatus(photos > 0 && videos > 0
+                        ? $"导入完成：照片 {photos} 张 → 照片库，视频 {videos} 个 → 视频库"
+                        : photos > 0
+                            ? $"导入完成：照片 {photos} 张 → 照片库"
+                            : $"导入完成：视频 {videos} 个 → 视频库");
+
+                    var target = photos > 0 ? LibraryScope.Photos : LibraryScope.Videos;
+                    await Task.Delay(600);   // 等导入报告与缩略图落位，再切库
+                    StjMediaViewer.App.Views.ShellPage.Current?.OpenLibraryScope(target);
+                }
+            }
         }
         catch (OperationCanceledException)
         {

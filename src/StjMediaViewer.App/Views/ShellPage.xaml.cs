@@ -60,8 +60,13 @@ public sealed partial class ShellPage : Page
             finally { _syncingSearch = false; }
         }
 
+        ApplyLibraryNavMode();
+
         // 恢复上次的导航项（换皮肤重建后不跳回默认页；启动时用设置里持久化的 LastViewId）。
         var initialView = AppServices.Settings.Current.LastViewId;
+        // 旧版本可能存的是 "library"，而当前是分库模式：落到照片库上
+        if (AppServices.Settings.Current.SplitMediaKindLibraries && initialView == "library")
+            initialView = Core.Models.LibraryScopeRules.ToViewId(Core.Models.LibraryScope.Photos);
         if (string.IsNullOrWhiteSpace(initialView)) initialView = ViewModel.SelectedNavId;
         ViewModel.SelectedNavId = initialView!;
         NavigateTo(initialView!);
@@ -263,6 +268,8 @@ public sealed partial class ShellPage : Page
     private static Type? ResolvePageType(string viewId) => viewId switch
     {
         "library" => typeof(LibraryPage),
+        "library-photo" => typeof(LibraryPage),
+        "library-video" => typeof(LibraryPage),
         "gallery" => typeof(GalleryPage),
         "import" => typeof(ImportPage),
         "timeline" => typeof(TimelinePage),
@@ -277,6 +284,69 @@ public sealed partial class ShellPage : Page
         _ => null,
     };
 
+    private NavigationViewItem? _videoNavItem;
+
+    /// <summary>
+    /// 按设置铺「素材库」导航：开启分库 → 照片库 + 视频库两个入口（不同图标）；
+    /// 关闭 → 一个「素材库」。可在设置里随时切换。
+    /// </summary>
+    private void ApplyLibraryNavMode()
+    {
+        bool split = AppServices.Settings.Current.SplitMediaKindLibraries;
+
+        // 先摘掉动态插入的视频库项（切回来时可能已存在）
+        if (_videoNavItem is not null)
+        {
+            NavView.MenuItems.Remove(_videoNavItem);
+            _videoNavItem = null;
+        }
+
+        if (split)
+        {
+            LibraryNavItem.Content = "照片库";
+            LibraryNavItem.Tag = "library-photo";
+            LibraryNavItem.Icon = new FontIcon { Glyph = "\uE91B" };   // 相机/照片
+            ToolTipService.SetToolTip(LibraryNavItem, "照片库：只显示照片（图片）");
+
+            if (_videoNavItem is null)
+            {
+                _videoNavItem = new NavigationViewItem
+                {
+                    Content = "视频库",
+                    Tag = "library-video",
+                    Icon = new FontIcon { Glyph = "\uE714" },             // 影片
+                };
+                ToolTipService.SetToolTip(_videoNavItem, "视频库：只显示视频 / 音频");
+            }
+            var index = NavView.MenuItems.IndexOf(LibraryNavItem);
+            if (index >= 0 && !NavView.MenuItems.Contains(_videoNavItem))
+                NavView.MenuItems.Insert(index + 1, _videoNavItem);
+        }
+        else
+        {
+            LibraryNavItem.Content = "素材库";
+            LibraryNavItem.Tag = "library";
+            LibraryNavItem.Icon = new SymbolIcon(Symbol.Pictures);
+            ToolTipService.SetToolTip(LibraryNavItem, "素材库：照片和视频放在一起");
+        }
+    }
+
+    /// <summary>设置页切换「照片 / 视频分成两个库」后调用。</summary>
+    public void RefreshLibraryNavMode()
+    {
+        ApplyLibraryNavMode();
+        var current = ViewModel.SelectedNavId;
+        if (Core.Models.LibraryScopeRules.FromViewId(current) != Core.Models.LibraryScope.All &&
+            !AppServices.Settings.Current.SplitMediaKindLibraries)
+        {
+            SyncNavSelection("library");
+        }
+        else if (current is "library" && AppServices.Settings.Current.SplitMediaKindLibraries)
+        {
+            SyncNavSelection(Core.Models.LibraryScopeRules.ToViewId(Core.Models.LibraryScope.Photos));
+        }
+    }
+
     private void SyncNavSelection(string viewId)
     {
         foreach (var menuItem in NavView.MenuItems.Concat(NavView.FooterMenuItems))
@@ -287,6 +357,18 @@ public sealed partial class ShellPage : Page
                 return;
             }
         }
+    }
+
+    /// <summary>跳到照片库 / 视频库（导卡完成后按素材类型自动切换）。</summary>
+    public void OpenLibraryScope(Core.Models.LibraryScope scope)
+    {
+        var viewId = Core.Models.LibraryScopeRules.ToViewId(scope);
+        // 关闭分库模式时统一回"素材库"
+        if (!AppServices.Settings.Current.SplitMediaKindLibraries) viewId = "library";
+        ViewModel.SelectedNavId = viewId;
+        PersistNavId(viewId);
+        NavigateTo(viewId);
+        SyncNavSelection(viewId);
     }
 
     private void BackToLibrary_Click(object sender, RoutedEventArgs e) => SyncNavSelection("library");

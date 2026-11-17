@@ -190,7 +190,7 @@
                         SelectionChanged="NavView_SelectionChanged"
                         Background="{ThemeResource AppSurfaceBrush}">
             <NavigationView.MenuItems>
-                <NavigationViewItem Content="素材库" Tag="library" Icon="Pictures" />
+                <NavigationViewItem x:Name="LibraryNavItem" Content="素材库" Tag="library" Icon="Pictures" />
                 <NavigationViewItem Content="导入" Tag="import">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE8B5;" />

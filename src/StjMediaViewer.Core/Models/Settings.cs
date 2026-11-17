@@ -96,6 +96,12 @@ public sealed class AppSettings
     /// <summary>总开关：是否按"设备绑定"给 Log 素材自动套监视 LUT。</summary>
     public bool AutoAssignLutForSony { get; set; } = true;
 
+    /// <summary>
+    /// 照片 / 视频分成两个媒体库（侧边栏两个入口，不同图标）。默认开启。
+    /// 只影响展示与导卡后的落位，不动磁盘文件、不复制素材。
+    /// </summary>
+    public bool SplitMediaKindLibraries { get; set; } = true;
+
     /// <summary>设备 ↔ LUT 绑定表（设备键 → LUT id）。只有命中的设备才会自动套。</summary>
     public List<DeviceLutBinding> DeviceLutBindings { get; set; } = new();
 
