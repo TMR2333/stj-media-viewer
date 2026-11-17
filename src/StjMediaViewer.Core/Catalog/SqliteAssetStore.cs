@@ -369,6 +369,16 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
                 if (patch.IsLog is { } isLog) Set("is_log", isLog ? 1 : 0);
                 if (patch.LogProfile is not null) Set("log_profile", NullIfEmpty(patch.LogProfile));
                 if (patch.Theme is not null) Set("theme", NullIfEmpty(patch.Theme));
+                if (patch.Themes is not null)
+                {
+                    var themes = patch.Themes
+                        .Where(t => !string.IsNullOrWhiteSpace(t))
+                        .Select(t => t.Trim())
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                    Set("themes_json", AssetMapper.JsonKeywords(themes));
+                    Set("theme", themes.Count > 0 ? themes[0] : null);
+                }
                 if (patch.Tone is not null) Set("tone", NullIfEmpty(patch.Tone));
                 if (patch.Rating is { } rating) Set("rating", Math.Clamp(rating, 0, 5));
                 if (patch.ColorLabel is not null) Set("color_label", NullIfEmpty(patch.ColorLabel));
@@ -774,7 +784,8 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
             f.OriginUnsetCount = (int)Scalar1(
                 "SELECT COUNT(*) FROM assets" + w.Sql + AndWhere(w, "(origin IS NULL OR origin='')"), w);
             f.ThemeUnsetCount = (int)Scalar1(
-                "SELECT COUNT(*) FROM assets" + w.Sql + AndWhere(w, "(theme IS NULL OR theme='')"), w);
+                "SELECT COUNT(*) FROM assets" + w.Sql +
+                AndWhere(w, "(theme IS NULL OR theme='') AND (themes_json IS NULL OR themes_json='' OR themes_json='[]')"), w);
             f.ToneUnsetCount = (int)Scalar1(
                 "SELECT COUNT(*) FROM assets" + w.Sql + AndWhere(w, "(tone IS NULL OR tone='')"), w);
 
@@ -793,9 +804,16 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
             f.ByCity = GroupText("city",
                 "SELECT city, COUNT(*) FROM assets" + w.Sql +
                 AndWhere(w, "city IS NOT NULL AND city<>''") + " GROUP BY city", w);
-            f.ByTheme = GroupText("theme",
-                "SELECT theme, COUNT(*) FROM assets" + w.Sql +
-                AndWhere(w, "theme IS NOT NULL AND theme<>''") + " GROUP BY theme", w);
+            // 多主题：主主题 + themes_json 里的附加主题一起计数（同一个值不会重复计同一张）
+            var themeSql =
+                "SELECT v, COUNT(DISTINCT id) FROM (" +
+                "SELECT assets.id AS id, assets.theme AS v FROM assets" + w.Sql +
+                AndWhere(w, "assets.theme IS NOT NULL AND assets.theme<>''") +
+                " UNION ALL " +
+                "SELECT assets.id AS id, je.value AS v FROM assets, json_each(CASE WHEN json_valid(assets.themes_json) THEN assets.themes_json ELSE '[]' END) je" +
+                w.Sql + AndWhere(w, "je.value IS NOT NULL AND je.value<>''") +
+                ") GROUP BY v";
+            f.ByTheme = GroupText("theme", themeSql, w);
             f.ByTone = GroupText("tone",
                 "SELECT tone, COUNT(*) FROM assets" + w.Sql +
                 AndWhere(w, "tone IS NOT NULL AND tone<>''") + " GROUP BY tone", w);
@@ -1072,7 +1090,7 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
         if (q.Devices.Count > 0) AddIn(w, "device_key", q.Devices.Cast<object?>().ToList());
         if (q.Cities.Count > 0) AddIn(w, "city", q.Cities.Cast<object?>().ToList());
         // 主题/影调支持"未填写"（__unset__）伪选项：选它 = 只要还没分类的素材
-        AddInOrUnset(w, "theme", q.Themes);
+        ApplyThemeFilter(w, q.Themes);
         AddInOrUnset(w, "tone", q.Tones);
         if (q.ColorLabels.Count > 0) AddIn(w, "color_label", q.ColorLabels.Cast<object?>().ToList());
         if (q.RawFormats.Count > 0) AddIn(w, "raw_format", q.RawFormats.Cast<object?>().ToList());
@@ -1137,6 +1155,51 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
         // 例外：筛「只看 RAW」时必须放行非代表的 RAW 行，否则 RAW 全被折叠掉、结果永远是 0 条。
         if (q.CollapseGroups && q.IsRaw != true) w.And("is_group_cover = 1");
         return w;
+    }
+
+    /// <summary>
+    /// 主题筛选：命中**主主题**或 `themes_json` 里的任意附加主题；
+    /// 选「未填写」= 既没有主主题也没有多主题。
+    /// </summary>
+    private static void ApplyThemeFilter(Where w, List<string> selected)
+    {
+        if (selected.Count == 0) return;
+
+        var values = selected.Where(v => v != "__unset__").Cast<object?>().ToList();
+        bool withUnset = values.Count != selected.Count;
+
+        if (values.Count == 0)
+        {
+            if (withUnset)
+                w.And("((theme IS NULL OR theme='') AND (themes_json IS NULL OR themes_json='' OR themes_json='[]'))");
+            return;
+        }
+
+        var prefix = w.NextInPrefix();
+        var names = new List<string>();
+        var sb = new StringBuilder();
+        sb.Append("(theme IN (");
+        for (int i = 0; i < values.Count; i++)
+        {
+            var name = prefix + "_t" + i;
+            names.Add(name);
+            if (i > 0) sb.Append(',');
+            sb.Append(name);
+            w.Args.Add(new KeyValuePair<string, object?>(name, values[i]));
+        }
+        sb.Append(") OR EXISTS(SELECT 1 FROM json_each(CASE WHEN json_valid(themes_json) THEN themes_json ELSE '[]' END) WHERE value IN (");
+        for (int i = 0; i < names.Count; i++)
+        {
+            if (i > 0) sb.Append(',');
+            sb.Append(names[i]);
+        }
+        sb.Append(')');
+        if (withUnset)
+            sb.Append(") OR ((theme IS NULL OR theme='') AND (themes_json IS NULL OR themes_json='' OR themes_json='[]'))");
+        else
+            sb.Append(')');
+        sb.Append(')');
+        w.And(sb.ToString());
     }
 
     /// <summary>IN (...) 之外再并入"该列为空"，用于"未填写"伪选项。</summary>

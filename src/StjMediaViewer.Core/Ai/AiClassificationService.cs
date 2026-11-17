@@ -281,7 +281,9 @@ public sealed class AiClassificationService : IAiClassificationService
         {
             var valueChanged = !string.Equals(asset.Theme, suggestion.Theme, StringComparison.OrdinalIgnoreCase);
             var provChanged = asset.Prov(ClassDimension.Theme)?.Source != ClassSource.Ai;
-            asset.Theme = suggestion.Theme;
+            // AI 给的是"主要主题"：放进多主题列表的第一位，人工已选的其它主题保留在后面
+            asset.SetThemes(new[] { suggestion.Theme }.Concat(asset.Themes.Where(t =>
+                !string.Equals(t, suggestion.Theme, StringComparison.OrdinalIgnoreCase))));
             asset.SetProv(ClassDimension.Theme, provenance.Clone());
             changed |= valueChanged || provChanged;
         }

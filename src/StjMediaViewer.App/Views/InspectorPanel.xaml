@@ -176,6 +176,26 @@
                            TextWrapping="Wrap"
                            Margin="0,2,0,0" />
 
+                <!-- 多主题：一张图可以同时属于多个主题；第一个选中的是主主题 -->
+                <TextBlock Text="多主题（可多选，第一个为主主题）" Style="{ThemeResource AppMicroTextStyle}" Margin="0,8,0,0" />
+                <ItemsRepeater ItemsSource="{x:Bind ViewModel.ThemeChips}">
+                    <ItemsRepeater.Layout>
+                        <UniformGridLayout Orientation="Horizontal"
+                                           MinItemWidth="72" MinItemHeight="26"
+                                           MinRowSpacing="4" MinColumnSpacing="4"
+                                           ItemsStretch="Fill" />
+                    </ItemsRepeater.Layout>
+                    <ItemsRepeater.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ThemeChipItem">
+                            <ToggleButton Content="{x:Bind Zh}"
+                                          MinWidth="0" MinHeight="26" Padding="8,2,8,2"
+                                          FontSize="{ThemeResource AppFontMicroSize}"
+                                          CornerRadius="{ThemeResource AppRadiusSmall}"
+                                          IsChecked="{x:Bind IsSelected, Mode=TwoWay}" />
+                        </DataTemplate>
+                    </ItemsRepeater.ItemTemplate>
+                </ItemsRepeater>
+
                 <TextBlock Text="影调" Style="{ThemeResource AppMicroTextStyle}" Margin="0,8,0,0" />
                 <ComboBox x:Name="ToneBox"
                           HorizontalAlignment="Stretch"

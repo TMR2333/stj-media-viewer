@@ -27,7 +27,7 @@ internal static class AssetMapper
         "captured_at", "captured_ms", "captured_day", "captured_at_source",
         "latitude", "longitude", "altitude_m", "country", "province", "city", "city_source",
         "title", "caption", "creator", "copyright",
-        "keywords_json", "keywords_flat",
+        "keywords_json", "keywords_flat", "themes_json",
         "post_process", "has_develop_edits", "develop_engine", "xmp_path",
         "sidecars_json", "has_embedded_xmp", "origin",
         "group_id", "is_group_cover", "group_has_raw", "group_has_jpeg", "companions_json", "lut_id",
@@ -135,6 +135,7 @@ internal static class AssetMapper
         "creator" => N(a.Creator),
         "copyright" => N(a.Copyright),
         "keywords_json" => JsonKeywords(a.Keywords),
+        "themes_json" => ThemesJson(a),
         "keywords_flat" => KeywordsFlat(a.Keywords),
         "post_process" => (int)a.PostProcess,
         "has_develop_edits" => a.HasDevelopEdits ? 1 : 0,
@@ -253,6 +254,9 @@ internal static class AssetMapper
         };
 
         a.Keywords = JsonToKeywords(GetS(r, "keywords_json"));
+        var themes = JsonToList(GetS(r, "themes_json"));
+        if (themes.Count == 0 && !string.IsNullOrWhiteSpace(a.Theme)) themes.Add(a.Theme!);
+        a.Themes = themes;
         a.Sidecars = JsonToList(GetS(r, "sidecars_json"));
         a.Origin = GetN(r, "origin");
         a.CompanionPaths = JsonToList(GetS(r, "companions_json"));
@@ -301,6 +305,15 @@ internal static class AssetMapper
     }
 
     public static string JsonKeywords(List<string>? list) => JsonList(list);
+
+    /// <summary>主题 JSON：没有单独设置 Themes 时用主主题兜底。</summary>
+    public static string ThemesJson(MediaAsset a)
+    {
+        var list = a.Themes.Count > 0
+            ? a.Themes
+            : (string.IsNullOrWhiteSpace(a.Theme) ? new List<string>() : new List<string> { a.Theme! });
+        return JsonList(list);
+    }
 
     public static List<string> JsonToKeywords(string? json) => JsonToList(json);
 

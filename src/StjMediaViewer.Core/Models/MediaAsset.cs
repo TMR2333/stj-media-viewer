@@ -109,6 +109,32 @@ public sealed class MediaAsset
 
     // ---- 分类结果 ----
     public string? Theme { get; set; }
+
+    /// <summary>
+    /// 多主题：一张图可以同时是「自然 + 夜景」。列表第一个视为**主主题**（写回 <see cref="Theme"/>，
+    /// 供整理/分面等只认单值的旧逻辑使用）。
+    /// </summary>
+    public List<string> Themes { get; set; } = new();
+
+    /// <summary>主主题（列表第一项）与 <see cref="Theme"/> 保持一致。</summary>
+    public string? PrimaryTheme =>
+        Themes.Count > 0 ? Themes[0] : Theme;
+
+    /// <summary>是否属于某个主题（主主题或附加主题）。</summary>
+    public bool HasTheme(string id) =>
+        Themes.Contains(id, StringComparer.OrdinalIgnoreCase) ||
+        string.Equals(Theme, id, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>设置主题集合：主主题 = 第一个，其余进列表。</summary>
+    public void SetThemes(IEnumerable<string>? themes)
+    {
+        Themes = (themes ?? Enumerable.Empty<string>())
+            .Where(t => !string.IsNullOrWhiteSpace(t))
+            .Select(t => t.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        Theme = Themes.Count > 0 ? Themes[0] : null;
+    }
     public string? Tone { get; set; }
     public int Rating { get; set; }
     public string? ColorLabel { get; set; }                 // None / Red / Yellow / Green / Blue / Purple

@@ -63,6 +63,30 @@ public sealed partial class LibraryPage : Page
         _ = CheckLibraryAvailabilityAsync();
         if (Environment.GetEnvironmentVariable("STJ_DEMO_ONLY_RAW") == "1")
             ViewModel.OnlyRaw = true;
+
+        // 截图用：等首屏加载完再打开检视面板，并优先选中一张多主题素材
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_INSPECTOR") == "1")
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(2500);
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    InspectorToggle.IsChecked = true;
+                    ApplyInspectorVisibility(true);
+                    var pick = ViewModel.Items.FirstOrDefault(i => i.Asset.Themes.Count > 1) ?? ViewModel.Items.FirstOrDefault();
+                    if (pick is not null) ViewModel.SetSelection(new[] { pick });
+
+                    // 滚到「手动分类」区域，让多主题 chips 进画面
+                    DispatcherQueue.TryEnqueue(async () =>
+                    {
+                        await Task.Delay(900);
+                        if (FindDescendant<ScrollViewer>(Inspector) is { } scroller)
+                            scroller.ChangeView(null, 1500, null, true);
+                    });
+                });
+            });
+        }
         _ = ShellViewModel.Shared.RefreshCacheSizeAsync();
         TryHookScrollViewer();
     }

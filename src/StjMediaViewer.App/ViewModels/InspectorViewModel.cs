@@ -81,6 +81,9 @@ public sealed partial class InspectorViewModel : ObservableObject
 
     // ---------------- 手动分类编辑器 ----------------
     public ObservableCollection<OptionItem> ThemeOptions { get; }
+
+    /// <summary>多主题选择：一张图可以同时是「自然 + 夜景」。</summary>
+    public ObservableCollection<ThemeChipItem> ThemeChips { get; } = new();
     public ObservableCollection<OptionItem> ToneOptions { get; }
 
     [ObservableProperty]
@@ -239,6 +242,7 @@ public sealed partial class InspectorViewModel : ObservableObject
             AiSubject = asset.AiSubject ?? "";
             AiMood = asset.AiMood ?? "";
             SelectedTheme = ThemeOptions.FirstOrDefault(o => string.Equals(o.Id, asset.Theme, StringComparison.OrdinalIgnoreCase));
+            SyncThemeChips(asset);
             SelectedTone = ToneOptions.FirstOrDefault(o => string.Equals(o.Id, asset.Tone, StringComparison.OrdinalIgnoreCase));
             BuildGroups(asset);
             _ = LoadCustomFieldsAsync(asset);
@@ -446,6 +450,17 @@ public sealed partial class InspectorViewModel : ObservableObject
         ThemeOptions.Add(new OptionItem("", "未分类"));
         foreach (var t in Vocabularies.Themes) ThemeOptions.Add(new OptionItem(t.Id, t.Zh));
 
+        ThemeChips.Clear();
+        foreach (var t in Vocabularies.Themes)
+        {
+            var chip = new ThemeChipItem(t.Id, t.Zh);
+            chip.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(ThemeChipItem.IsSelected)) OnThemeChipToggled(chip);
+            };
+            ThemeChips.Add(chip);
+        }
+
         ToneOptions.Clear();
         ToneOptions.Add(new OptionItem("", "未分类"));
         foreach (var t in Vocabularies.Tones) ToneOptions.Add(new OptionItem(t.Id, t.Zh));
@@ -454,15 +469,63 @@ public sealed partial class InspectorViewModel : ObservableObject
     // ==================================================================================
     //  编辑：每一处都写 Provenance=Manual
     // ==================================================================================
+    /// <summary>主题改为多选后，主主题仍允许用下拉快速指定（会重置为单选）。</summary>
     partial void OnSelectedThemeChanged(OptionItem? value)
     {
         if (_suppressEdits || CurrentAsset is null) return;
         var theme = string.IsNullOrEmpty(value?.Id) ? null : value!.Id;
-        if (ApplyToMultiSelection(new BatchEditPatch { Theme = theme ?? "" },
-                                  a => { a.Theme = theme; a.Provenance[ClassDimension.Theme] = FieldProvenance.Of(ClassSource.Manual); }))
+        var themes = theme is null ? new List<string>() : new List<string> { theme };
+        ApplyThemes(themes);
+    }
+
+    private void SyncThemeChips(MediaAsset asset)
+    {
+        _suppressChipEvents = true;
+        try
+        {
+            var selected = asset.Themes.Count > 0
+                ? asset.Themes
+                : (string.IsNullOrWhiteSpace(asset.Theme) ? new List<string>() : new List<string> { asset.Theme! });
+            foreach (var chip in ThemeChips)
+                chip.IsSelected = selected.Contains(chip.Id, StringComparer.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            _suppressChipEvents = false;
+        }
+    }
+
+    private bool _suppressChipEvents;
+
+    private void OnThemeChipToggled(ThemeChipItem chip)
+    {
+        if (_suppressEdits || _suppressChipEvents || CurrentAsset is null) return;
+
+        // 保持主题在词表里的顺序，第一个 = 主主题
+        var themes = ThemeChips.Where(c => c.IsSelected).Select(c => c.Id).ToList();
+        ApplyThemes(themes);
+    }
+
+    /// <summary>写入多主题：多选时一次性写到所有选中素材。</summary>
+    private void ApplyThemes(List<string> themes)
+    {
+        if (CurrentAsset is null) return;
+
+        if (ApplyToMultiSelection(new BatchEditPatch { Themes = themes },
+                                  a => { a.SetThemes(themes); a.Provenance[ClassDimension.Theme] = FieldProvenance.Of(ClassSource.Manual); }))
+        {
+            CurrentAsset.SetThemes(themes);
+            CurrentAsset.Provenance[ClassDimension.Theme] = FieldProvenance.Of(ClassSource.Manual);
+            _suppressEdits = true;
+            try { SelectedTheme = ThemeOptions.FirstOrDefault(o => string.Equals(o.Id, CurrentAsset.Theme, StringComparison.OrdinalIgnoreCase)); }
+            finally { _suppressEdits = false; }
+            SyncThemeChips(CurrentAsset);
             return;
-        CurrentAsset.Theme = theme;
+        }
+
+        CurrentAsset.SetThemes(themes);
         CurrentAsset.Provenance[ClassDimension.Theme] = FieldProvenance.Of(ClassSource.Manual);
+        SyncThemeChips(CurrentAsset);
         MarkDirty();
     }
 
@@ -688,6 +751,7 @@ public sealed partial class InspectorViewModel : ObservableObject
             try
             {
                 SelectedTheme = ThemeOptions.FirstOrDefault(o => string.Equals(o.Id, CurrentAsset.Theme, StringComparison.OrdinalIgnoreCase));
+                SyncThemeChips(CurrentAsset);
                 SelectedTone = ToneOptions.FirstOrDefault(o => string.Equals(o.Id, CurrentAsset.Tone, StringComparison.OrdinalIgnoreCase));
                 AiSubject = CurrentAsset.AiSubject ?? "";
                 AiMood = CurrentAsset.AiMood ?? "";
@@ -788,3 +852,18 @@ public sealed partial class InspectorViewModel : ObservableObject
 
 /// <summary>检视面板里的一行自定义类别。</summary>
 public sealed record CustomFieldItem(string Dimension, string Value);
+
+/// <summary>主题多选的一个小 chip（自然 / 夜景 / 风光 …）。</summary>
+public sealed partial class ThemeChipItem : ObservableObject
+{
+    public ThemeChipItem(string id, string zh)
+    {
+        Id = id;
+        Zh = zh;
+    }
+
+    public string Id { get; }
+    public string Zh { get; }
+
+    [ObservableProperty] private bool _isSelected;
+}

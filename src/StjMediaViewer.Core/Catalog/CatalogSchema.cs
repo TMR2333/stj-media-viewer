@@ -44,6 +44,7 @@ internal static class CatalogSchema
         EnsureColumn(conn, TableAssets, "lut_id", "TEXT");
         EnsureColumn(conn, TableAssets, "origin", "TEXT");
         EnsureColumn(conn, TableAssets, "creator", "TEXT");
+        EnsureColumn(conn, TableAssets, "themes_json", "TEXT NOT NULL DEFAULT '[]'");
 
         // 迁移：v2 之前"不属于任何 JPG/RAW 组"的素材（视频 / 音频 / 单张图）没被标成组封面，
         // 折叠模式下这些素材会被 `is_group_cover = 1` 过滤掉 → 按"视频"筛选出现 0 条。
@@ -144,6 +145,7 @@ internal static class CatalogSchema
             sidecars_json           TEXT NOT NULL DEFAULT '[]',
             has_embedded_xmp        INTEGER NOT NULL DEFAULT 0,
             theme                   TEXT,
+            themes_json             TEXT NOT NULL DEFAULT '[]',
             tone                    TEXT,
             rating                  INTEGER NOT NULL DEFAULT 0,
             color_label             TEXT,

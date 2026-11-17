@@ -24,6 +24,9 @@ public sealed class BatchEditPatch
 
     /// <summary>主题（人像 / 风光 / 街头 …，自由文本，与九维分类保持一致）。</summary>
     public string? Theme { get; set; }
+
+    /// <summary>多主题集合：非 null 时整体替换；第一项同时写进主主题 theme。</summary>
+    public List<string>? Themes { get; set; }
     /// <summary>影调（高调 / 低调 / 硬调 …）。</summary>
     public string? Tone { get; set; }
 
@@ -49,7 +52,7 @@ public sealed class BatchEditPatch
     public bool HasChanges =>
         CapturedAt is not null || Country is not null || Province is not null || City is not null ||
         CameraMake is not null || DeviceKey is not null || PostProcess is not null ||
-        IsLog is not null || LogProfile is not null || Theme is not null || Tone is not null ||
+        IsLog is not null || LogProfile is not null || Theme is not null || Themes is not null || Tone is not null ||
         Rating is not null || ColorLabel is not null || IsPick is not null ||
         Title is not null || Caption is not null ||
         AddKeywords is { Count: > 0 } || ReplaceKeywords is not null ||
@@ -66,6 +69,7 @@ public sealed class BatchEditPatch
         if (DeviceKey is not null) parts.Add(DeviceKey.Length == 0 ? "清空设备" : $"设备 {DeviceKey}");
         if (CameraMake is not null) parts.Add(CameraMake.Length == 0 ? "清空品牌" : $"品牌 {CameraMake}");
         if (Theme is not null) parts.Add(Theme.Length == 0 ? "清空主题" : $"主题 {Theme}");
+        if (Themes is not null) parts.Add(Themes.Count == 0 ? "清空主题" : $"主题 {string.Join("+", Themes)}");
         if (Tone is not null) parts.Add(Tone.Length == 0 ? "清空影调" : $"影调 {Tone}");
         if (PostProcess is { } pp) parts.Add($"已后期 {PostProcessText(pp)}");
         if (IsLog is { } log) parts.Add(log ? "Log 素材" : "非 Log");
