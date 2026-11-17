@@ -364,6 +364,7 @@ internal sealed class FallbackAssetStore : IAssetStore
         if (q.RawFormats.Count > 0) src = src.Where(a => q.RawFormats.Contains(a.RawFormat));
         if (q.IsRaw.HasValue) src = src.Where(a => a.IsRaw == q.IsRaw.Value);
         if (q.IsLog.HasValue) src = src.Where(a => (a.IsLog ?? false) == q.IsLog.Value);
+        if (q.OnlyRejected) src = src.Where(a => a.IsPick == false);
         if (q.HasGps.HasValue) src = src.Where(a => (a.Latitude.HasValue && a.Longitude.HasValue) == q.HasGps.Value);
         if (q.IsPick.HasValue) src = src.Where(a => a.IsPick == q.IsPick.Value);
         if (q.PostProcess.HasValue) src = src.Where(a => a.PostProcess == q.PostProcess.Value);

@@ -1559,6 +1559,7 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
             w.And(gps ? "latitude IS NOT NULL AND longitude IS NOT NULL"
                       : "(latitude IS NULL OR longitude IS NULL)");
         if (q.IsPick is { } pick) w.And(pick ? "is_pick = 1" : "(is_pick IS NULL OR is_pick = 0)");
+        if (q.OnlyRejected) w.And("is_pick = 0");
         if (q.PostProcess is { } pp) w.And("post_process = @w_pp", "@w_pp", (int)pp);
         if (q.MinRating is { } minR) w.And("rating >= @w_minr", "@w_minr", minR);
         if (q.MaxRating is { } maxR) w.And("rating <= @w_maxr", "@w_maxr", maxR);

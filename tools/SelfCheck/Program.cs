@@ -83,6 +83,7 @@ public static partial class Program
             await Section("合并组（大文件夹）", async () => await CheckMergeGroups(s, tempData));
             await Section("设备 ↔ LUT 绑定", () => { CheckDeviceLutBindings(s, tempData); return Task.CompletedTask; });
             await Section("照片/视频分库", async () => await CheckSplitLibraries(s, tempData));
+            await Section("删除废片（回收站）", async () => await CheckRecycleBinDelete(s, tempData));
             await Section("设置持久化", async () => await CheckSettings(s, tempData));
             await Section("AI 客户端(dry-run)", async () => await CheckAi(s));
             var aiUrl = ArgValue(args, "--ai-url");

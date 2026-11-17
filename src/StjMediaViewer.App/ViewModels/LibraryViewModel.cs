@@ -307,6 +307,22 @@ public sealed partial class LibraryViewModel : ObservableObject
         }
     }
 
+    /// <summary>取当前库范围（照片库 / 视频库）里的全部废片（IsPick=false）。</summary>
+    public async Task<IReadOnlyList<MediaAsset>> LoadRejectedAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            var query = new AssetQuery { OnlyRejected = true, Limit = 0, SortBy = AssetSortKeys.CapturedAt, Descending = true };
+            if (Scope != LibraryScope.All) LibraryScopeRules.Apply(query, Scope);
+            return await AppServices.Store.QueryAsync(query, ct);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("读取废片失败", ex);
+            return Array.Empty<MediaAsset>();
+        }
+    }
+
     /// <summary>取某个合集里的全部素材（批量编辑 / 查看元数据用）。</summary>
     public async Task<IReadOnlyList<MediaAsset>> LoadCollectionAssetsAsync(string collectionId, CancellationToken ct = default)
     {

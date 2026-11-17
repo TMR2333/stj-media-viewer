@@ -93,6 +93,16 @@ public sealed partial class LibraryPage : Page
             });
         }
 
+        // 截图用：STJ_DEMO_DELETE_REJECTS=1 点开「删除废片」确认框（不真的执行）
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_DELETE_REJECTS") == "1")
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(2500);
+                DispatcherQueue.TryEnqueue(() => DeleteRejects_Click(this, new RoutedEventArgs()));
+            });
+        }
+
         // 截图用：STJ_DEMO_COLLECTION_OPEN=1 打开第一个影像合集（看合集横幅）
         //          =meta 打开后顺便看元数据；=batch 打开后进批量编辑
         var collectionDemo = Environment.GetEnvironmentVariable("STJ_DEMO_COLLECTION_OPEN");
@@ -591,6 +601,64 @@ public sealed partial class LibraryPage : Page
         ViewModel.CollectionGroup.Clear();
         AppEvents.SetStatus("合集已删除（素材都还在）");
         await ViewModel.RefreshCollectionsAsync();
+    }
+
+    // ==================================================================================
+    //  删除废片：先移入系统回收站，再从索引库移除
+    // ==================================================================================
+    private async void DeleteRejects_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var rejects = await ViewModel.LoadRejectedAsync();
+            if (rejects.Count == 0)
+            {
+                AppEvents.SetStatus("当前没有标记为「废片」的素材");
+                return;
+            }
+
+            var bytes = rejects.Sum(a => a.SizeBytes);
+            var ok = await AppServices.Dialogs.ConfirmAsync(
+                "删除废片",
+                $"把 {rejects.Count} 个标记为「废片」的素材移入系统回收站（约 {Formatting.FileSize(bytes)}），并从索引库移除。\n\n" +
+                "回收站里的文件可以还原；索引记录删除后需要重新扫描才能恢复。",
+                "移入回收站", "取消");
+            if (!ok) return;
+
+            await DeleteAssetsToRecycleBinAsync(rejects, "废片");
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("删除废片失败", ex);
+            AppEvents.SetError($"删除废片失败：{ex.Message}");
+        }
+    }
+
+    /// <summary>把一批素材移到回收站，然后清理索引并刷新清单。</summary>
+    private async Task DeleteAssetsToRecycleBinAsync(IReadOnlyList<MediaAsset> assets, string label)
+    {
+        if (assets.Count == 0) return;
+
+        var deleted = await AppServices.Operations.DeleteToRecycleBinAsync(assets);
+        // 不管文件是否全部成功，索引里已经不在磁盘上的记录都要清掉，避免幽灵条目
+        try
+        {
+            var gone = assets.Where(a => !File.Exists(a.FullPath)).Select(a => a.Id).ToList();
+            if (gone.Count > 0) await AppServices.Store.DeleteAsync(gone);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("清理已删除素材的索引失败", ex);
+        }
+
+        AppEvents.RaiseLibraryContentChanged();
+        ViewModel.RequestRefresh(immediate: true);
+        await ViewModel.RefreshCollectionsAsync();
+        await ViewModel.RefreshMergeGroupsAsync();
+
+        AppEvents.SetStatus(deleted >= assets.Count
+            ? $"已把 {deleted} 个{label}移入回收站"
+            : $"已移入回收站 {deleted} / {assets.Count} 个{label}（其余可能已被占用或已删除）");
     }
 
     private void BatchEdit_Click(object sender, RoutedEventArgs e)
@@ -1400,6 +1468,21 @@ public sealed partial class LibraryPage : Page
             leaveGroup.Click += async (_, _) => await LeaveMergeGroupAsync(item.Asset);
             flyout.Items.Add(leaveGroup);
         }
+
+        var deleteItem = new MenuFlyoutItem { Text = "删除到回收站（所选）" };
+        deleteItem.Click += async (_, _) =>
+        {
+            var targets = TargetAssets(item);
+            if (targets.Count == 0) return;
+            var bytes = targets.Sum(a => a.SizeBytes);
+            var ok = await AppServices.Dialogs.ConfirmAsync(
+                "删除到回收站",
+                $"把 {targets.Count} 个文件移入系统回收站（约 {Formatting.FileSize(bytes)}），并从索引库移除。\n\n回收站里可以还原。",
+                "移入回收站", "取消");
+            if (!ok) return;
+            await DeleteAssetsToRecycleBinAsync(targets, "文件");
+        };
+        flyout.Items.Add(deleteItem);
 
         var collectionItem = new MenuFlyoutItem { Text = "加入影像合集…" };
         collectionItem.Click += async (_, _) => await ShowCollectionsDialogAsync(TargetAssets(item));

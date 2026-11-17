@@ -17,6 +17,12 @@ public sealed class AssetQuery
     /// <summary>影像合集筛选：命中任意一个选中合集的素材（多选 = 并集）。</summary>
     public List<string> Collections { get; set; } = new();
 
+    /// <summary>
+    /// 只要"废片"（显式标记 is_pick = 0）。
+    /// 注意和 <see cref="IsPick"/> 区分：IsPick=false 表示"未被选用"，包含从未标记的 NULL。
+    /// </summary>
+    public bool OnlyRejected { get; set; }
+
     /// <summary>合并组筛选：命中任意一个选中合并组的素材（多选 = 并集）。</summary>
     public List<string> MergeGroups { get; set; } = new();
     public List<string> ColorLabels { get; set; } = new();

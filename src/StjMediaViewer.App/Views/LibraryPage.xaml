@@ -573,6 +573,14 @@
                         </StackPanel>
                     </Button>
                     <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="12,2,12,2" MinHeight="30"
+                            Click="DeleteRejects_Click"
+                            ToolTipService.ToolTip="把标记为「废片」的素材移入系统回收站并从索引库移除">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE74D;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                            <TextBlock Text="删除废片" Style="{ThemeResource AppCaptionTextStyle}" />
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="12,2,12,2" MinHeight="30"
                             Click="BatchEdit_Click"
                             ToolTipService.ToolTip="给选中的素材批量填日期 / 城市 / 分类等信息">
                         <StackPanel Orientation="Horizontal" Spacing="6">
