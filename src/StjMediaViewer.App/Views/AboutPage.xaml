@@ -79,7 +79,7 @@
                 </StackPanel>
             </Border>
 
-            <!-- ============ 表情包 ============ -->
+            <!-- ============ 作者 ============ -->
             <Border Background="{ThemeResource AppSurfaceBrush}"
                     BorderBrush="{ThemeResource AppCardStrokeBrush}"
                     BorderThickness="{ThemeResource AppCardStrokeThickness}"
@@ -87,60 +87,69 @@
                     Padding="20,16">
                 <StackPanel Spacing="12">
                     <StackPanel Spacing="2">
-                        <TextBlock Text="项目表情包" Style="{ThemeResource AppSectionHeaderTextStyle}" />
-                        <TextBlock Text="开发过程中的真实精神状态，共四张（随仓库一起分发）。"
+                        <TextBlock Text="作者" Style="{ThemeResource AppSectionHeaderTextStyle}" />
+                        <TextBlock Text="这个项目是两个人（和一个模型）互相鞭策出来的。"
                                    Style="{ThemeResource AppCaptionTextStyle}"
                                    Foreground="{ThemeResource TextSecondaryBrush}" />
                     </StackPanel>
 
-                    <Grid ColumnSpacing="12" RowSpacing="12">
+                    <!-- TMR：点整行打开 B 站主页 -->
+                    <Button x:Name="TmrAuthorButton"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Stretch"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Padding="10,8"
+                            Click="TmrAuthor_Click"
+                            ToolTipService.ToolTip="打开 TMR 的 B 站主页">
+                        <Grid ColumnSpacing="14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Ellipse Grid.Column="0" Width="56" Height="56" VerticalAlignment="Center">
+                                <Ellipse.Fill>
+                                    <ImageBrush ImageSource="ms-appx:///Assets/About/author-tmr.jpg" Stretch="UniformToFill" />
+                                </Ellipse.Fill>
+                            </Ellipse>
+                            <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                                <TextBlock Text="TMR" Style="{ThemeResource AppSubtitleTextStyle}" />
+                                <TextBlock Text="不会开发，只会鞭策大肥鱼"
+                                           Style="{ThemeResource AppCaptionTextStyle}"
+                                           Foreground="{ThemeResource TextSecondaryBrush}"
+                                           TextWrapping="Wrap" />
+                                <TextBlock Text="space.bilibili.com/632568585"
+                                           Style="{ThemeResource AppMicroTextStyle}"
+                                           Foreground="{ThemeResource TextTertiaryBrush}" />
+                            </StackPanel>
+                            <FontIcon Grid.Column="2" Glyph="&#xE8A7;" FontSize="{ThemeResource AppFontCaptionSize}"
+                                      Foreground="{ThemeResource TextTertiaryBrush}" VerticalAlignment="Center" />
+                        </Grid>
+                    </Button>
+
+                    <Border Height="1" Background="{ThemeResource AppDividerBrush}" Margin="10,0" />
+
+                    <!-- 我（DeepSeek Harness） -->
+                    <Grid ColumnSpacing="14" Padding="10,8">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="*" />
                         </Grid.ColumnDefinitions>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-
-                        <StackPanel Grid.Row="0" Grid.Column="0" Spacing="6">
-                            <Border CornerRadius="{ThemeResource AppRadiusMedium}">
-                                <Image Source="ms-appx:///Assets/About/meme-dsh.png" Stretch="Uniform"
-                                       Height="200" HorizontalAlignment="Center" />
-                            </Border>
-                            <TextBlock Text="「你目录里的 dsh 是什么…大烧货吗？」"
+                        <Ellipse Grid.Column="0" Width="56" Height="56" VerticalAlignment="Center">
+                            <Ellipse.Fill>
+                                <ImageBrush ImageSource="ms-appx:///Assets/About/author-dsh.png" Stretch="UniformToFill" />
+                            </Ellipse.Fill>
+                        </Ellipse>
+                        <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                            <TextBlock Text="大肥鱼（DeepSeek Harness）" Style="{ThemeResource AppSubtitleTextStyle}" />
+                            <TextBlock Text="写代码的那条鱼：搬需求、修 bug、跑自检；被鞭策得越狠，提交越勤。"
+                                       Style="{ThemeResource AppCaptionTextStyle}"
+                                       Foreground="{ThemeResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap" />
+                            <TextBlock Text="co-worked on this app"
                                        Style="{ThemeResource AppMicroTextStyle}"
-                                       Foreground="{ThemeResource TextSecondaryBrush}" />
-                        </StackPanel>
-
-                        <StackPanel Grid.Row="0" Grid.Column="1" Spacing="6">
-                            <Border CornerRadius="{ThemeResource AppRadiusMedium}">
-                                <Image Source="ms-appx:///Assets/About/meme-model.png" Stretch="Uniform"
-                                       Height="200" HorizontalAlignment="Center" />
-                            </Border>
-                            <TextBlock Text="「好模型」"
-                                       Style="{ThemeResource AppMicroTextStyle}"
-                                       Foreground="{ThemeResource TextSecondaryBrush}" />
-                        </StackPanel>
-
-                        <StackPanel Grid.Row="1" Grid.Column="0" Spacing="6">
-                            <Border CornerRadius="{ThemeResource AppRadiusMedium}">
-                                <Image Source="ms-appx:///Assets/About/meme-xiong.png" Stretch="Uniform"
-                                       Height="200" HorizontalAlignment="Center" />
-                            </Border>
-                            <TextBlock Text="「大师，这个『凶』是什么意思啊？」"
-                                       Style="{ThemeResource AppMicroTextStyle}"
-                                       Foreground="{ThemeResource TextSecondaryBrush}" />
-                        </StackPanel>
-
-                        <StackPanel Grid.Row="1" Grid.Column="1" Spacing="6">
-                            <Border CornerRadius="{ThemeResource AppRadiusMedium}">
-                                <Image Source="ms-appx:///Assets/About/meme-quiet.png" Stretch="Uniform"
-                                       Height="200" HorizontalAlignment="Center" />
-                            </Border>
-                            <TextBlock Text="「嘘——先把它能跑通」"
-                                       Style="{ThemeResource AppMicroTextStyle}"
-                                       Foreground="{ThemeResource TextSecondaryBrush}" />
+                                       Foreground="{ThemeResource TextTertiaryBrush}" />
                         </StackPanel>
                     </Grid>
                 </StackPanel>
@@ -194,11 +203,16 @@
                 </Border>
             </Grid>
 
-            <TextBlock Text="Stjarna PERSPECTIVE · co-worked with DeepSeek Harness"
-                       Style="{ThemeResource AppMicroTextStyle}"
-                       Foreground="{ThemeResource TextTertiaryBrush}"
-                       HorizontalAlignment="Center"
-                       Margin="0,4,0,0" />
+            <StackPanel Spacing="6" HorizontalAlignment="Center" Margin="0,4,0,4">
+                <HyperlinkButton Content="项目地址：gitcode.com/TMR2333/stj-media-viewer"
+                                 NavigateUri="https://gitcode.com/TMR2333/stj-media-viewer"
+                                 HorizontalAlignment="Center"
+                                 ToolTipService.ToolTip="在浏览器中打开项目主页" />
+                <TextBlock Text="Stjarna PERSPECTIVE · co-worked with DeepSeek Harness"
+                           Style="{ThemeResource AppMicroTextStyle}"
+                           Foreground="{ThemeResource TextTertiaryBrush}"
+                           HorizontalAlignment="Center" />
+            </StackPanel>
         </StackPanel>
     </ScrollViewer>
 </Page>

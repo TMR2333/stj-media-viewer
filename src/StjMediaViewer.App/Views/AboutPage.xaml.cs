@@ -38,6 +38,27 @@ public sealed partial class AboutPage : Page
         }
 
         FillStack();
+
+        // 截图用：STJ_DEMO_ABOUT_SCROLL=1 滚到作者区
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_ABOUT_SCROLL") == "1")
+        {
+            _ = DispatcherQueue.TryEnqueue(async () =>
+            {
+                await Task.Delay(1500);
+                try { FindScrollViewer(this)?.ChangeView(null, 520, null, true); } catch { }
+            });
+        }
+    }
+
+    private static ScrollViewer? FindScrollViewer(DependencyObject root)
+    {
+        if (root is ScrollViewer sv) return sv;
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (int i = 0; i < count; i++)
+        {
+            if (FindScrollViewer(VisualTreeHelper.GetChild(root, i)) is { } found) return found;
+        }
+        return null;
     }
 
     private static string BuildTimestamp(string assemblyPath)
@@ -51,6 +72,19 @@ public sealed partial class AboutPage : Page
         catch
         {
             return DateTimeOffset.Now.ToString("yyyy-MM-dd");
+        }
+    }
+
+    /// <summary>点作者卡片：打开 TMR 的 B 站主页。</summary>
+    private async void TmrAuthor_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await Windows.System.Launcher.LaunchUriAsync(new Uri("https://space.bilibili.com/632568585"));
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("打开作者主页失败", ex);
         }
     }
 
