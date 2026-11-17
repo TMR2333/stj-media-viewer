@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml;
+using StjMediaViewer.App.Services;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media;
 using StjMediaViewer.Core.Util;
@@ -19,6 +20,7 @@ public sealed partial class AboutPage : Page
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        PageLayout.Fit(PageScroll, PageContent);
         try
         {
             var asm = typeof(App).Assembly;

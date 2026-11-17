@@ -11,11 +11,16 @@
         导入页：外部存储设备 → 导入计划（JPG 预览 + RAW 配对）→ 执行与报告 → 目录级核验。
         设计语言：单一 Fluent；颜色 / 字号 / 圆角全部来自 ThemeResource token。
     -->
-    <ScrollViewer VerticalScrollMode="Enabled" VerticalScrollBarVisibility="Auto"
+    <ScrollViewer x:Name="PageScroll" VerticalScrollMode="Enabled" VerticalScrollBarVisibility="Auto"
                   HorizontalContentAlignment="Stretch"
                   Background="{ThemeResource AppSurfaceBrush}"
                   Padding="{ThemeResource AppPagePadding}">
-        <StackPanel MaxWidth="1760" HorizontalAlignment="Left" Spacing="12">
+        <StackPanel x:Name="PageContent" HorizontalAlignment="Left" Spacing="12">
+                <StackPanel.ChildrenTransitions>
+                    <TransitionCollection>
+                        <EntranceThemeTransition IsStaggeringEnabled="True" FromHorizontalOffset="24" FromVerticalOffset="0" />
+                    </TransitionCollection>
+                </StackPanel.ChildrenTransitions>
 
             <!-- 页头 -->
             <StackPanel Spacing="2" Margin="0,0,0,4">
@@ -24,8 +29,20 @@
                            Style="{ThemeResource AppCaptionTextStyle}" TextWrapping="Wrap" />
             </StackPanel>
 
+            <!-- 宽窗口：设备区与导入设置左右并排；窄窗口自动堆叠（代码里切换行列） -->
+            <Grid x:Name="ImportTopGrid" ColumnSpacing="12" RowSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition x:Name="ImportTopRightColumn" Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
             <!-- ================= ① 设备区 ================= -->
-            <uic:SectionCard Header="外部存储设备"
+            <uic:SectionCard x:Name="DeviceCard" Grid.Row="0" Grid.Column="0"
+                             Header="外部存储设备"
                              Subtitle="插入 U 盘 / SD 卡 / 相机后点刷新；也可以直接浏览任意文件夹"
                              Glyph="&#xE88E;">
                 <StackPanel Spacing="12">
@@ -339,7 +356,8 @@
             </uic:SectionCard>
 
             <!-- ================= ③ 设置区（Expander 默认展开） ================= -->
-            <Border Style="{ThemeResource AppCardStyle}">
+            <Border x:Name="SettingsCard" Grid.Row="0" Grid.Column="1"
+                    Style="{ThemeResource AppCardStyle}">
                 <Expander IsExpanded="True"
                           HorizontalAlignment="Stretch"
                           HorizontalContentAlignment="Stretch">
@@ -472,6 +490,8 @@
                     </StackPanel>
                 </Expander>
             </Border>
+
+            </Grid>
 
             <!-- ================= ④ 执行进度 ================= -->
             <uic:SectionCard Header="导入进度"

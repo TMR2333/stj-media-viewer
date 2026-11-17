@@ -28,6 +28,10 @@ public sealed partial class ImportPage : Page
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
+        PageLayout.Fit(PageScroll, PageContent);
+
+        // 宽窗口把「设备区 / 导入设置」并排，窄窗口堆叠
+        HookTopLayout();
         if (_loadedOnce) return;
         _loadedOnce = true;
         await ViewModel.InitializeAsync();
@@ -221,4 +225,52 @@ public sealed partial class ImportPage : Page
         }
         return null;
     }
+    private bool _topLayoutHooked;
+
+    /// <summary>顶部两栏的布局钩子：窗口尺寸 / 首次布局 / 延迟一拍都要重算一次。</summary>
+    private void HookTopLayout()
+    {
+        if (_topLayoutHooked) return;
+        _topLayoutHooked = true;
+        PageScroll.SizeChanged += (_, _) => ApplyImportTopLayout();
+        SizeChanged += (_, _) => ApplyImportTopLayout();
+        LayoutUpdated += OnTopLayoutUpdatedOnce;
+        DispatcherQueue.TryEnqueue(() => ApplyImportTopLayout());
+    }
+
+    private void OnTopLayoutUpdatedOnce(object? sender, object e)
+    {
+        LayoutUpdated -= OnTopLayoutUpdatedOnce;
+        ApplyImportTopLayout();
+    }
+
+    /// <summary>导入页顶部两栏自适应：宽窗口左右并排，窄窗口上下堆叠。</summary>
+    private void ApplyImportTopLayout()
+    {
+        try
+        {
+            var width = Math.Max(PageScroll.ActualWidth, ActualWidth);
+            if (width <= 0) return;
+            bool wide = width >= 1180;
+
+            var wasWide = ImportTopRightColumn.Width.Value > 0.5;
+            if (wide)
+            {
+                ImportTopRightColumn.Width = new GridLength(1, GridUnitType.Star);
+                Grid.SetRow(SettingsCard, 0);
+                Grid.SetColumn(SettingsCard, 1);
+            }
+            else
+            {
+                ImportTopRightColumn.Width = new GridLength(0);
+                Grid.SetRow(SettingsCard, 1);
+                Grid.SetColumn(SettingsCard, 0);
+            }
+
+            // 跨过断点时让布局变化不那么生硬
+            if (wasWide != wide) PageLayout.FadeIn(ImportTopGrid, 160);
+        }
+        catch { }
+    }
+
 }

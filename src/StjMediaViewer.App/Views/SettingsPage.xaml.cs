@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using StjMediaViewer.App.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using StjMediaViewer.App.ViewModels;
@@ -27,6 +28,7 @@ public sealed partial class SettingsPage : Page
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
+        PageLayout.Fit(PageScroll, PageContent);
         if (_loadedOnce) return;
         _loadedOnce = true;
 

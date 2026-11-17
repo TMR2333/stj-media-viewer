@@ -11,9 +11,14 @@
         数据全部来自 CloudViewModel.Shared；页面里没有任何硬编码颜色/字号/圆角。
     -->
     <Grid Background="{ThemeResource AppWindowBackgroundBrush}">
-        <ScrollViewer VerticalScrollMode="Enabled" VerticalScrollBarVisibility="Auto"
+        <ScrollViewer x:Name="PageScroll" VerticalScrollMode="Enabled" VerticalScrollBarVisibility="Auto"
                   HorizontalContentAlignment="Stretch" Padding="24,18,24,24">
-            <StackPanel Spacing="16" MaxWidth="1760" HorizontalAlignment="Left">
+            <StackPanel x:Name="PageContent" Spacing="16" MaxWidth="1760" HorizontalAlignment="Left">
+                <StackPanel.ChildrenTransitions>
+                    <TransitionCollection>
+                        <EntranceThemeTransition IsStaggeringEnabled="True" FromHorizontalOffset="24" FromVerticalOffset="0" />
+                    </TransitionCollection>
+                </StackPanel.ChildrenTransitions>
 
                 <!-- ============ 标题 ============ -->
                 <Grid>

@@ -6,11 +6,16 @@
     xmlns:uic="using:StjMediaViewer.App.Controls"
     Background="{ThemeResource AppTransparentBrush}">
 
-    <ScrollViewer VerticalScrollMode="Enabled" VerticalScrollBarVisibility="Auto"
+    <ScrollViewer x:Name="PageScroll" VerticalScrollMode="Enabled" VerticalScrollBarVisibility="Auto"
                   HorizontalContentAlignment="Stretch"
                   Background="{ThemeResource AppSurfaceBrush}"
                   Padding="{ThemeResource AppPagePadding}">
-        <StackPanel MaxWidth="1760" HorizontalAlignment="Left" Spacing="16">
+        <StackPanel x:Name="PageContent" HorizontalAlignment="Left" Spacing="16">
+                <StackPanel.ChildrenTransitions>
+                    <TransitionCollection>
+                        <EntranceThemeTransition IsStaggeringEnabled="True" FromHorizontalOffset="24" FromVerticalOffset="0" />
+                    </TransitionCollection>
+                </StackPanel.ChildrenTransitions>
 
             <!-- ============ 品牌区 ============ -->
             <Border Background="{ThemeResource AppSurfaceAltBrush}"

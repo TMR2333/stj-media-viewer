@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml;
+using StjMediaViewer.App.Services;
 using Microsoft.UI.Xaml.Controls;
 using StjMediaViewer.App.ViewModels;
 using StjMediaViewer.Core.Util;
@@ -20,6 +21,7 @@ public sealed partial class AiQueuePage : Page
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        PageLayout.Fit(PageScroll, PageContent);
         _suppressUiEvents = true;
         try
         {

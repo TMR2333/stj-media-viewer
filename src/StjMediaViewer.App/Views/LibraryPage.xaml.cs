@@ -45,7 +45,13 @@ public sealed partial class LibraryPage : Page
     // ==================================================================================
     /// <summary>侧边栏切到照片库 / 视频库时调用：只改范围，不重建整页。</summary>
     public void ApplyNavScope(string viewId)
-        => ViewModel.SetScope(LibraryScopeRules.FromViewId(viewId));
+    {
+        var scope = LibraryScopeRules.FromViewId(viewId);
+        if (ViewModel.Scope == scope) return;
+        ViewModel.SetScope(scope);
+        // 换库时网格轻微淡入，避免列表"啪"地换成另一批素材
+        PageLayout.FadeIn(AssetList, 180);
+    }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {

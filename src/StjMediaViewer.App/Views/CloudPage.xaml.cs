@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml;
+using StjMediaViewer.App.Services;
 using Microsoft.UI.Xaml.Controls;
 using StjMediaViewer.App.ViewModels;
 
@@ -20,6 +21,7 @@ public sealed partial class CloudPage : Page
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
+        PageLayout.Fit(PageScroll, PageContent);
         await ViewModel.InitializeAsync();
         SyncEditorSelections();
 

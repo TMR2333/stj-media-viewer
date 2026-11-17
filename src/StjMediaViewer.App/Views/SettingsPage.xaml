@@ -27,11 +27,16 @@
     </Page.Resources>
 
     <!-- 内容区加一层半透明表面（Glass 下 55%），保证文字不直接落在光场上（可读性优先） -->
-    <ScrollViewer VerticalScrollMode="Enabled" VerticalScrollBarVisibility="Auto"
+    <ScrollViewer x:Name="PageScroll" VerticalScrollMode="Enabled" VerticalScrollBarVisibility="Auto"
                   HorizontalContentAlignment="Stretch"
                   Background="{ThemeResource AppSurfaceBrush}"
                   Padding="{ThemeResource AppPagePadding}">
-        <StackPanel MaxWidth="1760" HorizontalAlignment="Left" Spacing="12">
+        <StackPanel x:Name="PageContent" HorizontalAlignment="Left" Spacing="12">
+                <StackPanel.ChildrenTransitions>
+                    <TransitionCollection>
+                        <EntranceThemeTransition IsStaggeringEnabled="True" FromHorizontalOffset="24" FromVerticalOffset="0" />
+                    </TransitionCollection>
+                </StackPanel.ChildrenTransitions>
 
             <!-- ============ 页头 ============ -->
             <Grid Margin="0,0,0,4">

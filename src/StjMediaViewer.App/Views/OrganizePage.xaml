@@ -37,9 +37,14 @@
             </Grid>
         </Border>
 
-        <ScrollViewer Grid.Row="1" VerticalScrollMode="Enabled" VerticalScrollBarVisibility="Auto"
+        <ScrollViewer x:Name="PageScroll" Grid.Row="1" VerticalScrollMode="Enabled" VerticalScrollBarVisibility="Auto"
                       HorizontalContentAlignment="Stretch" Padding="24,18,24,28">
-            <StackPanel Spacing="12" MaxWidth="1760" HorizontalAlignment="Left">
+            <StackPanel x:Name="PageContent" Spacing="12" MaxWidth="1760" HorizontalAlignment="Left">
+                <StackPanel.ChildrenTransitions>
+                    <TransitionCollection>
+                        <EntranceThemeTransition IsStaggeringEnabled="True" FromHorizontalOffset="24" FromVerticalOffset="0" />
+                    </TransitionCollection>
+                </StackPanel.ChildrenTransitions>
 
                 <!-- 来源 -->
                 <Border Background="{ThemeResource AppSurfaceRaisedBrush}"

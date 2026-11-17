@@ -1,4 +1,5 @@
 using Microsoft.UI.Xaml;
+using StjMediaViewer.App.Services;
 using Microsoft.UI.Xaml.Controls;
 using StjMediaViewer.App.ViewModels;
 
@@ -12,6 +13,7 @@ public sealed partial class OrganizePage : Page
     {
         InitializeComponent();
         Loaded += OnLoadedAsync;
+        Loaded += (_, _) => PageLayout.Fit(PageScroll, PageContent);
     }
 
     private async void OnLoadedAsync(object sender, RoutedEventArgs e)

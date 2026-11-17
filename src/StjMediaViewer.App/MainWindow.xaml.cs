@@ -41,6 +41,23 @@ public sealed partial class MainWindow : Window
             var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary);
             var wa = area.WorkArea;
 
+            // 截图/验收用：STJ_WINDOW_SIZE=1800x1000 指定逻辑尺寸（DIP）
+            var sizeOverride = Environment.GetEnvironmentVariable("STJ_WINDOW_SIZE");
+            if (!string.IsNullOrWhiteSpace(sizeOverride))
+            {
+                var parts = sizeOverride.Split('x', 'X');
+                if (parts.Length == 2 && int.TryParse(parts[0], out var ow) && int.TryParse(parts[1], out var oh))
+                {
+                    AppWindow.MoveAndResize(new Windows.Graphics.RectInt32(
+                        wa.X + (wa.Width - (int)(ow * scale)) / 2,
+                        wa.Y + (wa.Height - (int)(oh * scale)) / 2,
+                        Math.Min((int)(ow * scale), wa.Width),
+                        Math.Min((int)(oh * scale), wa.Height)));
+                    Core.Util.Log.Info($"窗口尺寸（演示）{ow}x{oh} DIP");
+                    return;
+                }
+            }
+
             // 目标逻辑尺寸 1500x900 DIP；AppWindow 用物理像素，所以乘缩放。
             // 再与工作区做 clamp，保证一定完整可见（含任务栏）。
             int margin = (int)(80 * scale);
