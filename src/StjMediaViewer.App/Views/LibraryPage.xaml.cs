@@ -64,6 +64,21 @@ public sealed partial class LibraryPage : Page
         if (Environment.GetEnvironmentVariable("STJ_DEMO_ONLY_RAW") == "1")
             ViewModel.OnlyRaw = true;
 
+        // 截图用：STJ_DEMO_MARQUEE=1 模拟一次框选（画框 + 选中框内卡片）
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_MARQUEE") == "1")
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(2600);
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    var rect = new Windows.Foundation.Rect(456, 250, 760, 470);
+                    ShowMarquee(rect);
+                    ApplyMarqueeSelection(rect);
+                });
+            });
+        }
+
         // 截图用：STJ_DEMO_PREVIEW=<素材绝对路径> 直接打开全屏预览（验证视频代理等）
         if (Environment.GetEnvironmentVariable("STJ_DEMO_PREVIEW") is { Length: > 0 } demoPreviewPath)
         {
@@ -472,6 +487,188 @@ public sealed partial class LibraryPage : Page
     // ==================================================================================
     //  网格交互
     // ==================================================================================
+    // ==================================================================================
+    //  框选（像资源管理器那样：在空白处按下 → 拖出选择框 → 框到的卡片全选中）
+    // ==================================================================================
+
+    private bool _marqueeActive;
+    private bool _marqueeAdditive;
+    private Windows.Foundation.Point _marqueeStart;
+    private readonly List<AssetCardItem> _marqueeBase = new();
+    private ScrollViewer? _assetListScroller;
+
+    private void AssetList_PointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        try
+        {
+            var point = e.GetCurrentPoint(AssetList);
+            if (!point.Properties.IsLeftButtonPressed) return;
+            if (IsOnScrollBar(e.OriginalSource as DependencyObject)) return;
+            var pointInCanvas = e.GetCurrentPoint(MarqueeCanvas).Position;
+
+            // 卡片之间的空隙（container 的外边距）也算"空白处"，从那里按下就拖框；
+            // 卡面本身仍是普通点选。注意不要用 Alt：Alt+拖动是 Windows 的"移动窗口"手势。
+            if (FindAncestor<ListViewItem>(e.OriginalSource as DependencyObject) is { } pressedItem)
+            {
+                const double cardMargin = 6;   // CardTemplate 里卡片的 Margin
+                var bounds = pressedItem.TransformToVisual(MarqueeCanvas)
+                    .TransformBounds(new Windows.Foundation.Rect(0, 0, pressedItem.ActualWidth, pressedItem.ActualHeight));
+                var inCard = pointInCanvas.X >= bounds.X + cardMargin &&
+                             pointInCanvas.X <= bounds.X + bounds.Width - cardMargin &&
+                             pointInCanvas.Y >= bounds.Y + cardMargin &&
+                             pointInCanvas.Y <= bounds.Y + bounds.Height - cardMargin;
+                if (inCard) return;
+            }
+
+            _marqueeActive = true;
+            _marqueeAdditive = e.KeyModifiers.HasFlag(VirtualKeyModifiers.Control);
+            _marqueeStart = e.GetCurrentPoint(MarqueeCanvas).Position;
+
+            _marqueeBase.Clear();
+            if (_marqueeAdditive) _marqueeBase.AddRange(ViewModel.SelectedItems);
+
+            ShowMarquee(new Windows.Foundation.Rect(_marqueeStart, _marqueeStart));
+            AssetList.CapturePointer(e.Pointer);
+            e.Handled = true;
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("框选按下失败", ex);
+        }
+    }
+
+    private void AssetList_PointerMoved(object sender, PointerRoutedEventArgs e)
+    {
+        if (!_marqueeActive) return;
+        try
+        {
+            var pos = e.GetCurrentPoint(MarqueeCanvas).Position;
+            var rect = NormalizeRect(_marqueeStart, pos);
+            MarqueeRect.Width = rect.Width;
+            MarqueeRect.Height = rect.Height;
+            Canvas.SetLeft(MarqueeRect, rect.X);
+            Canvas.SetTop(MarqueeRect, rect.Y);
+
+            ApplyMarqueeSelection(rect);
+            AutoScrollOnEdge(e.GetCurrentPoint(AssetList).Position);
+            e.Handled = true;
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("框选移动失败", ex);
+        }
+    }
+
+    private void AssetList_PointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        if (!_marqueeActive) return;
+        _marqueeActive = false;
+        try
+        {
+            EndMarquee();
+            AssetList.ReleasePointerCapture(e.Pointer);
+        }
+        catch { /* 指针已释放 */ }
+        e.Handled = true;
+    }
+
+    private void AssetList_PointerCaptureLost(object sender, PointerRoutedEventArgs e)
+    {
+        if (!_marqueeActive) return;
+        _marqueeActive = false;
+        EndMarquee();
+    }
+
+    private void EndMarquee()
+    {
+        MarqueeRect.Visibility = Visibility.Collapsed;
+        MarqueeRect.Width = 0;
+        MarqueeRect.Height = 0;
+    }
+
+    private void ShowMarquee(Windows.Foundation.Rect rect)
+    {
+        MarqueeRect.Visibility = Visibility.Visible;
+        MarqueeRect.Width = Math.Max(1, rect.Width);
+        MarqueeRect.Height = Math.Max(1, rect.Height);
+        Canvas.SetLeft(MarqueeRect, rect.X);
+        Canvas.SetTop(MarqueeRect, rect.Y);
+    }
+
+    private static Windows.Foundation.Rect NormalizeRect(Windows.Foundation.Point a, Windows.Foundation.Point b)
+    {
+        var x = Math.Min(a.X, b.X);
+        var y = Math.Min(a.Y, b.Y);
+        return new Windows.Foundation.Rect(x, y, Math.Abs(a.X - b.X), Math.Abs(a.Y - b.Y));
+    }
+
+    /// <summary>把与框选矩形相交的（已实现出来的）卡片选上。</summary>
+    private void ApplyMarqueeSelection(Windows.Foundation.Rect rect)
+    {
+        var selected = new List<AssetCardItem>(_marqueeBase);
+        for (int i = 0; i < ViewModel.Items.Count; i++)
+        {
+            if (AssetList.ContainerFromIndex(i) is not ListViewItem container) continue;
+            if (container.ActualWidth <= 0 || container.ActualHeight <= 0) continue;
+
+            Windows.Foundation.Rect bounds;
+            try
+            {
+                bounds = container.TransformToVisual(MarqueeCanvas)
+                    .TransformBounds(new Windows.Foundation.Rect(0, 0, container.ActualWidth, container.ActualHeight));
+            }
+            catch
+            {
+                continue;
+            }
+
+            var intersects = rect.X < bounds.X + bounds.Width && rect.X + rect.Width > bounds.X &&
+                             rect.Y < bounds.Y + bounds.Height && rect.Y + rect.Height > bounds.Y;
+            if (!intersects) continue;
+            var item = ViewModel.Items[i];
+            if (!selected.Contains(item)) selected.Add(item);
+        }
+
+        if (selected.Count == ViewModel.SelectedItems.Count &&
+            selected.SequenceEqual(ViewModel.SelectedItems))
+            return;
+
+        ViewModel.SetSelection(selected);
+    }
+
+    /// <summary>拖到列表上下边缘时自动滚动（资源管理器的手感）。</summary>
+    private void AutoScrollOnEdge(Windows.Foundation.Point positionInList)
+    {
+        _assetListScroller ??= FindDescendant<ScrollViewer>(AssetList);
+        if (_assetListScroller is null) return;
+
+        const double edge = 28;
+        const double step = 24;
+        if (positionInList.Y < edge)
+            _assetListScroller.ChangeView(null, Math.Max(0, _assetListScroller.VerticalOffset - step), null, true);
+        else if (positionInList.Y > AssetList.ActualHeight - edge)
+            _assetListScroller.ChangeView(null, _assetListScroller.VerticalOffset + step, null, true);
+    }
+
+    private static bool IsOnScrollBar(DependencyObject? source)
+    {
+        for (var node = source; node is not null; node = VisualTreeHelper.GetParent(node))
+        {
+            if (node is ScrollBar) return true;
+            if (node is ListView) return false;
+        }
+        return false;
+    }
+
+    private static T? FindAncestor<T>(DependencyObject? node) where T : DependencyObject
+    {
+        for (var current = node; current is not null; current = VisualTreeHelper.GetParent(current))
+        {
+            if (current is T match) return match;
+        }
+        return null;
+    }
+
     private void AssetList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         var selected = AssetList.SelectedItems.OfType<AssetCardItem>().ToList();

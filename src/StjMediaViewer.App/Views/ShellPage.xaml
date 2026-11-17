@@ -15,8 +15,8 @@
         <!-- 顶栏紧凑按钮：小圆角、无粗边框，避免一排大胶囊把顶栏撑得笨重 -->
         <Style x:Key="TopBarCompactButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="{ThemeResource AppTransparentBrush}" />
-            <Setter Property="BorderBrush" Value="{ThemeResource AppTransparentBrush}" />
-            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="BorderBrush" Value="{ThemeResource AppCardStrokeBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="{ThemeResource AppRadiusSmall}" />
             <Setter Property="Padding" Value="10,3,10,3" />
             <Setter Property="MinHeight" Value="32" />

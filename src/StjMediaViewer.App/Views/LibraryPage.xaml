@@ -27,7 +27,9 @@
         <!-- ================= 筛选行：整行可点，选中态用强调色底 + 勾 ================= -->
         <Style x:Key="FilterRowButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="{ThemeResource AppTransparentBrush}" />
-            <Setter Property="BorderThickness" Value="0" />
+            <!-- 圆角矩形边框：让"这一行可以点"有明确边界（Explorer 选择框那种感觉） -->
+            <Setter Property="BorderBrush" Value="{ThemeResource AppCardStrokeBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
             <!-- Padding 归零：让选中色块与按钮 hover 底严格重合，内边距交给内容层 -->
             <Setter Property="Padding" Value="0" />
             <Setter Property="MinHeight" Value="26" />
@@ -49,8 +51,9 @@
         -->
         <Style x:Key="CompactToggleStyle" TargetType="ToggleButton">
             <Setter Property="Background" Value="{ThemeResource AppTransparentBrush}" />
-            <Setter Property="BorderBrush" Value="{ThemeResource AppTransparentBrush}" />
-            <Setter Property="BorderThickness" Value="0" />
+            <!-- 静止态给一圈很淡的圆角边框，选中态换成强调色（不是无边框纯文字） -->
+            <Setter Property="BorderBrush" Value="{ThemeResource AppCardStrokeBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="{ThemeResource AppRadiusSmall}" />
             <Setter Property="MinHeight" Value="24" />
             <Setter Property="MinWidth" Value="0" />
@@ -134,8 +137,8 @@
         <!-- 紧凑普通按钮（排序方向、清空筛选等）：同尺寸、同圆角，无胶囊 -->
         <Style x:Key="CompactButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="{ThemeResource AppTransparentBrush}" />
-            <Setter Property="BorderBrush" Value="{ThemeResource AppTransparentBrush}" />
-            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="BorderBrush" Value="{ThemeResource AppCardStrokeBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
             <Setter Property="CornerRadius" Value="{ThemeResource AppRadiusSmall}" />
             <Setter Property="MinHeight" Value="26" />
             <Setter Property="MinWidth" Value="0" />
@@ -160,7 +163,7 @@
 
         <!-- ================= 网格卡片（主内容单元 → container-high，浮起） ================= -->
         <DataTemplate x:Key="CardTemplate" x:DataType="vm:AssetCardItem">
-            <Grid Margin="4" ToolTipService.ToolTip="{x:Bind TooltipText, Mode=OneWay}">
+            <Grid Margin="6" ToolTipService.ToolTip="{x:Bind TooltipText, Mode=OneWay}">
                 <Border Background="{ThemeResource AppSurfaceRaisedBrush}"
                         BorderBrush="{ThemeResource AppCardStrokeBrush}"
                         BorderThickness="{ThemeResource AppCardStrokeThickness}"
@@ -650,6 +653,8 @@
                                                         <Grid>
                                                             <!-- 选中色块满铺整行（与按钮 hover 底严格重合），内容再内缩 -->
                                                             <Border Background="{ThemeResource AppSelectedBrush}"
+                                                                    BorderBrush="{ThemeResource AppSelectedBorderBrush}"
+                                                                    BorderThickness="1"
                                                                     CornerRadius="{ThemeResource AppRadiusSmall}"
                                                                     Visibility="{x:Bind SelectionVisibility, Mode=OneWay}" />
                                                             <Grid ColumnSpacing="6" Margin="6,0,6,0">
@@ -712,6 +717,10 @@
                           DoubleTapped="AssetList_DoubleTapped"
                           RightTapped="AssetList_RightTapped"
                           KeyDown="AssetList_KeyDown"
+                          PointerPressed="AssetList_PointerPressed"
+                          PointerMoved="AssetList_PointerMoved"
+                          PointerReleased="AssetList_PointerReleased"
+                          PointerCaptureLost="AssetList_PointerCaptureLost"
                           ScrollViewer.HorizontalScrollMode="Disabled"
                           ScrollViewer.VerticalScrollBarVisibility="Auto">
                         <!-- 筛选变化 / 增量加载时：新增、删除、重排都走主题过渡，不再硬切 -->
@@ -723,6 +732,16 @@
                             </TransitionCollection>
                         </ListView.ItemContainerTransitions>
                     </ListView>
+
+                <!-- 框选矩形（像资源管理器那样拖出一个选择框） -->
+                <Canvas x:Name="MarqueeCanvas" Grid.Row="0" IsHitTestVisible="False" Canvas.ZIndex="20">
+                    <Rectangle x:Name="MarqueeRect"
+                               Visibility="Collapsed"
+                               Fill="{ThemeResource AccentSubtleBrush}"
+                               Stroke="{ThemeResource AccentBrush}"
+                               StrokeThickness="1"
+                               RadiusX="3" RadiusY="3" />
+                </Canvas>
 
                 <!-- 加载中：顶部细进度条 -->
                 <ProgressBar Grid.Row="0"
