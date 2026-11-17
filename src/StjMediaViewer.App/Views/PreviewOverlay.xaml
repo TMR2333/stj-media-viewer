@@ -97,6 +97,28 @@
                                     AutoPlay="True"
                                     Stretch="Uniform" />
 
+                <!-- 视频格式不支持时的状态提示（4:2:2 / 10-bit / HEVC → ffmpeg 代理） -->
+                <Border Visibility="{x:Bind ViewModel.VideoStatusVisibility, Mode=OneWay}"
+                        HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                        Margin="0,0,0,72"
+                        Background="{ThemeResource AppSurfaceAltBrush}"
+                        BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                        BorderThickness="{ThemeResource AppCardStrokeThickness}"
+                        CornerRadius="{ThemeResource AppRadiusMedium}"
+                        Padding="14,8">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <FontIcon Glyph="&#xE7BA;" FontSize="{ThemeResource AppFontCaptionSize}"
+                                  Foreground="{ThemeResource TextTertiaryBrush}" VerticalAlignment="Center" />
+                        <TextBlock Text="{x:Bind ViewModel.VideoStatusText, Mode=OneWay}"
+                                   Style="{ThemeResource AppCaptionTextStyle}"
+                                   Foreground="{ThemeResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap" MaxWidth="620" VerticalAlignment="Center" />
+                        <Button Content="用外部播放器打开"
+                                Style="{ThemeResource AppSubtleButtonStyle}"
+                                Click="OpenExternal_Click" />
+                    </StackPanel>
+                </Border>
+
                 <!-- 音频：封面占位 + 信息 -->
                 <Grid Visibility="{x:Bind ViewModel.AudioVisibility, Mode=OneWay}"
                       HorizontalAlignment="Center" VerticalAlignment="Center"

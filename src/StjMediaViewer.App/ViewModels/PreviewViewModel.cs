@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
+using StjMediaViewer.App.Services;
 using StjMediaViewer.Core.Models;
 using StjMediaViewer.Core.Util;
 using Windows.Media.Core;
@@ -187,6 +188,10 @@ public sealed partial class PreviewViewModel : ObservableObject
         PlaceholderGlyph = Formatting.KindGlyph(asset.Kind);
         PlaceholderText = "暂无可显示的画面";
         LoadingVisibility = Visibility.Visible;
+        _proxyAttempted = false;
+        VideoStatusText = "";
+        VideoStatusVisibility = Visibility.Collapsed;
+        VideoErrorVisibility = Visibility.Collapsed;
 
         OnPropertyChanged(nameof(IsImage));
         OnPropertyChanged(nameof(IsVideo));
@@ -264,6 +269,77 @@ public sealed partial class PreviewViewModel : ObservableObject
             PlaceholderText = failText;
         }
     }
+
+    /// <summary>
+    /// 系统解码器不支持该视频（4:2:2 / 10-bit H.264、HEVC、ProRes…）时：
+    /// 用 ffmpeg 生成一份 720p H.264 8-bit 代理再播放；没有 ffmpeg 就给出明确的设置指引。
+    /// </summary>
+    public async Task SwitchToProxyAsync()
+    {
+        if (_proxyAttempted || Current is not { } asset) return;
+        _proxyAttempted = true;
+
+        var proxy = AppServices.VideoProxy;
+        if (proxy is null || !proxy.IsAvailable)
+        {
+            VideoStatusText = "系统解码器不支持这个视频的格式（4:2:2 / 10-bit / HEVC 等常见于相机原片）。" +
+                              "在「设置 → 工具链」里指定 ffmpeg.exe 后，会自动生成预览代理来播放。";
+            VideoStatusVisibility = Visibility.Visible;
+            VideoErrorVisibility = Visibility.Visible;
+            return;
+        }
+
+        try
+        {
+            VideoStatusText = "系统解码器不支持该格式，正在用 ffmpeg 生成预览代理（首次稍慢，之后秒开）…";
+            VideoStatusVisibility = Visibility.Visible;
+            LoadingVisibility = Visibility.Visible;
+
+            var proxyPath = await proxy.EnsureProxyAsync(asset.FullPath, CancellationToken.None);
+            if (string.IsNullOrEmpty(proxyPath))
+            {
+                VideoStatusText = "生成预览代理失败：可以在「设置 → 工具链」确认 ffmpeg 可用，或用外部播放器打开。";
+                VideoErrorVisibility = Visibility.Visible;
+                return;
+            }
+
+            VideoSource = MediaSource.CreateFromUri(new Uri(proxyPath));
+            VideoStatusText = "已用 ffmpeg 预览代理播放（H.264 8-bit · 720p，代理已缓存）";
+            VideoErrorVisibility = Visibility.Collapsed;
+            LoadingVisibility = Visibility.Collapsed;
+            Log.Info($"[preview] 切换预览代理：{asset.FileName} → {proxyPath}");
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            VideoStatusText = $"生成预览代理失败：{ex.Message}";
+            VideoErrorVisibility = Visibility.Visible;
+            Log.Warn("切换视频预览代理失败", ex);
+        }
+    }
+
+    /// <summary>用系统默认播放器打开当前视频。</summary>
+    public void OpenInExternalPlayer()
+    {
+        try
+        {
+            if (Current is not { } asset || !File.Exists(asset.FullPath)) return;
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(asset.FullPath)
+            {
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("外部播放器打开失败", ex);
+        }
+    }
+
+    private bool _proxyAttempted;
+
+    [ObservableProperty] private string _videoStatusText = "";
+    [ObservableProperty] private Visibility _videoStatusVisibility = Visibility.Collapsed;
+    [ObservableProperty] private Visibility _videoErrorVisibility = Visibility.Collapsed;
 
     private static MediaSource? TryCreateVideoSource(MediaAsset asset)
     {

@@ -76,6 +76,7 @@ public static partial class Program
             await Section("媒体库重新定位", async () => await CheckLibraryRelocate(s, tempData));
             await Section("筛选/多选/云诊断回归", async () => await CheckFilterAndBatchFixes(s, tempData));
             await Section("多主题", async () => await CheckMultiTheme(s, tempData));
+            await Section("视频预览代理", async () => await CheckVideoProxy(s, tempData));
             await Section("设置持久化", async () => await CheckSettings(s, tempData));
             await Section("AI 客户端(dry-run)", async () => await CheckAi(s));
             var aiUrl = ArgValue(args, "--ai-url");

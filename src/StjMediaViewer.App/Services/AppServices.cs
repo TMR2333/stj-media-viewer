@@ -65,6 +65,9 @@ public static class AppServices
     // ---- 后台缩略图预热 ----
     public static ThumbnailWarmup Warmup { get; private set; } = null!;
 
+    /// <summary>视频预览代理：系统解码器不支持 4:2:2 / 10-bit / HEVC 时用 ffmpeg 转 720p 代理再播。</summary>
+    public static VideoProxyService VideoProxy { get; private set; } = null!;
+
     /// <summary>缩略图缓存自动清理服务。</summary>
     public static CacheMaintenanceService CacheMaintenance { get; private set; } = null!;
 
@@ -132,6 +135,7 @@ public static class AppServices
             Thumbnails = new ThumbnailService(Decoder, Encoder, ThumbnailCacheDirectory);
             Thumbs = new ThumbnailLoader(Thumbnails);
             Warmup = new ThumbnailWarmup(Store, Thumbnails, Luts);
+        VideoProxy = new VideoProxyService(Ffmpeg, CacheRootDirectory);
             Log.Info($"缩略图缓存目录已切换：{ThumbnailCacheDirectory}");
         }
         catch (Exception ex)
@@ -217,6 +221,7 @@ public static class AppServices
         Transcode = new TranscodeService(Ffmpeg);
         Luts = new LutService(Settings, Decoder, Encoder);
         Warmup = new ThumbnailWarmup(Store, Thumbnails, Luts);
+        VideoProxy = new VideoProxyService(Ffmpeg, CacheRootDirectory);
         Cloud = new CloudSyncService(store: Store, xmp: Xmp);
         // 别把 App 自己的缓存/数据目录当素材同步（缩略图缓存被用户放进库里时也安全）
         CloudSyncService.ExcludeDirectory(Path.Combine(Settings.AppDataDirectory, "Cache"));
@@ -260,6 +265,7 @@ public static class AppServices
         Transcode = new FallbackTranscodeService();
         Luts = new FallbackLutService();
         Warmup = new ThumbnailWarmup(Store, Thumbnails, Luts);
+        VideoProxy = new VideoProxyService(Ffmpeg, CacheRootDirectory);
         Cloud = new FallbackCloudSyncService();
         CloudAuto = new CloudAutoSyncService(Settings, Cloud);
         Organizer = new OrganizerService(Settings.AppDataDirectory, Cloud);

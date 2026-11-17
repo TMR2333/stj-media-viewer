@@ -3,6 +3,7 @@ using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using StjMediaViewer.App.ViewModels;
 using StjMediaViewer.Core.Models;
+using StjMediaViewer.Core.Util;
 using Windows.System;
 
 namespace StjMediaViewer.App.Views;
@@ -23,6 +24,9 @@ public sealed partial class PreviewOverlay : UserControl
     {
         InitializeComponent();
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+        // 系统解码器（Media Foundation）不支持 4:2:2 / 10-bit / HEVC 时，
+        // MediaPlayerElement 会抛 MediaFailed：这时切到 ffmpeg 生成的预览代理。
+        VideoPlayer.Loaded += (_, _) => HookMediaPlayer();
         // ScrollViewer 自带 ZoomMode 会把滚轮当成滚动/缩放处理，这里用 handledEventsToo 抢在前面，
         // 保证"滚轮 = 以指针为中心缩放"这一条交互契约稳定生效。
         AddHandler(PointerWheelChangedEvent, new PointerEventHandler(Overlay_WheelZoom), true);
@@ -52,10 +56,37 @@ public sealed partial class PreviewOverlay : UserControl
         ViewModel.Close();
     }
 
+    private Windows.Media.Playback.MediaPlayer? _hookedPlayer;
+
+    private void HookMediaPlayer()
+    {
+        try
+        {
+            var player = VideoPlayer.MediaPlayer;
+            if (player is null || ReferenceEquals(player, _hookedPlayer)) return;
+            _hookedPlayer = player;
+            player.MediaFailed += (playerSender, args) =>
+            {
+                Log.Info($"[preview] MediaFailed：{args.ErrorMessage}（{args.Error}）→ 尝试 ffmpeg 预览代理");
+                // MediaFailed 在后台线程触发，ViewModel 的属性会触发 x:Bind 更新 → 必须切回 UI 线程
+                DispatcherQueue.TryEnqueue(() => _ = ViewModel.SwitchToProxyAsync());
+            };
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("挂接视频播放失败事件失败", ex);
+        }
+    }
+
+    private void OpenExternal_Click(object sender, RoutedEventArgs e) => ViewModel.OpenInExternalPlayer();
+
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         switch (e.PropertyName)
         {
+            case nameof(PreviewViewModel.VideoSource):
+                HookMediaPlayer();
+                break;
             case nameof(PreviewViewModel.Image):
                 AudioGlyph.Visibility = ViewModel.Image is null ? Visibility.Visible : Visibility.Collapsed;
                 ResetZoom();

@@ -64,6 +64,27 @@ public sealed partial class LibraryPage : Page
         if (Environment.GetEnvironmentVariable("STJ_DEMO_ONLY_RAW") == "1")
             ViewModel.OnlyRaw = true;
 
+        // 截图用：STJ_DEMO_PREVIEW=<素材绝对路径> 直接打开全屏预览（验证视频代理等）
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_PREVIEW") is { Length: > 0 } demoPreviewPath)
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(2500);
+                try
+                {
+                    var asset = await AppServices.Store.GetByPathAsync(demoPreviewPath);
+                    if (asset is not null)
+                    {
+                        DispatcherQueue.TryEnqueue(() => ShellPage.Current?.ShowPreview(new[] { asset }, 0));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log.Warn("demo preview failed", ex);
+                }
+            });
+        }
+
         // 截图用：等首屏加载完再打开检视面板，并优先选中一张多主题素材
         if (Environment.GetEnvironmentVariable("STJ_DEMO_INSPECTOR") == "1")
         {
