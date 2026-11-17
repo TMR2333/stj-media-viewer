@@ -859,6 +859,12 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
                 "SELECT COUNT(*) FROM assets" + w.Sql +
                 AndWhere(w, "NOT EXISTS(SELECT 1 FROM collection_assets ca WHERE ca.asset_id = assets.id)"), w);
 
+            // 合并组分面：合并组 id → 组内素材数
+            var mergeSql = "SELECT mg.group_id, COUNT(*) FROM merge_group_assets mg " +
+                           "WHERE mg.asset_id IN (SELECT assets.id FROM assets" + w.Sql + ") " +
+                           "GROUP BY mg.group_id";
+            f.ByMergeGroup = GroupText("group_id", mergeSql, w);
+
             f.ByPick = GroupText("is_pick",
                 "SELECT is_pick, COUNT(*) FROM assets" + w.Sql + " GROUP BY is_pick", w,
                 v => v switch { "1" => "picked", "0" => "rejected", _ => "unset" });
@@ -974,6 +980,244 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
         list.Sort(StringComparer.OrdinalIgnoreCase);
         return list;
     }
+
+    // ==================================================================== 合并组
+
+    public Task<IReadOnlyList<MergeGroup>> GetMergeGroupsAsync(CancellationToken ct = default) =>
+        RunAsync(() =>
+        {
+            using var cmd = _conn!.CreateCommand();
+            cmd.CommandText = @"
+                SELECT g.id, g.name, g.cover_asset_id, g.created_at, g.sort_order, COUNT(a.asset_id)
+                FROM merge_groups g
+                LEFT JOIN merge_group_assets a ON a.group_id = g.id
+                GROUP BY g.id
+                ORDER BY g.sort_order, g.created_at, g.name";
+            using var r = cmd.ExecuteReader();
+            var list = new List<MergeGroup>();
+            while (r.Read())
+            {
+                list.Add(new MergeGroup
+                {
+                    Id = r.GetString(0),
+                    Name = r.IsDBNull(1) ? "" : r.GetString(1),
+                    CoverAssetId = r.IsDBNull(2) ? null : r.GetString(2),
+                    CreatedAt = r.IsDBNull(3) || !DateTimeOffset.TryParse(r.GetString(3), out var created)
+                        ? DateTimeOffset.Now : created,
+                    SortOrder = r.IsDBNull(4) ? 0 : r.GetInt32(4),
+                    AssetCount = r.IsDBNull(5) ? 0 : r.GetInt32(5),
+                });
+            }
+            return (IReadOnlyList<MergeGroup>)list;
+        }, ct);
+
+    public Task<MergeGroup> CreateMergeGroupAsync(string name, IEnumerable<string> assetIds, CancellationToken ct = default) =>
+        RunAsync(() =>
+        {
+            var ids = (assetIds ?? Array.Empty<string>())
+                .Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList();
+            var group = new MergeGroup
+            {
+                Id = Guid.NewGuid().ToString("N")[..12],
+                Name = string.IsNullOrWhiteSpace(name) ? $"合并组 {DateTime.Now:MMdd-HHmm}" : name.Trim(),
+                CreatedAt = DateTimeOffset.Now,
+                AssetCount = ids.Count,
+                CoverAssetId = ids.FirstOrDefault(),
+            };
+
+            using var tx = _conn!.BeginTransaction();
+            using (var cmd = _conn.CreateCommand())
+            {
+                cmd.Transaction = tx;
+                cmd.CommandText = @"
+                    INSERT INTO merge_groups(id, name, cover_asset_id, created_at, sort_order)
+                    VALUES(@id, @name, @cover, @created,
+                           COALESCE((SELECT MAX(sort_order) + 1 FROM merge_groups), 0))";
+                cmd.Parameters.AddWithValue("@id", group.Id);
+                cmd.Parameters.AddWithValue("@name", group.Name);
+                cmd.Parameters.AddWithValue("@cover", (object?)group.CoverAssetId ?? DBNull.Value);
+                cmd.Parameters.AddWithValue("@created", group.CreatedAt.ToString("O"));
+                cmd.ExecuteNonQuery();
+            }
+
+            using (var cmd = _conn.CreateCommand())
+            {
+                cmd.Transaction = tx;
+                cmd.CommandText = "INSERT OR IGNORE INTO merge_group_assets(group_id, asset_id, position, added_at) VALUES(@g, @a, @p, @t)";
+                cmd.Parameters.AddWithValue("@g", group.Id);
+                var pAsset = cmd.Parameters.Add("@a", SqliteType.Text);
+                var pPos = cmd.Parameters.Add("@p", SqliteType.Integer);
+                cmd.Parameters.AddWithValue("@t", DateTimeOffset.Now.ToString("O"));
+                for (int i = 0; i < ids.Count; i++)
+                {
+                    pAsset.Value = ids[i];
+                    pPos.Value = i;
+                    cmd.ExecuteNonQuery();
+                }
+            }
+            tx.Commit();
+            return group;
+        }, ct);
+
+    public Task RenameMergeGroupAsync(string groupId, string name, CancellationToken ct = default) =>
+        RunAsync(() =>
+        {
+            if (string.IsNullOrWhiteSpace(groupId)) return;
+            using var cmd = _conn!.CreateCommand();
+            cmd.CommandText = "UPDATE merge_groups SET name=@name WHERE id=@id";
+            cmd.Parameters.AddWithValue("@name", string.IsNullOrWhiteSpace(name) ? "未命名合并组" : name.Trim());
+            cmd.Parameters.AddWithValue("@id", groupId);
+            cmd.ExecuteNonQuery();
+        }, ct);
+
+    public Task DeleteMergeGroupAsync(string groupId, CancellationToken ct = default) =>
+        RunAsync(() =>
+        {
+            if (string.IsNullOrWhiteSpace(groupId)) return;
+            using var tx = _conn!.BeginTransaction();
+            using (var del = _conn.CreateCommand())
+            {
+                del.Transaction = tx;
+                del.CommandText = "DELETE FROM merge_group_assets WHERE group_id=@id";
+                del.Parameters.AddWithValue("@id", groupId);
+                del.ExecuteNonQuery();
+            }
+            using (var del = _conn.CreateCommand())
+            {
+                del.Transaction = tx;
+                del.CommandText = "DELETE FROM merge_groups WHERE id=@id";
+                del.Parameters.AddWithValue("@id", groupId);
+                del.ExecuteNonQuery();
+            }
+            tx.Commit();
+        }, ct);
+
+    public Task SetMergeGroupCoverAsync(string groupId, string? assetId, CancellationToken ct = default) =>
+        RunAsync(() =>
+        {
+            if (string.IsNullOrWhiteSpace(groupId)) return;
+            using var cmd = _conn!.CreateCommand();
+            if (string.IsNullOrWhiteSpace(assetId))
+            {
+                cmd.CommandText = @"
+                    UPDATE merge_groups SET cover_asset_id =
+                        (SELECT asset_id FROM merge_group_assets WHERE group_id=@id ORDER BY position, added_at LIMIT 1)
+                    WHERE id=@id";
+                cmd.Parameters.AddWithValue("@id", groupId);
+            }
+            else
+            {
+                cmd.CommandText = @"
+                    UPDATE merge_groups SET cover_asset_id=@a
+                    WHERE id=@id AND EXISTS(SELECT 1 FROM merge_group_assets WHERE group_id=@id AND asset_id=@a)";
+                cmd.Parameters.AddWithValue("@id", groupId);
+                cmd.Parameters.AddWithValue("@a", assetId);
+            }
+            cmd.ExecuteNonQuery();
+        }, ct);
+
+    public Task<int> AddToMergeGroupAsync(string groupId, IEnumerable<string> assetIds, CancellationToken ct = default) =>
+        RunAsync(() =>
+        {
+            if (string.IsNullOrWhiteSpace(groupId) || assetIds is null) return 0;
+            var ids = assetIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList();
+            if (ids.Count == 0) return 0;
+
+            int maxPos;
+            using (var read = _conn!.CreateCommand())
+            {
+                read.CommandText = "SELECT COALESCE(MAX(position), -1) FROM merge_group_assets WHERE group_id=@g";
+                read.Parameters.AddWithValue("@g", groupId);
+                maxPos = Convert.ToInt32(read.ExecuteScalar() ?? -1);
+            }
+
+            using var tx = _conn!.BeginTransaction();
+            using var cmd = _conn.CreateCommand();
+            cmd.Transaction = tx;
+            cmd.CommandText = "INSERT OR IGNORE INTO merge_group_assets(group_id, asset_id, position, added_at) VALUES(@g, @a, @p, @t)";
+            cmd.Parameters.AddWithValue("@g", groupId);
+            var pAsset = cmd.Parameters.Add("@a", SqliteType.Text);
+            var pPos = cmd.Parameters.Add("@p", SqliteType.Integer);
+            cmd.Parameters.AddWithValue("@t", DateTimeOffset.Now.ToString("O"));
+            int added = 0;
+            foreach (var id in ids)
+            {
+                pAsset.Value = id;
+                pPos.Value = ++maxPos;
+                added += cmd.ExecuteNonQuery();
+            }
+            tx.Commit();
+            return added;
+        }, ct);
+
+    public Task<int> RemoveFromMergeGroupAsync(string groupId, IEnumerable<string> assetIds, CancellationToken ct = default) =>
+        RunAsync(() =>
+        {
+            if (string.IsNullOrWhiteSpace(groupId) || assetIds is null) return 0;
+            var ids = assetIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList();
+            if (ids.Count == 0) return 0;
+
+            using var tx = _conn!.BeginTransaction();
+            using var cmd = _conn.CreateCommand();
+            cmd.Transaction = tx;
+            var sb = new StringBuilder("DELETE FROM merge_group_assets WHERE group_id=@g AND asset_id IN (");
+            cmd.Parameters.AddWithValue("@g", groupId);
+            for (int i = 0; i < ids.Count; i++)
+            {
+                if (i > 0) sb.Append(',');
+                sb.Append("@a").Append(i);
+                cmd.Parameters.AddWithValue("@a" + i, ids[i]);
+            }
+            sb.Append(')');
+            cmd.CommandText = sb.ToString();
+            var removed = cmd.ExecuteNonQuery();
+            tx.Commit();
+            return removed;
+        }, ct);
+
+    public Task<IReadOnlyDictionary<string, string>> GetMergeMembershipAsync(
+        IEnumerable<string> assetIds, CancellationToken ct = default) =>
+        RunAsync(() =>
+        {
+            var map = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (assetIds is null) return (IReadOnlyDictionary<string, string>)map;
+            var ids = assetIds.Where(id => !string.IsNullOrWhiteSpace(id)).Distinct().ToList();
+            if (ids.Count == 0) return (IReadOnlyDictionary<string, string>)map;
+
+            for (int start = 0; start < ids.Count; start += InClauseChunk)
+            {
+                var chunk = ids.Skip(start).Take(InClauseChunk).ToList();
+                using var cmd = _conn!.CreateCommand();
+                var sb = new StringBuilder("SELECT asset_id, group_id FROM merge_group_assets WHERE asset_id IN (");
+                for (int i = 0; i < chunk.Count; i++)
+                {
+                    if (i > 0) sb.Append(',');
+                    sb.Append("@a").Append(i);
+                    cmd.Parameters.AddWithValue("@a" + i, chunk[i]);
+                }
+                sb.Append(')');
+                cmd.CommandText = sb.ToString();
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                {
+                    if (!r.IsDBNull(0) && !r.IsDBNull(1)) map[r.GetString(0)] = r.GetString(1);
+                }
+            }
+            return (IReadOnlyDictionary<string, string>)map;
+        }, ct);
+
+    public Task<IReadOnlyList<string>> GetMergeGroupAssetIdsAsync(string groupId, CancellationToken ct = default) =>
+        RunAsync(() =>
+        {
+            var list = new List<string>();
+            if (string.IsNullOrWhiteSpace(groupId)) return (IReadOnlyList<string>)list;
+            using var cmd = _conn!.CreateCommand();
+            cmd.CommandText = "SELECT asset_id FROM merge_group_assets WHERE group_id=@g ORDER BY position, added_at";
+            cmd.Parameters.AddWithValue("@g", groupId);
+            using var r = cmd.ExecuteReader();
+            while (r.Read()) list.Add(r.GetString(0));
+            return (IReadOnlyList<string>)list;
+        }, ct);
 
     // ==================================================================== 影像合集
 
@@ -1264,6 +1508,7 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
         // 主题/影调支持"未填写"（__unset__）伪选项：选它 = 只要还没分类的素材
         ApplyThemeFilter(w, q.Themes);
         ApplyCollectionFilter(w, q.Collections);
+        ApplyMergeGroupFilter(w, q.MergeGroups);
         AddInOrUnset(w, "tone", q.Tones);
         if (q.ColorLabels.Count > 0) AddIn(w, "color_label", q.ColorLabels.Cast<object?>().ToList());
         if (q.RawFormats.Count > 0) AddIn(w, "raw_format", q.RawFormats.Cast<object?>().ToList());
@@ -1328,6 +1573,23 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
         // 例外：筛「只看 RAW」时必须放行非代表的 RAW 行，否则 RAW 全被折叠掉、结果永远是 0 条。
         if (q.CollapseGroups && q.IsRaw != true) w.And("is_group_cover = 1");
         return w;
+    }
+
+    /// <summary>合并组筛选：命中任意选中合并组的素材（多选 = 并集）。</summary>
+    private static void ApplyMergeGroupFilter(Where w, List<string> selected)
+    {
+        if (selected.Count == 0) return;
+        var prefix = w.NextInPrefix();
+        var sb = new StringBuilder("EXISTS(SELECT 1 FROM merge_group_assets mg WHERE mg.asset_id = assets.id AND mg.group_id IN (");
+        for (int i = 0; i < selected.Count; i++)
+        {
+            if (i > 0) sb.Append(',');
+            var name = prefix + "_m" + i;
+            sb.Append(name);
+            w.Args.Add(new KeyValuePair<string, object?>(name, selected[i]));
+        }
+        sb.Append("))");
+        w.And(sb.ToString());
     }
 
     /// <summary>

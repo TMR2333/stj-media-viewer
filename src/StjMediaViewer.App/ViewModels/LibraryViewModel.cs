@@ -35,6 +35,7 @@ public sealed partial class LibraryViewModel : ObservableObject
             IsExpanded = true,   // 快捷入口：默认展开
         };
         CollectionGroup = new FilterGroupViewModel(FilterGroupKind.Collection, "影像合集", true);
+        MergeGroupGroup = new FilterGroupViewModel(FilterGroupKind.MergeGroup, "合并组", true);
         DeviceGroup = new FilterGroupViewModel(FilterGroupKind.Device, "拍摄设备", true);
         YearGroup = new FilterGroupViewModel(FilterGroupKind.Year, "拍摄年份", false);
         MonthGroup = new FilterGroupViewModel(FilterGroupKind.Month, "拍摄月份", false);
@@ -48,7 +49,7 @@ public sealed partial class LibraryViewModel : ObservableObject
 
         Groups = new ObservableCollection<FilterGroupViewModel>
         {
-            KindGroup, FormatGroup, FrequentDeviceGroup, DeviceGroup, CollectionGroup, YearGroup, MonthGroup, CityGroup,
+            KindGroup, FormatGroup, FrequentDeviceGroup, DeviceGroup, CollectionGroup, MergeGroupGroup, YearGroup, MonthGroup, CityGroup,
             PostProcessGroup, RawJpgGroup, LogGroup, ThemeGroup, ToneGroup, OriginGroup,
         };
         foreach (var g in Groups) g.SelectionChanged += OnGroupSelectionChanged;
@@ -67,6 +68,9 @@ public sealed partial class LibraryViewModel : ObservableObject
 
     /// <summary>影像合集筛选（用户自建的素材分组）。</summary>
     public FilterGroupViewModel CollectionGroup { get; }
+
+    /// <summary>合并组筛选（多重曝光 / 星轨 / 演示视频合并成的大文件夹）。</summary>
+    public FilterGroupViewModel MergeGroupGroup { get; }
 
     public FilterGroupViewModel DeviceGroup { get; }
     public FilterGroupViewModel YearGroup { get; }
@@ -224,9 +228,44 @@ public sealed partial class LibraryViewModel : ObservableObject
         }
     }
 
+    /// <summary>合并组（网格折叠 + 筛选面板显示名称用）。</summary>
+    public IReadOnlyList<MergeGroup> MergeGroups { get; private set; } = Array.Empty<MergeGroup>();
+
+    private bool _mergeGroupsLoaded;
+
+    public async Task RefreshMergeGroupsAsync()
+    {
+        try
+        {
+            MergeGroups = await AppServices.Store.GetMergeGroupsAsync();
+            _mergeGroupsLoaded = true;
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("加载合并组失败", ex);
+        }
+        RequestRefresh(immediate: true);
+    }
+
+    private async Task EnsureMergeGroupsLoadedAsync(CancellationToken ct)
+    {
+        if (_mergeGroupsLoaded) return;
+        try
+        {
+            MergeGroups = await AppServices.Store.GetMergeGroupsAsync(ct);
+            _mergeGroupsLoaded = true;
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            Log.Warn("加载合并组失败", ex);
+        }
+    }
+
     public void Initialize()
     {
         _ = EnsureCollectionsLoadedAsync(CancellationToken.None);
+        _ = EnsureMergeGroupsLoadedAsync(CancellationToken.None);
         RequestRefresh(immediate: true);
     }
 
@@ -257,6 +296,7 @@ public sealed partial class LibraryViewModel : ObservableObject
             var itemsTask = AppServices.Store.QueryAsync(pageQuery, ct);
             var countTask = AppServices.Store.CountAsync(pageQuery, ct);
             await EnsureCollectionsLoadedAsync(ct);
+            await EnsureMergeGroupsLoadedAsync(ct);
             var facetsTask = AppServices.Store.GetFacetsAsync(facetQuery, ct);
             await Task.WhenAll(itemsTask, countTask, facetsTask);
 
@@ -271,8 +311,9 @@ public sealed partial class LibraryViewModel : ObservableObject
             FilteredCount = filtered;
             IsLibraryEmpty = facets.Total == 0;
 
+            var displayItems = await BuildDisplayItemsAsync(items, ct);
             Items.Clear();
-            foreach (var a in items) Items.Add(new AssetCardItem(a));
+            foreach (var card in displayItems) Items.Add(card);
             PrefetchThumbnailsAhead(items);
 
             HasMore = items.Count >= PageSize;
@@ -371,6 +412,7 @@ public sealed partial class LibraryViewModel : ObservableObject
         foreach (var id in DeviceGroup.SelectedIds) q.Devices.Add(id);
         foreach (var id in FrequentDeviceGroup.SelectedIds) q.Devices.Add(id);
         foreach (var id in CollectionGroup.SelectedIds) q.Collections.Add(id);
+        foreach (var id in MergeGroupGroup.SelectedIds) q.MergeGroups.Add(id);
         foreach (var id in CityGroup.SelectedIds) q.Cities.Add(id);
 
         // 「来自 xx 云同步」：__unset__ = 本地文件（没有来源标记）
@@ -521,6 +563,91 @@ public sealed partial class LibraryViewModel : ObservableObject
             group.UpdateCounts(target.ToDictionary(t => t.Id, t => t.Count, StringComparer.OrdinalIgnoreCase));
     }
 
+    /// <summary>打开某个合并组（= 选中该组合集筛选）。</summary>
+    public void OpenMergeGroup(string groupId)
+    {
+        if (string.IsNullOrWhiteSpace(groupId)) return;
+        _suppressRefresh = true;
+        try
+        {
+            foreach (var o in MergeGroupGroup.Options)
+                o.SetSelectedSilently(string.Equals(o.Id, groupId, StringComparison.Ordinal));
+        }
+        finally { _suppressRefresh = false; }
+        RequestRefresh(immediate: true);
+    }
+
+    /// <summary>
+    /// 网格折叠：合并组里的成员只出现一张卡片（封面 + 数量）。
+    /// 正在按"合并组"筛选时不折叠，方便逐张查看/设封面。
+    /// </summary>
+    private async Task<List<AssetCardItem>> BuildDisplayItemsAsync(IReadOnlyList<MediaAsset> items, CancellationToken ct)
+    {
+        var cards = new List<AssetCardItem>(items.Count);
+        if (items.Count == 0) return cards;
+
+        var collapse = !MergeGroupGroup.HasSelection;
+        if (!collapse || MergeGroups.Count == 0)
+        {
+            foreach (var a in items) cards.Add(new AssetCardItem(a));
+            return cards;
+        }
+
+        IReadOnlyDictionary<string, string> membership;
+        try
+        {
+            membership = await AppServices.Store.GetMergeMembershipAsync(items.Select(a => a.Id), ct);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            Log.Warn("读取合并组成员失败", ex);
+            foreach (var a in items) cards.Add(new AssetCardItem(a));
+            return cards;
+        }
+
+        if (membership.Count == 0)
+        {
+            foreach (var a in items) cards.Add(new AssetCardItem(a));
+            return cards;
+        }
+
+        var groups = MergeGroups.ToDictionary(g => g.Id, g => g, StringComparer.Ordinal);
+        var covers = new Dictionary<string, MediaAsset>(StringComparer.Ordinal);
+        var coverIds = groups.Values
+            .Where(g => !string.IsNullOrEmpty(g.CoverAssetId))
+            .Select(g => g.CoverAssetId!)
+            .Distinct()
+            .ToList();
+        if (coverIds.Count > 0)
+        {
+            try
+            {
+                foreach (var cover in await AppServices.Store.GetByIdsAsync(coverIds, ct))
+                    covers[cover.Id] = cover;
+            }
+            catch (Exception ex) { Log.Warn("读取合并组封面失败", ex); }
+        }
+
+        var placed = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var asset in items)
+        {
+            if (!membership.TryGetValue(asset.Id, out var groupId) || !groups.TryGetValue(groupId, out var group))
+            {
+                cards.Add(new AssetCardItem(asset));
+                continue;
+            }
+            if (!placed.Add(groupId)) continue;   // 同组只留一张
+
+            // 组卡片显示封面素材（没有封面或封面不在当前页时用组内第一张）
+            var coverAsset = group.CoverAssetId is { Length: > 0 } cid && covers.TryGetValue(cid, out var cov) ? cov : asset;
+            var card = new AssetCardItem(coverAsset);
+            card.ApplyMergeGroup(group);
+            cards.Add(card);
+        }
+        return cards;
+    }
+
     private void ApplyFacets(FacetCounts facets)
     {
         _suppressRefresh = true;
@@ -538,6 +665,11 @@ public sealed partial class LibraryViewModel : ObservableObject
                 .Where(kv => collectionNames.ContainsKey(kv.Key))
                 .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
             Log.Info($"[collections] 合集 {Collections.Count} 个，分面 {facets.ByCollection.Count} 个，未加入 {facets.CollectionUnsetCount}");
+            var mergeNames = MergeGroups.ToDictionary(g => g.Id, g => g.DisplayName, StringComparer.Ordinal);
+            var mergeCounts = facets.ByMergeGroup
+                .Where(kv => mergeNames.ContainsKey(kv.Key))
+                .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
+            SyncOptions(MergeGroupGroup, mergeCounts, key => mergeNames[key]);
             SyncOptions(CollectionGroup, collectionCounts, key => collectionNames[key],
                 unsetCount: facets.CollectionUnsetCount, unsetDisplay: "未加入合集");
             Log.Info($"[collections] group options={CollectionGroup.Options.Count}, vis={CollectionGroup.GroupVisibility}");

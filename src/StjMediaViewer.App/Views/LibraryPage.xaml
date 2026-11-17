@@ -187,6 +187,10 @@
                                            Visibility="{x:Bind RawJpegBadgeVisibility, Mode=OneWay}"
                                            ToolTipService.ToolTip="该照片同时拥有 JPEG 预览与 RAW 原件" />
                                 <uic:Badge Text="LOG" Kind="Log" Visibility="{x:Bind LogBadgeVisibility, Mode=OneWay}" />
+                                <!-- 合并组：多重曝光 / 星轨 / 演示视频合并成的大文件夹 -->
+                                <uic:Badge Text="{x:Bind MergeBadgeText, Mode=OneWay}" Kind="Video"
+                                           Visibility="{x:Bind MergeBadgeVisibility, Mode=OneWay}"
+                                           ToolTipService.ToolTip="合并组：点开查看组内素材" />
                                 <!-- 视频编码：H.264 / H.265 / AV1…（便于一眼看出是否需要转码） -->
                                 <uic:Badge Text="{x:Bind CodecBadgeText, Mode=OneWay}" Kind="Video"
                                            Visibility="{x:Bind CodecBadgeVisibility, Mode=OneWay}"

@@ -340,6 +340,11 @@ internal sealed class FallbackAssetStore : IAssetStore
         if (q.Kinds.Count > 0) src = src.Where(a => q.Kinds.Contains(a.Kind));
         if (q.Formats.Count > 0) src = src.Where(a => q.Formats.Contains(a.FormatCode, StringComparer.OrdinalIgnoreCase));
         if (q.Devices.Count > 0) src = src.Where(a => q.Devices.Contains(a.DisplayDevice, StringComparer.OrdinalIgnoreCase));
+        if (q.MergeGroups.Count > 0)
+        {
+            var ids = q.MergeGroups.ToHashSet(StringComparer.Ordinal);
+            src = src.Where(a => _mergeMembers.Any(kv => ids.Contains(kv.Key) && kv.Value.Contains(a.Id)));
+        }
         if (q.Collections.Count > 0)
         {
             var withUnset = q.Collections.Contains("__unset__");
@@ -412,6 +417,7 @@ internal sealed class FallbackAssetStore : IAssetStore
             ByFormat = all.GroupBy(a => a.FormatCode).ToDictionary(g => g.Key, g => g.Count()),
             ByDevice = all.GroupBy(a => a.DisplayDevice).ToDictionary(g => g.Key, g => g.Count()),
             ByCollection = _collectionAssets.ToDictionary(kv => kv.Key, kv => kv.Value.Count, StringComparer.Ordinal),
+            ByMergeGroup = _mergeMembers.ToDictionary(kv => kv.Key, kv => kv.Value.Count, StringComparer.Ordinal),
             CollectionUnsetCount = _assets.Count(a => !_collectionAssets.Any(kv => kv.Value.Contains(a.Id))),
             ByCity = all.Where(a => a.City is not null).GroupBy(a => a.City!).ToDictionary(g => g.Key, g => g.Count()),
             ByTheme = all.Where(a => a.Theme is not null).GroupBy(a => a.Theme!).ToDictionary(g => g.Key, g => g.Count()),
@@ -530,6 +536,92 @@ internal sealed class FallbackAssetStore : IAssetStore
     public Task<IReadOnlyDictionary<string, int>> GetCollectionCountsAsync(CancellationToken ct = default)
         => Task.FromResult<IReadOnlyDictionary<string, int>>(
             _collectionAssets.ToDictionary(kv => kv.Key, kv => kv.Value.Count, StringComparer.Ordinal));
+
+    // ---------- 合并组（演示模式：内存实现） ----------
+    private readonly List<MergeGroup> _mergeGroups = new();
+    private readonly Dictionary<string, List<string>> _mergeMembers = new(StringComparer.Ordinal);
+
+    public Task<IReadOnlyList<MergeGroup>> GetMergeGroupsAsync(CancellationToken ct = default)
+    {
+        foreach (var g in _mergeGroups)
+            g.AssetCount = _mergeMembers.TryGetValue(g.Id, out var list) ? list.Count : 0;
+        return Task.FromResult<IReadOnlyList<MergeGroup>>(_mergeGroups.ToList());
+    }
+
+    public Task<MergeGroup> CreateMergeGroupAsync(string name, IEnumerable<string> assetIds, CancellationToken ct = default)
+    {
+        var ids = (assetIds ?? Array.Empty<string>()).Where(i => !string.IsNullOrWhiteSpace(i)).Distinct().ToList();
+        var group = new MergeGroup
+        {
+            Id = Guid.NewGuid().ToString("N")[..12],
+            Name = string.IsNullOrWhiteSpace(name) ? "合并组" : name.Trim(),
+            CoverAssetId = ids.FirstOrDefault(),
+            CreatedAt = DateTimeOffset.Now,
+            SortOrder = _mergeGroups.Count,
+            AssetCount = ids.Count,
+        };
+        _mergeGroups.Add(group);
+        _mergeMembers[group.Id] = ids;
+        return Task.FromResult(group);
+    }
+
+    public Task RenameMergeGroupAsync(string groupId, string name, CancellationToken ct = default)
+    {
+        var g = _mergeGroups.FirstOrDefault(x => x.Id == groupId);
+        if (g is not null) g.Name = string.IsNullOrWhiteSpace(name) ? "未命名合并组" : name.Trim();
+        return Task.CompletedTask;
+    }
+
+    public Task DeleteMergeGroupAsync(string groupId, CancellationToken ct = default)
+    {
+        _mergeGroups.RemoveAll(g => g.Id == groupId);
+        _mergeMembers.Remove(groupId);
+        return Task.CompletedTask;
+    }
+
+    public Task SetMergeGroupCoverAsync(string groupId, string? assetId, CancellationToken ct = default)
+    {
+        var g = _mergeGroups.FirstOrDefault(x => x.Id == groupId);
+        if (g is null) return Task.CompletedTask;
+        if (string.IsNullOrWhiteSpace(assetId))
+        {
+            g.CoverAssetId = _mergeMembers.TryGetValue(groupId, out var list) ? list.FirstOrDefault() : null;
+            return Task.CompletedTask;
+        }
+        if (_mergeMembers.TryGetValue(groupId, out var members) && members.Contains(assetId))
+            g.CoverAssetId = assetId;
+        return Task.CompletedTask;
+    }
+
+    public Task<int> AddToMergeGroupAsync(string groupId, IEnumerable<string> assetIds, CancellationToken ct = default)
+    {
+        if (!_mergeMembers.TryGetValue(groupId, out var list)) return Task.FromResult(0);
+        int added = 0;
+        foreach (var id in assetIds)
+            if (!list.Contains(id)) { list.Add(id); added++; }
+        return Task.FromResult(added);
+    }
+
+    public Task<int> RemoveFromMergeGroupAsync(string groupId, IEnumerable<string> assetIds, CancellationToken ct = default)
+    {
+        if (!_mergeMembers.TryGetValue(groupId, out var list)) return Task.FromResult(0);
+        int removed = 0;
+        foreach (var id in assetIds) if (list.Remove(id)) removed++;
+        return Task.FromResult(removed);
+    }
+
+    public Task<IReadOnlyDictionary<string, string>> GetMergeMembershipAsync(
+        IEnumerable<string> assetIds, CancellationToken ct = default)
+    {
+        var map = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var (gid, members) in _mergeMembers)
+            foreach (var id in members) map[id] = gid;
+        return Task.FromResult<IReadOnlyDictionary<string, string>>(map);
+    }
+
+    public Task<IReadOnlyList<string>> GetMergeGroupAssetIdsAsync(string groupId, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<string>>(
+            _mergeMembers.TryGetValue(groupId, out var list) ? list.ToList() : new List<string>());
 
     public Task SaveLibraryRootsAsync(IEnumerable<LibraryRoot> roots, CancellationToken ct = default)
     {

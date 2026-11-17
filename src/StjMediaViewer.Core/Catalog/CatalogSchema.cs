@@ -19,6 +19,8 @@ internal static class CatalogSchema
     public const string TableAssetCustom = "asset_custom";
     public const string TableCollections = "collections";
     public const string TableCollectionAssets = "collection_assets";
+    public const string TableMergeGroups = "merge_groups";
+    public const string TableMergeGroupAssets = "merge_group_assets";
 
     /// <summary>建表 + 索引 + PRAGMA。可重复执行（幂等）。</summary>
     public static void Apply(SqliteConnection conn)
@@ -37,6 +39,8 @@ internal static class CatalogSchema
         Execute(conn, DdlAssetCustom);
         Execute(conn, DdlCollections);
         Execute(conn, DdlCollectionAssets);
+        Execute(conn, DdlMergeGroups);
+        Execute(conn, DdlMergeGroupAssets);
 
         // 迁移：v1 老库补 JPG/RAW 分组列（幂等）
         EnsureColumn(conn, TableAssets, "group_id", "TEXT");
@@ -252,4 +256,23 @@ internal static class CatalogSchema
             PRIMARY KEY (collection_id, asset_id)
         );
         CREATE INDEX IF NOT EXISTS idx_collection_assets_asset ON collection_assets(asset_id);";
+
+    private const string DdlMergeGroups = @"
+        CREATE TABLE IF NOT EXISTS merge_groups (
+            id              TEXT PRIMARY KEY,
+            name            TEXT NOT NULL DEFAULT '',
+            cover_asset_id  TEXT,
+            created_at      TEXT,
+            sort_order      INTEGER NOT NULL DEFAULT 0
+        );";
+
+    private const string DdlMergeGroupAssets = @"
+        CREATE TABLE IF NOT EXISTS merge_group_assets (
+            group_id        TEXT NOT NULL,
+            asset_id        TEXT NOT NULL,
+            position        INTEGER NOT NULL DEFAULT 0,
+            added_at        TEXT,
+            PRIMARY KEY (group_id, asset_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_merge_group_assets_asset ON merge_group_assets(asset_id);";
 }

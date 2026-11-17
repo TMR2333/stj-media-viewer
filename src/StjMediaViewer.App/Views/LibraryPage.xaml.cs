@@ -64,6 +64,23 @@ public sealed partial class LibraryPage : Page
         if (Environment.GetEnvironmentVariable("STJ_DEMO_ONLY_RAW") == "1")
             ViewModel.OnlyRaw = true;
 
+        // 截图用：STJ_DEMO_MERGE_FILTER=1 展开「合并组」分组并滚到它
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_MERGE_FILTER") == "1")
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(2600);
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    ViewModel.FrequentDeviceGroup.IsExpanded = false;
+                    ViewModel.DeviceGroup.IsExpanded = false;
+                    ViewModel.CollectionGroup.IsExpanded = false;
+                    ViewModel.MergeGroupGroup.IsExpanded = true;
+                    FilterScroll.ChangeView(null, 300, null, true);
+                });
+            });
+        }
+
         // 截图用：STJ_DEMO_COLLECTION_FILTER=1 展开「影像合集」分组并滚到它
         if (Environment.GetEnvironmentVariable("STJ_DEMO_COLLECTION_FILTER") == "1")
         {
@@ -76,6 +93,21 @@ public sealed partial class LibraryPage : Page
                     ViewModel.DeviceGroup.IsExpanded = false;
                     ViewModel.CollectionGroup.IsExpanded = true;
                     FilterScroll.ChangeView(null, 300, null, true);
+                });
+            });
+        }
+
+        // 截图用：STJ_DEMO_MERGE_DIALOG=1 打开"合并为大文件夹"对话框（带 4 张选中素材）
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_MERGE_DIALOG") == "1")
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(2800);
+                DispatcherQueue.TryEnqueue(async () =>
+                {
+                    var pick = ViewModel.Items.Take(4).ToList();
+                    if (pick.Count > 0) ViewModel.SetSelection(pick);
+                    await ShowMergeGroupsDialogAsync(pick.Select(p => p.Asset).ToList());
                 });
             });
         }
@@ -716,7 +748,20 @@ public sealed partial class LibraryPage : Page
     private void AssetList_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
     {
         var item = FindItemAt(e.OriginalSource);
-        if (item is not null) OpenPreview(item);
+        if (item is null) return;
+        if (item.IsMergeGroupCard && item.MergeGroup is { } group)
+        {
+            OpenMergeGroupCard(group);
+            return;
+        }
+        OpenPreview(item);
+    }
+
+    /// <summary>打开合并组：切到"合并组"筛选，只显示组内成员（此时不折叠，可逐张操作）。</summary>
+    private void OpenMergeGroupCard(MergeGroup group)
+    {
+        ViewModel.OpenMergeGroup(group.Id);
+        AppEvents.SetStatus($"已打开合并组「{group.DisplayName}」（{group.AssetCount} 张）");
     }
 
     private void AssetList_KeyDown(object sender, KeyRoutedEventArgs e)
@@ -803,6 +848,177 @@ public sealed partial class LibraryPage : Page
     // ==================================================================================
     //  右键菜单
     // ==================================================================================
+    // ==================================================================================
+    //  合并组：把多重曝光 / 星轨 / 演示视频等合并成一个大文件夹（封面可自定义）
+    // ==================================================================================
+    private async void MergeGroups_Click(object sender, RoutedEventArgs e)
+        => await ShowMergeGroupsDialogAsync(ViewModel.SelectedItems.Select(i => i.Asset).ToList());
+
+    private async Task DissolveMergeGroupAsync(MergeGroup group)
+    {
+        await AppServices.Store.DeleteMergeGroupAsync(group.Id);
+        AppEvents.SetStatus($"已解散合并组「{group.DisplayName}」（素材都还在）");
+        await ViewModel.RefreshMergeGroupsAsync();
+    }
+
+    /// <summary>把当前素材所在合并组的封面设为它。</summary>
+    private async Task SetMergeCoverAsync(MediaAsset asset)
+    {
+        var membership = await AppServices.Store.GetMergeMembershipAsync(new[] { asset.Id });
+        if (!membership.TryGetValue(asset.Id, out var groupId))
+        {
+            AppEvents.SetStatus("这张素材不在任何合并组里");
+            return;
+        }
+        await AppServices.Store.SetMergeGroupCoverAsync(groupId, asset.Id);
+        var group = (await AppServices.Store.GetMergeGroupsAsync()).FirstOrDefault(g => g.Id == groupId);
+        AppEvents.SetStatus($"已把「{asset.FileName}」设为「{group?.DisplayName ?? "合并组"}」的封面");
+        await ViewModel.RefreshMergeGroupsAsync();
+    }
+
+    private async Task LeaveMergeGroupAsync(MediaAsset asset)
+    {
+        var membership = await AppServices.Store.GetMergeMembershipAsync(new[] { asset.Id });
+        if (!membership.TryGetValue(asset.Id, out var groupId))
+        {
+            AppEvents.SetStatus("这张素材不在任何合并组里");
+            return;
+        }
+        await AppServices.Store.RemoveFromMergeGroupAsync(groupId, new[] { asset.Id });
+        AppEvents.SetStatus($"已把「{asset.FileName}」移出合并组");
+        await ViewModel.RefreshMergeGroupsAsync();
+    }
+
+    private async Task ShowMergeGroupsDialogAsync(IReadOnlyList<MediaAsset> targets)
+    {
+        try
+        {
+            var groups = (await AppServices.Store.GetMergeGroupsAsync()).ToList();
+            var panel = new StackPanel { Spacing = 10, MinWidth = 470 };
+
+            panel.Children.Add(new TextBlock
+            {
+                Text = targets.Count >= 2
+                    ? $"把选中的 {targets.Count} 张合并成一个大文件夹；封面默认第一张，之后可右键任意成员「设为合并组封面」。"
+                    : "选中 2 张以上素材才能合并；封面默认第一张，之后可右键任意成员「设为合并组封面」。",
+                TextWrapping = TextWrapping.Wrap,
+                Style = (Style)Application.Current.Resources["AppCaptionTextStyle"],
+            });
+
+            // —— 新建 ——
+            var createRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+            var nameBox = new TextBox { PlaceholderText = "合并组名称，例如「多重曝光 1109」", Width = 280 };
+            var createButton = new Button { Content = "合并所选", IsEnabled = targets.Count >= 2 };
+            createRow.Children.Add(nameBox);
+            createRow.Children.Add(createButton);
+            panel.Children.Add(createRow);
+
+            var listPanel = new StackPanel { Spacing = 6 };
+            panel.Children.Add(listPanel);
+
+            void BuildRow(MergeGroup group)
+            {
+                var row = new Grid { ColumnSpacing = 8 };
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                var box = new TextBox { Text = group.DisplayName, MinHeight = 30 };
+                Grid.SetColumn(box, 0);
+                row.Children.Add(box);
+
+                var countText = new TextBlock
+                {
+                    Text = $"{group.AssetCount} 张",
+                    Style = (Style)Application.Current.Resources["AppMicroTextStyle"],
+                    Foreground = (Brush)Application.Current.Resources["TextTertiaryBrush"],
+                    VerticalAlignment = VerticalAlignment.Center,
+                    MinWidth = 52,
+                };
+                Grid.SetColumn(countText, 1);
+                row.Children.Add(countText);
+
+                var openButton = new Button { Content = "打开", MinHeight = 28 };
+                openButton.Click += (_, _) => OpenMergeGroupCard(group);
+                Grid.SetColumn(openButton, 2);
+                row.Children.Add(openButton);
+
+                var defaultCoverButton = new Button { Content = "默认封面", MinHeight = 28 };
+                defaultCoverButton.Click += async (_, _) =>
+                {
+                    await AppServices.Store.SetMergeGroupCoverAsync(group.Id, null);
+                    AppEvents.SetStatus($"「{group.DisplayName}」的封面已恢复为第一张");
+                    await ViewModel.RefreshMergeGroupsAsync();
+                };
+                Grid.SetColumn(defaultCoverButton, 3);
+                row.Children.Add(defaultCoverButton);
+
+                var deleteButton = new Button { Content = "解散", MinHeight = 28 };
+                deleteButton.Click += async (_, _) =>
+                {
+                    await AppServices.Store.DeleteMergeGroupAsync(group.Id);
+                    AppEvents.SetStatus($"已解散合并组「{group.DisplayName}」（素材都还在）");
+                    listPanel.Children.Remove(row);
+                    await ViewModel.RefreshMergeGroupsAsync();
+                };
+                Grid.SetColumn(deleteButton, 4);
+                row.Children.Add(deleteButton);
+
+                listPanel.Children.Add(row);
+                row.Tag = group;
+            }
+
+            foreach (var g in groups) BuildRow(g);
+
+            createButton.Click += async (_, _) =>
+            {
+                if (targets.Count < 2) return;
+                var created = await AppServices.Store.CreateMergeGroupAsync(nameBox.Text, targets.Select(t => t.Id));
+                nameBox.Text = "";
+                AppEvents.SetStatus($"已合并 {created.AssetCount} 张为「{created.Name}」");
+                BuildRow(created);
+                await ViewModel.RefreshMergeGroupsAsync();
+            };
+
+            var dialog = new ContentDialog
+            {
+                Title = "合并为大文件夹",
+                Content = new ScrollViewer
+                {
+                    Content = panel,
+                    MaxHeight = 460,
+                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                },
+                PrimaryButtonText = "保存名称",
+                CloseButtonText = "关闭",
+                DefaultButton = ContentDialogButton.Primary,
+                XamlRoot = XamlRoot,
+            };
+
+            var result = await dialog.ShowAsync();
+            if (result == ContentDialogResult.Primary)
+            {
+                foreach (var child in listPanel.Children)
+                {
+                    if (child is not Grid row || row.Tag is not MergeGroup group) continue;
+                    if (row.Children[0] is not TextBox box) continue;
+                    if (!string.Equals(group.DisplayName, box.Text, StringComparison.Ordinal))
+                        await AppServices.Store.RenameMergeGroupAsync(group.Id, box.Text);
+                }
+                AppEvents.SetStatus("合并组名称已保存");
+            }
+
+            await ViewModel.RefreshMergeGroupsAsync();
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("合并组对话框失败", ex);
+            AppEvents.SetError($"合并组操作失败：{ex.Message}");
+        }
+    }
+
     // ==================================================================================
     //  影像合集：创建 / 重命名 / 删除 / 加入 / 移出
     // ==================================================================================
@@ -990,6 +1206,33 @@ public sealed partial class LibraryPage : Page
         pickMenu.Items.Add(rejectItem);
         pickMenu.Items.Add(clearPickItem);
         flyout.Items.Add(pickMenu);
+
+        if (item.IsMergeGroupCard && item.MergeGroup is { } mergeGroup)
+        {
+            var openGroup = new MenuFlyoutItem { Text = $"打开合并组「{mergeGroup.DisplayName}」" };
+            openGroup.Click += (_, _) => OpenMergeGroupCard(mergeGroup);
+            flyout.Items.Add(openGroup);
+
+            var dissolve = new MenuFlyoutItem { Text = "解散合并组（不删素材）" };
+            dissolve.Click += async (_, _) => await DissolveMergeGroupAsync(mergeGroup);
+            flyout.Items.Add(dissolve);
+            flyout.Items.Add(new MenuFlyoutSeparator());
+        }
+
+        var mergeSelected = new MenuFlyoutItem { Text = "合并所选为一个大文件夹…" };
+        mergeSelected.Click += async (_, _) => await ShowMergeGroupsDialogAsync(TargetAssets(item));
+        flyout.Items.Add(mergeSelected);
+
+        if (!item.IsMergeGroupCard)
+        {
+            var coverItem = new MenuFlyoutItem { Text = "设为合并组封面" };
+            coverItem.Click += async (_, _) => await SetMergeCoverAsync(item.Asset);
+            flyout.Items.Add(coverItem);
+
+            var leaveGroup = new MenuFlyoutItem { Text = "移出合并组" };
+            leaveGroup.Click += async (_, _) => await LeaveMergeGroupAsync(item.Asset);
+            flyout.Items.Add(leaveGroup);
+        }
 
         var collectionItem = new MenuFlyoutItem { Text = "加入影像合集…" };
         collectionItem.Click += async (_, _) => await ShowCollectionsDialogAsync(TargetAssets(item));

@@ -24,6 +24,8 @@ public enum FilterGroupKind
     Origin,
     /// <summary>影像合集（用户自建的素材分组）。</summary>
     Collection,
+    /// <summary>合并组（多重曝光 / 星轨 / 演示视频等合并成大文件夹）。</summary>
+    MergeGroup,
     /// <summary>用户自建维度（维度名即分组标题，值是自由文本）。</summary>
     Custom,
 }

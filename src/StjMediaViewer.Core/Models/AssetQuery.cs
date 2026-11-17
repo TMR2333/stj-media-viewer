@@ -16,6 +16,9 @@ public sealed class AssetQuery
     public List<string> Keywords { get; set; } = new();
     /// <summary>影像合集筛选：命中任意一个选中合集的素材（多选 = 并集）。</summary>
     public List<string> Collections { get; set; } = new();
+
+    /// <summary>合并组筛选：命中任意一个选中合并组的素材（多选 = 并集）。</summary>
+    public List<string> MergeGroups { get; set; } = new();
     public List<string> ColorLabels { get; set; } = new();
     public List<RawFormat> RawFormats { get; set; } = new();
 
@@ -107,6 +110,9 @@ public sealed class FacetCounts
 
     /// <summary>没有加入任何合集的素材数（"未加入合集"伪选项用）。</summary>
     public int CollectionUnsetCount { get; set; }
+
+    /// <summary>合并组分面：合并组 id → 素材数。</summary>
+    public Dictionary<string, int> ByMergeGroup { get; set; } = new(StringComparer.Ordinal);
     public int ToneUnsetCount { get; set; }
     public long TotalBytes { get; set; }
 }

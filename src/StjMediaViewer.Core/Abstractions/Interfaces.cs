@@ -87,6 +87,21 @@ public interface IAssetStore
     /// <summary>合集 id → 素材数。</summary>
     Task<IReadOnlyDictionary<string, int>> GetCollectionCountsAsync(CancellationToken ct = default);
 
+    // ---------- 合并组（多重曝光 / 星轨 / 演示视频…合并成一个大文件夹） ----------
+    Task<IReadOnlyList<MergeGroup>> GetMergeGroupsAsync(CancellationToken ct = default);
+    /// <summary>按给定顺序把素材合并成一组；封面默认=第一张。</summary>
+    Task<MergeGroup> CreateMergeGroupAsync(string name, IEnumerable<string> assetIds, CancellationToken ct = default);
+    Task RenameMergeGroupAsync(string groupId, string name, CancellationToken ct = default);
+    Task DeleteMergeGroupAsync(string groupId, CancellationToken ct = default);
+    /// <summary>设置封面（必须是组内素材）；assetId 为空 = 恢复默认第一张。</summary>
+    Task SetMergeGroupCoverAsync(string groupId, string? assetId, CancellationToken ct = default);
+    Task<int> AddToMergeGroupAsync(string groupId, IEnumerable<string> assetIds, CancellationToken ct = default);
+    Task<int> RemoveFromMergeGroupAsync(string groupId, IEnumerable<string> assetIds, CancellationToken ct = default);
+    /// <summary>素材 id → 所属合并组 id（素材不属于任何组时不在表里）。</summary>
+    Task<IReadOnlyDictionary<string, string>> GetMergeMembershipAsync(IEnumerable<string> assetIds, CancellationToken ct = default);
+    /// <summary>组内成员 id（按 position 顺序）。</summary>
+    Task<IReadOnlyList<string>> GetMergeGroupAssetIdsAsync(string groupId, CancellationToken ct = default);
+
     Task SaveLibraryRootsAsync(IEnumerable<LibraryRoot> roots, CancellationToken ct = default);
     Task<IReadOnlyList<LibraryRoot>> LoadLibraryRootsAsync(CancellationToken ct = default);
 }

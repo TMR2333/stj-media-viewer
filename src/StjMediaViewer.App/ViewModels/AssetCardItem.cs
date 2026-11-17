@@ -22,6 +22,23 @@ public sealed partial class AssetCardItem : ObservableObject
     private MediaAsset _asset;
 
     /// <summary>可观察：预览里做了旋转/翻转后要触发缩略图重新加载。</summary>
+    /// <summary>如果这张卡片代表一个"合并组"（多重曝光 / 星轨 / 演示视频合并成的大文件夹），这里存组信息。</summary>
+    public MergeGroup? MergeGroup { get; private set; }
+
+    public bool IsMergeGroupCard => MergeGroup is not null;
+
+    public string MergeBadgeText => MergeGroup is null ? "" : $"合并 · {MergeGroup.AssetCount} 张";
+    public Visibility MergeBadgeVisibility => MergeGroup is null ? Visibility.Collapsed : Visibility.Visible;
+
+    /// <summary>把卡片标记成合并组卡片（显示封面素材 + 组徽标）。</summary>
+    public void ApplyMergeGroup(MergeGroup? group)
+    {
+        MergeGroup = group;
+        OnPropertyChanged(nameof(IsMergeGroupCard));
+        OnPropertyChanged(nameof(MergeBadgeText));
+        OnPropertyChanged(nameof(MergeBadgeVisibility));
+    }
+
     public MediaAsset Asset
     {
         get => _asset;
