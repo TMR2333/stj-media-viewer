@@ -130,6 +130,16 @@ public sealed partial class SettingsPage : Page
     private async void SaveDeviceAliases_Click(object sender, RoutedEventArgs e)
         => await ViewModel.SaveDeviceAliasesAsync();
 
+    private async void LoadDeviceLuts_Click(object sender, RoutedEventArgs e)
+        => await ViewModel.LoadDeviceLutBindingsAsync();
+
+    private void SuggestSonyLuts_Click(object sender, RoutedEventArgs e) => ViewModel.SuggestSonyLuts();
+
+    private async void SaveDeviceLuts_Click(object sender, RoutedEventArgs e)
+        => await ViewModel.SaveDeviceLutBindingsAsync();
+
+    private void ResetDeviceLuts_Click(object sender, RoutedEventArgs e) => ViewModel.ResetDeviceLutBindings();
+
     private void ResetDeviceAliases_Click(object sender, RoutedEventArgs e)
         => ViewModel.ResetDeviceAliases();
 
@@ -176,7 +186,8 @@ public sealed partial class SettingsPage : Page
     {
         var cache = Environment.GetEnvironmentVariable("STJ_DEMO_SETTINGS_CACHE") == "1";
         var devices = Environment.GetEnvironmentVariable("STJ_DEMO_SETTINGS_DEVICES") == "1";
-        if (!cache && !devices) return;
+        var luts = Environment.GetEnvironmentVariable("STJ_DEMO_SETTINGS_LUT") == "1";
+        if (!cache && !devices && !luts) return;
 
         DispatcherQueue.TryEnqueue(async () =>
         {
@@ -189,7 +200,7 @@ public sealed partial class SettingsPage : Page
             }
 
             // 设备名称卡片：按"设备"标题找到它在滚动内容里的位置
-            if (FindTextBlock(this, "设备名称") is { } heading && scroll.Content is UIElement content)
+            if (FindTextBlock(this, luts ? "设备 ↔ LUT 绑定" : "设备名称") is { } heading && scroll.Content is UIElement content)
             {
                 try
                 {

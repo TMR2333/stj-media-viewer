@@ -199,13 +199,12 @@ public sealed class LutService : ILutService
             if (explicitEntry is not null) return explicitEntry;
         }
 
-        // 2) 自动匹配：Sony 相机 + Log 素材 → 内置基准转换
+        // 2) 自动匹配：只认"设备 ↔ LUT 绑定"，且素材必须确实是 Log。
+        //    不再按品牌猜：别的设备拍的 Log 不会被套上 Sony LUT。
         if (!_settings.Current.AutoAssignLutForSony) return null;
-        var key = LutCatalog.AutoMatchBuiltInKey(asset);
-        if (key is null) return null;
-        return _entries.FirstOrDefault(e =>
-            e.Category == LutCategory.BuiltIn &&
-            string.Equals(e.Id, "builtin:" + key, StringComparison.Ordinal));
+        var boundId = DeviceLutRules.ResolveLutId(asset, _settings.Current.DeviceLutBindings);
+        if (string.IsNullOrWhiteSpace(boundId)) return null;
+        return _entries.FirstOrDefault(e => string.Equals(e.Id, boundId, StringComparison.Ordinal));
     }
 
     /// <summary>后台预热：让 ResolveForAsset 在首帧就有列表可用（启动时调用一次即可）。</summary>

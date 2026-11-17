@@ -410,6 +410,7 @@ public sealed partial class SettingsViewModel : ObservableObject
 
             await RefreshLibrariesAsync();
             await LoadDeviceAliasesAsync();
+            await LoadDeviceLutBindingsAsync();
             await RefreshToolStatusAsync();
             await RefreshCacheSizeAsync();
         }
@@ -703,6 +704,107 @@ public sealed partial class SettingsViewModel : ObservableObject
             DeviceAliasStatus = $"保存失败：{ex.Message}";
             AppEvents.SetError(DeviceAliasStatus);
         }
+    }
+
+    // ==================================================================================
+    //  设备 ↔ LUT 绑定（Log 监视）
+    // ==================================================================================
+    public ObservableCollection<DeviceLutRow> DeviceLutRows { get; } = new();
+
+    [ObservableProperty] private string _deviceLutStatus = "";
+    [ObservableProperty] private Visibility _deviceLutEmptyVisibility = Visibility.Collapsed;
+
+    /// <summary>LUT 下拉选项（第一条 = 不自动套用）；设备行共用同一份。</summary>
+    public ObservableCollection<LutOption> DeviceLutOptions { get; } = new();
+
+    public async Task LoadDeviceLutBindingsAsync()
+    {
+        try
+        {
+            DeviceLutOptions.Clear();
+            DeviceLutOptions.Add(new LutOption("", "不自动套用"));
+            foreach (var entry in await AppServices.Luts.ListAsync())
+                DeviceLutOptions.Add(new LutOption(entry.Id, entry.Name));
+
+            var facets = await AppServices.Store.GetFacetsAsync(new Core.Models.AssetQuery());
+            var bindings = AppServices.Settings.Current.DeviceLutBindings ?? new List<Core.Models.DeviceLutBinding>();
+            var map = bindings
+                .Where(b => !string.IsNullOrWhiteSpace(b.DeviceKey))
+                .GroupBy(b => b.DeviceKey, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+            DeviceLutRows.Clear();
+            foreach (var (deviceKey, count) in facets.ByDevice.OrderByDescending(kv => kv.Value))
+            {
+                var lutId = map.TryGetValue(deviceKey, out var binding) ? (binding.LutId ?? "") : "";
+                DeviceLutRows.Add(new DeviceLutRow(deviceKey, count, lutId, DeviceLutOptions));
+            }
+            DeviceLutEmptyVisibility = DeviceLutRows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            DeviceLutStatus = DeviceLutRows.Count == 0
+                ? ""
+                : "只有「设备命中绑定 + 素材标记为 Log」才会自动套 LUT；没绑定的设备一律不套。";
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("加载设备 LUT 绑定失败", ex);
+            DeviceLutStatus = $"加载失败：{ex.Message}";
+        }
+    }
+
+    /// <summary>把 Sony 设备的 LUT 自动填成内置 S-Log3 → Rec.709（只填，不立即保存）。</summary>
+    public void SuggestSonyLuts()
+    {
+        int filled = 0;
+        foreach (var row in DeviceLutRows)
+        {
+            if (!string.IsNullOrWhiteSpace(row.SelectedLutId)) continue;
+            var suggestion = Core.Color.DeviceLutRules.SuggestBuiltInLutId(row.Key);
+            if (string.IsNullOrWhiteSpace(suggestion)) continue;
+            if (DeviceLutOptions.All(o => o.Id != suggestion)) continue;
+            row.SelectedLutId = suggestion;
+            filled++;
+        }
+        DeviceLutStatus = filled == 0
+            ? "没有可自动推荐的设备（非 Sony 设备需要先导入官方 .cube，再在下拉里选）。"
+            : $"已为 {filled} 台 Sony 设备预填内置 S-Log3 → Rec.709，点「保存绑定」生效。";
+    }
+
+    public async Task SaveDeviceLutBindingsAsync()
+    {
+        try
+        {
+            var settings = AppServices.Settings.Current;
+            settings.DeviceLutBindings = DeviceLutRows
+                .Where(r => !string.IsNullOrWhiteSpace(r.Key) && !string.IsNullOrWhiteSpace(r.SelectedLutId))
+                .Select(r => new Core.Models.DeviceLutBinding
+                {
+                    DeviceKey = r.Key,
+                    LutId = r.SelectedLutId,
+                    Enabled = true,
+                })
+                .ToList();
+            await AppServices.Settings.SaveAsync();
+
+            // LUT 变了：缩略图缓存按 lutKey 分文件，直接清内存图并刷新即可
+            AppServices.Thumbs.Clear();
+            LibraryViewModel.Shared.RequestRefresh();
+            DeviceLutStatus = settings.DeviceLutBindings.Count == 0
+                ? "已清空所有绑定：Log 素材不再自动套 LUT"
+                : $"已保存 {settings.DeviceLutBindings.Count} 条设备 LUT 绑定";
+            AppEvents.SetStatus(DeviceLutStatus);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("保存设备 LUT 绑定失败", ex);
+            DeviceLutStatus = $"保存失败：{ex.Message}";
+            AppEvents.SetError(DeviceLutStatus);
+        }
+    }
+
+    public void ResetDeviceLutBindings()
+    {
+        foreach (var row in DeviceLutRows) row.SelectedLutId = "";
+        DeviceLutStatus = "已清空下拉选择（点「保存绑定」生效）";
     }
 
     public void ResetDeviceAliases()
@@ -1080,3 +1182,32 @@ public sealed partial class DeviceAliasRow : ObservableObject
 
     [ObservableProperty] private string _alias;
 }
+
+/// <summary>设备 ↔ LUT 绑定的一行。</summary>
+public sealed partial class DeviceLutRow : ObservableObject
+{
+    public DeviceLutRow(string key, int count, string? lutId, IEnumerable<LutOption>? options = null)
+    {
+        Key = key;
+        Count = count;
+        SelectedLutId = lutId ?? "";
+        Options = options?.ToList() ?? new List<LutOption> { new("", "不自动套用") };
+    }
+
+    /// <summary>LUT 下拉项（每行各自持有同一份列表的引用，方便 DataTemplate 绑定）。</summary>
+    public IReadOnlyList<LutOption> Options { get; }
+
+    public string Key { get; }
+    public int Count { get; }
+    public string CountText => $"{Count} 张";
+    public string DisplayName => AppServices.DeviceAlias(Key);
+
+    /// <summary>没有自定义名称时别名=原名，此时不再重复显示一模一样的设备键。</summary>
+    public Visibility KeyVisibility =>
+        string.Equals(DisplayName, Key, StringComparison.OrdinalIgnoreCase) ? Visibility.Collapsed : Visibility.Visible;
+
+    [ObservableProperty] private string _selectedLutId;
+}
+
+/// <summary>LUT 下拉项。</summary>
+public sealed record LutOption(string Id, string Name);

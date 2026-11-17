@@ -90,13 +90,13 @@ public sealed partial class LutViewModel : ObservableObject
             var sonyLog = await CountSonyLogOnlineAsync();
             if (sonyLog > 0 && AutoAssignForSony)
             {
-                DetectText = $"检测到 {sonyLog} 条 Sony Log 素材：已自动套用内置基准 LUT（S-Log3 → Rec.709）。" +
-                             "预览与图库缩略图都会按当前 LUT 重新渲染。";
+                DetectText = $"检测到 {sonyLog} 条素材命中「设备 ↔ LUT 绑定」：已自动套用各自绑定的监视 LUT。" +
+                             "可在「设置 → 设备 ↔ LUT 绑定」里调整；没绑定的设备不会自动套。";
                 DetectVisibility = Visibility.Visible;
             }
             else if (sonyLog > 0)
             {
-                DetectText = $"检测到 {sonyLog} 条 Sony Log 素材，但自动套用已关闭。";
+                DetectText = $"检测到 {sonyLog} 条素材命中设备绑定，但自动套用总开关已关闭。";
                 DetectVisibility = Visibility.Visible;
             }
             else
@@ -124,7 +124,7 @@ public sealed partial class LutViewModel : ObservableObject
                 Limit = 0,
                 Kinds = { MediaKind.Video, MediaKind.Image },
             });
-            return assets.Count(a => LutCatalog.AutoMatchBuiltInKey(a) is not null);
+            return assets.Count(a => Core.Color.DeviceLutRules.ResolveLutId(a, AppServices.Settings.Current.DeviceLutBindings) is not null);
         }
         catch
         {
@@ -146,7 +146,8 @@ public sealed partial class LutViewModel : ObservableObject
             }
 
             var candidates = await AppServices.Store.QueryAsync(new AssetQuery { Limit = 0, Kinds = { MediaKind.Video } });
-            var sony = candidates.FirstOrDefault(a => LutCatalog.AutoMatchBuiltInKey(a) is not null);
+            var sony = candidates.FirstOrDefault(a =>
+                Core.Color.DeviceLutRules.ResolveLutId(a, AppServices.Settings.Current.DeviceLutBindings) is not null);
             _sample = sony ?? candidates.FirstOrDefault() ?? (await AppServices.Store.QueryAsync(new AssetQuery { Limit = 1 })).FirstOrDefault();
             SampleText = _sample is null
                 ? "图库里还没有素材可做预览"

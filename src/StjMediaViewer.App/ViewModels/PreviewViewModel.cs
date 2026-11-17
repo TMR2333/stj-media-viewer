@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Media;
 using StjMediaViewer.App.Services;
+using StjMediaViewer.Core.Color;
 using StjMediaViewer.Core.Models;
 using StjMediaViewer.Core.Util;
 using Windows.Media.Core;
@@ -191,6 +192,7 @@ public sealed partial class PreviewViewModel : ObservableObject
         LoadEdits();
         RefreshEditBar();
         _proxyAttempted = false;
+        Interlocked.Increment(ref _lutProxyVersion);
         VideoStatusText = "";
         VideoStatusVisibility = Visibility.Collapsed;
         VideoErrorVisibility = Visibility.Collapsed;
@@ -214,6 +216,11 @@ public sealed partial class PreviewViewModel : ObservableObject
                         var poster = await ImageSourceLoader.LoadVideoPosterAsync(asset, 1600, ct);
                         ApplyImage(poster, "视频首帧不可用");
                     }
+
+                    // 设备绑定了监视 LUT 且这条视频是 Log：用 ffmpeg 把 LUT 烧进代理再播放
+                    var videoLut = ResolveBoundLut(asset);
+                    if (videoLut is not null)
+                        _ = ApplyVideoLutProxyAsync(asset, videoLut, ct);
                     break;
 
                 case MediaKind.Audio:
@@ -384,7 +391,8 @@ public sealed partial class PreviewViewModel : ObservableObject
             VideoStatusVisibility = Visibility.Visible;
             LoadingVisibility = Visibility.Visible;
 
-            var proxyPath = await proxy.EnsureProxyAsync(asset.FullPath, CancellationToken.None);
+            var fallbackLut = ResolveBoundLut(asset);
+            var proxyPath = await proxy.EnsureProxyAsync(asset.FullPath, fallbackLut?.FilePath, CancellationToken.None);
             if (string.IsNullOrEmpty(proxyPath))
             {
                 VideoStatusText = "生成预览代理失败：可以在「设置 → 工具链」确认 ffmpeg 可用，或用外部播放器打开。";
@@ -406,6 +414,68 @@ public sealed partial class PreviewViewModel : ObservableObject
             Log.Warn("切换视频预览代理失败", ex);
         }
     }
+
+    /// <summary>按"设备 ↔ LUT 绑定"解析出该素材该套的 LUT（未绑定 / 非 Log 返回 null）。</summary>
+    private static LutEntry? ResolveBoundLut(MediaAsset asset)
+    {
+        try
+        {
+            return AppServices.Luts?.ResolveForAsset(asset);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn($"解析自动 LUT 失败 {asset.FileName}: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Log 视频的监视预览：把绑定 LUT 烧进 ffmpeg 代理再播放（代理按 LUT 分缓存，切换素材不重复转码）。
+    /// ffmpeg 不可用 / 转码失败时保持原始播放，只在状态条说明。
+    /// </summary>
+    private async Task ApplyVideoLutProxyAsync(MediaAsset asset, LutEntry lut, CancellationToken ct)
+    {
+        var proxy = AppServices.VideoProxy;
+        if (proxy is null || !proxy.IsAvailable)
+        {
+            VideoStatusText = $"按设备绑定应套用「{lut.Name}」，但没找到 ffmpeg，无法生成带 LUT 的监视代理（当前为原始画面）。";
+            VideoStatusVisibility = Visibility.Visible;
+            return;
+        }
+
+        var token = Interlocked.Increment(ref _lutProxyVersion);
+        try
+        {
+            VideoStatusText = $"Log 监视：正在套用「{lut.Name}」（设备绑定：{asset.DisplayDevice}），首次生成稍慢…";
+            VideoStatusVisibility = Visibility.Visible;
+            LoadingVisibility = Visibility.Visible;
+
+            var proxyPath = await proxy.EnsureProxyAsync(asset.FullPath, lut.FilePath, ct);
+            if (token != _lutProxyVersion) return;
+            if (string.IsNullOrEmpty(proxyPath))
+            {
+                VideoStatusText = $"「{lut.Name}」监视代理生成失败，当前播放原始画面（可检查 ffmpeg 设置）。";
+                VideoErrorVisibility = Visibility.Visible;
+                return;
+            }
+
+            VideoSource = MediaSource.CreateFromUri(new Uri(proxyPath));
+            VideoVisibility = Visibility.Visible;
+            VideoStatusText = $"已按设备绑定自动套用监视 LUT「{lut.Name}」（{asset.DisplayDevice} · Log），代理已缓存";
+            VideoErrorVisibility = Visibility.Collapsed;
+            LoadingVisibility = Visibility.Collapsed;
+            Log.Info($"[preview] Log 监视 LUT：「{lut.Name}」→ {asset.FileName}（{asset.DeviceKey}）");
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            VideoStatusText = $"套用监视 LUT 失败：{ex.Message}（当前播放原始画面）";
+            VideoErrorVisibility = Visibility.Visible;
+            Log.Warn("套用视频监视 LUT 失败", ex);
+        }
+    }
+
+    private int _lutProxyVersion;
 
     /// <summary>用系统默认播放器打开当前视频。</summary>
     public void OpenInExternalPlayer()

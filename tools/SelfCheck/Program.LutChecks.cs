@@ -67,18 +67,37 @@ public static partial class Program
                   $"{Path.GetFileName(plain)} → {Path.GetFileName(gradedPath)}");
         }
 
-        // Sony 自动匹配：样例库里有一条 Sony S-Log3 视频
+        // 自动套 LUT 改为「设备 ↔ LUT 绑定」：没绑定的设备一律不套（不再按品牌猜）
         var all = await s.Store.QueryAsync(new AssetQuery { Limit = 0 });
-        var sonyLog = all.Where(a => LutCatalog.AutoMatchBuiltInKey(a) is not null).ToList();
-        Check("识别出 Sony Log 素材", sonyLog.Count >= 1, $"{sonyLog.Count} 条");
+        var logAssets = all.Where(a => a.IsLog == true).ToList();
+        Check("识别出 Log 素材", logAssets.Count >= 1, $"{logAssets.Count} 条");
 
-        if (sonyLog.Count > 0)
+        if (logAssets.Count > 0)
         {
-            var key = LutCatalog.AutoMatchBuiltInKey(sonyLog[0]);
-            Check("Sony Log 命中 S-Log3 基准 LUT", key == "sony-slog3-cine-709", key);
-            var resolved = s.Luts.ResolveForAsset(sonyLog[0]);
-            Check("自动匹配解析到内置 LUT", resolved is { Category: LutCategory.BuiltIn },
+            var target = logAssets[0];
+            var originalBindings = s.Settings.Current.DeviceLutBindings;
+            s.Settings.Current.DeviceLutBindings = new List<DeviceLutBinding>();
+            var unbound = s.Luts.ResolveForAsset(target);
+            Check("未绑定设备时 Log 素材不自动套 LUT（防误套）", unbound is null,
+                  unbound?.Name ?? "未套用");
+
+            s.Settings.Current.DeviceLutBindings = new List<DeviceLutBinding>
+            {
+                new() { DeviceKey = target.DeviceKey, LutId = "builtin:sony-slog3-cine-709" },
+            };
+            var resolved = s.Luts.ResolveForAsset(target);
+            Check("绑定设备后解析到内置监视 LUT", resolved is { Category: LutCategory.BuiltIn },
                   resolved is null ? "未匹配" : $"{resolved.Name}（{resolved.Id}）");
+
+            // 换成别的设备绑定的 LUT，不该再套到这条素材上
+            s.Settings.Current.DeviceLutBindings = new List<DeviceLutBinding>
+            {
+                new() { DeviceKey = "NIKON Z6", LutId = "builtin:sony-slog3-cine-709" },
+            };
+            Check("其他设备拍的同一条素材不会被套 LUT",
+                  s.Luts.ResolveForAsset(target) is null);
+
+            s.Settings.Current.DeviceLutBindings = originalBindings;
         }
 
         // 文件名分类

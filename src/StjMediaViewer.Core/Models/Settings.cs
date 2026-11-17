@@ -93,7 +93,11 @@ public sealed class AppSettings
     /// <summary>用户 LUT 目录（放 .cube 文件的文件夹；为空时用默认目录）。</summary>
     public string? LutFolderPath { get; set; }
     /// <summary>识别到 Sony 相机 + Log 素材时自动套用内置基准 LUT。</summary>
+    /// <summary>总开关：是否按"设备绑定"给 Log 素材自动套监视 LUT。</summary>
     public bool AutoAssignLutForSony { get; set; } = true;
+
+    /// <summary>设备 ↔ LUT 绑定表（设备键 → LUT id）。只有命中的设备才会自动套。</summary>
+    public List<DeviceLutBinding> DeviceLutBindings { get; set; } = new();
 
     /// <summary>自定义设备名：设备标识（device_key）→ 用户起的名字，例如 "SONY ILCE-7M4" → "我的 A7M4"。</summary>
     public Dictionary<string, string> DeviceAliases { get; set; } = new(StringComparer.OrdinalIgnoreCase);

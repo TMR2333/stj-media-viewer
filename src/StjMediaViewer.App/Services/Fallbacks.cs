@@ -297,7 +297,7 @@ internal sealed class NullFfmpegService : IFfmpegService
     public bool IsAvailable => false;
     public Task<string?> ProbeJsonAsync(string fullPath, CancellationToken ct = default) => Task.FromResult<string?>(null);
     public Task<byte[]?> ExtractFrameAsync(string fullPath, double positionSeconds, int maxSize, CancellationToken ct = default) => Task.FromResult<byte[]?>(null);
-    public Task<bool> TranscodeProxyAsync(string source, string destination, CancellationToken ct = default) => Task.FromResult(false);
+    public Task<bool> TranscodeProxyAsync(string source, string destination, string? lutPath = null, CancellationToken ct = default) => Task.FromResult(false);
 }
 
 internal sealed class NullAiClient : IAiClient

@@ -222,7 +222,7 @@ public interface IFfmpegService
     bool IsAvailable { get; }
     Task<string?> ProbeJsonAsync(string fullPath, CancellationToken ct = default);
     Task<byte[]?> ExtractFrameAsync(string fullPath, double positionSeconds, int maxSize, CancellationToken ct = default);
-    Task<bool> TranscodeProxyAsync(string source, string destination, CancellationToken ct = default);
+    Task<bool> TranscodeProxyAsync(string source, string destination, string? lutPath = null, CancellationToken ct = default);
 }
 
 // ---------------------------- 重复 / 相似 ----------------------------

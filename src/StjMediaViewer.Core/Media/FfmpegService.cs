@@ -97,7 +97,21 @@ public sealed class FfmpegService : IFfmpegService
         }
     }
 
-    public async Task<bool> TranscodeProxyAsync(string source, string destination, CancellationToken ct = default)
+    /// <summary>代理转码的缩放/像素格式滤镜（不含 LUT 部分）。</summary>
+    internal const string ProxyScaleFilter =
+        "scale=w=min(1280\\,iw):h=min(720\\,ih):force_original_aspect_ratio=decrease,format=yuv420p";
+
+    /// <summary>
+    /// 拼 <c>-vf</c>：可选的 LUT 烧录（<c>lut3d</c>）+ 缩放。
+    /// LUT 用相对文件名（工作目录=代理目录），躲开 Windows 盘符冒号与空格转义。
+    /// </summary>
+    public static string BuildProxyVideoFilter(string? lutFile)
+        => string.IsNullOrWhiteSpace(lutFile)
+            ? ProxyScaleFilter
+            : $"lut3d=file={lutFile}:interp=tetrahedral,{ProxyScaleFilter}";
+
+    public async Task<bool> TranscodeProxyAsync(
+        string source, string destination, string? lutPath = null, CancellationToken ct = default)
     {
         var exe = _ffmpeg;
         if (exe is null || string.IsNullOrWhiteSpace(source) || string.IsNullOrWhiteSpace(destination)) return false;
@@ -108,17 +122,34 @@ public sealed class FfmpegService : IFfmpegService
             if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
             if (File.Exists(destination)) File.Delete(destination);
 
+            // LUT 复制进代理目录，用相对文件名喂 ffmpeg
+            string? lutFile = null;
+            string? workDir = null;
+            if (!string.IsNullOrWhiteSpace(lutPath) && File.Exists(lutPath))
+            {
+                workDir = dir;
+                var hash = Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(
+                    System.Text.Encoding.UTF8.GetBytes(Path.GetFullPath(lutPath).ToLowerInvariant())))[..12].ToLowerInvariant();
+                lutFile = $"lut-{hash}.cube";
+                try { File.Copy(lutPath, Path.Combine(workDir!, lutFile), overwrite: true); }
+                catch (Exception ex)
+                {
+                    Log.Warn($"[ffmpeg] LUT 复制失败，改为不套 LUT: {ex.Message}");
+                    lutFile = null;
+                }
+            }
+
             var args = new List<string>
             {
                 "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
                 "-i", source,
                 "-c:v", "libx264", "-preset", "veryfast", "-crf", "28", "-pix_fmt", "yuv420p",
-                "-vf", "scale=w=min(1280\\,iw):h=min(720\\,ih):force_original_aspect_ratio=decrease,format=yuv420p",
+                "-vf", BuildProxyVideoFilter(lutFile),
                 "-c:a", "aac", "-b:a", "128k", "-ac", "2",
                 "-movflags", "+faststart",
                 destination,
             };
-            var result = await RunAsync(exe, args, binaryStdout: false, TranscodeTimeout, ct).ConfigureAwait(false);
+            var result = await RunAsync(exe, args, binaryStdout: false, TranscodeTimeout, ct, workDir).ConfigureAwait(false);
             bool ok = result.ExitCode == 0 && File.Exists(destination) && new FileInfo(destination).Length > 0;
             if (!ok) Log.Warn($"[ffmpeg] transcode exit={result.ExitCode}: {Trim(result.StdErr)}");
             return ok;
@@ -208,7 +239,8 @@ public sealed class FfmpegService : IFfmpegService
     private sealed record ProcResult(int ExitCode, byte[] StdOut, string StdErr);
 
     private static async Task<ProcResult> RunAsync(
-        string exe, IEnumerable<string> args, bool binaryStdout, TimeSpan timeout, CancellationToken ct)
+        string exe, IEnumerable<string> args, bool binaryStdout, TimeSpan timeout, CancellationToken ct,
+        string? workingDirectory = null)
     {
         var psi = new ProcessStartInfo(exe)
         {
@@ -220,6 +252,8 @@ public sealed class FfmpegService : IFfmpegService
             StandardOutputEncoding = binaryStdout ? null : Encoding.UTF8,
             StandardErrorEncoding = Encoding.UTF8,
         };
+        if (!string.IsNullOrWhiteSpace(workingDirectory)) psi.WorkingDirectory = workingDirectory;
+        if (!string.IsNullOrWhiteSpace(workingDirectory)) psi.WorkingDirectory = workingDirectory;
         foreach (var a in args) psi.ArgumentList.Add(a);
 
         using var proc = new Process { StartInfo = psi };

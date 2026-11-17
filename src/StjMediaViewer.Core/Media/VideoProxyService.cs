@@ -33,11 +33,18 @@ public sealed class VideoProxyService
     /// 返回可直接播放的代理文件路径；失败（没有 ffmpeg / 转码失败）返回 null。
     /// 同一个源文件的并发请求会合并。
     /// </summary>
-    public async Task<string?> EnsureProxyAsync(string sourcePath, CancellationToken ct = default)
+    public Task<string?> EnsureProxyAsync(string sourcePath, CancellationToken ct = default)
+        => EnsureProxyAsync(sourcePath, lutPath: null, ct);
+
+    /// <summary>
+    /// 返回可播放的代理文件；<paramref name="lutPath"/> 非空时把 LUT 烧进画面（用于 Log 素材的监视预览），
+    /// 缓存键包含 LUT 路径，换了 LUT 会重新生成。
+    /// </summary>
+    public async Task<string?> EnsureProxyAsync(string sourcePath, string? lutPath, CancellationToken ct = default)
     {
         if (!IsAvailable || string.IsNullOrWhiteSpace(sourcePath) || !File.Exists(sourcePath)) return null;
 
-        var destination = ProxyPathFor(sourcePath);
+        var destination = ProxyPathFor(sourcePath, lutPath);
         if (IsUsable(destination)) return destination;
 
         Task<string?> task;
@@ -45,7 +52,7 @@ public sealed class VideoProxyService
         {
             if (!_inflight.TryGetValue(destination, out task!))
             {
-                task = BuildAsync(sourcePath, destination, ct);
+                task = BuildAsync(sourcePath, destination, lutPath, ct);
                 _inflight[destination] = task;
             }
         }
@@ -60,23 +67,24 @@ public sealed class VideoProxyService
         }
     }
 
-    /// <summary>根据源文件推断代理路径（不保证已存在）。</summary>
-    public string ProxyPathFor(string sourcePath)
+    /// <summary>根据源文件推断代理路径（不保证已存在）；LUT 不同则路径不同。</summary>
+    public string ProxyPathFor(string sourcePath, string? lutPath = null)
     {
         var info = new FileInfo(sourcePath);
         var key = CacheKey(sourcePath, info.Exists ? info.Length : 0,
-            info.Exists ? info.LastWriteTimeUtc : DateTime.MinValue);
+            info.Exists ? info.LastWriteTimeUtc : DateTime.MinValue, lutPath);
         return Path.Combine(ProxyDirectory, key + ".mp4");
     }
 
-    public static string CacheKey(string fullPath, long sizeBytes, DateTime lastWriteUtc)
+    public static string CacheKey(string fullPath, long sizeBytes, DateTime lastWriteUtc, string? lutPath = null)
     {
-        var raw = $"{fullPath}|{sizeBytes}|{lastWriteUtc.Ticks}";
+        var lutPart = string.IsNullOrWhiteSpace(lutPath) ? "" : "|lut:" + lutPath;
+        var raw = $"{fullPath}|{sizeBytes}|{lastWriteUtc.Ticks}{lutPart}";
         var hash = SHA1.HashData(Encoding.UTF8.GetBytes(raw));
         return Convert.ToHexString(hash)[..16].ToLowerInvariant();
     }
 
-    private async Task<string?> BuildAsync(string sourcePath, string destination, CancellationToken ct)
+    private async Task<string?> BuildAsync(string sourcePath, string destination, string? lutPath, CancellationToken ct)
     {
         await _gate.WaitAsync(ct).ConfigureAwait(false);
         try
@@ -87,8 +95,9 @@ public sealed class VideoProxyService
             var tmp = destination + ".tmp.mp4";
             try { File.Delete(tmp); } catch { }
 
-            Log.Info($"[proxy] 转码预览代理：{Path.GetFileName(sourcePath)} → {Path.GetFileName(destination)}");
-            var ok = await _ffmpeg.TranscodeProxyAsync(sourcePath, tmp, ct).ConfigureAwait(false);
+            Log.Info($"[proxy] 转码预览代理：{Path.GetFileName(sourcePath)} → {Path.GetFileName(destination)}" +
+                     (string.IsNullOrWhiteSpace(lutPath) ? "" : $"（烧录 LUT：{Path.GetFileName(lutPath)}）"));
+            var ok = await _ffmpeg.TranscodeProxyAsync(sourcePath, tmp, lutPath, ct).ConfigureAwait(false);
             if (!ok)
             {
                 try { File.Delete(tmp); } catch { }
