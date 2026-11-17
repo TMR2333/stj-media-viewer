@@ -382,6 +382,9 @@ public interface ICloudStorage : IAsyncDisposable
 
     /// <summary>把云端文件从 A 移到 B（目标目录由调用方先 EnsureFolderAsync 建好）。</summary>
     Task MoveAsync(string fromRelativePath, string toRelativePath, CancellationToken ct = default);
+
+    /// <summary>删除云端文件（文件不存在视为成功；主要用于连接诊断的探针清理）。</summary>
+    Task DeleteAsync(string relativePath, CancellationToken ct = default);
 }
 
 /// <summary>
@@ -398,6 +401,10 @@ public interface ICloudSyncService
         CloudTarget target,
         IProgress<CloudSyncProgress>? progress = null,
         CancellationToken ct = default);
+
+    /// <summary>连接诊断：逐步检查连通 / 鉴权 / 列目录 / 上传 / 校验 / 清理，返回每一步的结果。</summary>
+    Task<CloudDiagnosticReport> DiagnoseAsync(CloudTarget target,
+        IProgress<string>? progress = null, CancellationToken ct = default);
 
     /// <summary>执行计划；dryRun=true 时只统计不落盘。</summary>
     Task<CloudSyncReport> ExecuteAsync(

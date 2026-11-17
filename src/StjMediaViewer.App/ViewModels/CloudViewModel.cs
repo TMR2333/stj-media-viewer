@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Xaml;
 using StjMediaViewer.App.Services;
 using StjMediaViewer.Core.Models;
+using StjMediaViewer.Core.Settings;
 using StjMediaViewer.Core.Util;
 
 #pragma warning disable MVVMTK0045 // 未启用 AOT；字段式 [ObservableProperty] 在 WinUI 3 下等价且更易读
@@ -647,6 +648,10 @@ public sealed partial class CloudViewModel : ObservableObject
             ReportIssuesVisibility = Visibility.Collapsed;
             ReportVisibility = Visibility.Visible;
             StatusText = "同步失败：" + ex.Message;
+            DiagnosticTitle = $"同步失败 · {row.Name}";
+            DiagnosticOk = false;
+            DiagnosticVisibility = Visibility.Visible;
+            DiagnosticText = $"同步失败：{ex.Message}\n\n点上面目标卡片里的「连接诊断」可以逐步检查 连通 / 鉴权 / 列目录 / 上传 / 校验 / 清理。\n日志：{AppPaths.LogFilePath}";
         }
         finally
         {
@@ -664,6 +669,67 @@ public sealed partial class CloudViewModel : ObservableObject
             await RunAsync(row, dryRun: false);
         }
     }
+
+    /// <summary>云同步连接诊断：逐项验证连通 / 鉴权 / 列目录 / 上传 / 校验 / 清理，结果显示在页面并写日志。</summary>
+    public async Task DiagnoseAsync(CloudTargetRow row)
+    {
+        DiagnosticTitle = $"连接诊断 · {row.Name}（{row.KindText}）";
+        DiagnosticVisibility = Visibility.Visible;
+        DiagnosticOk = true;
+        DiagnosticText = "诊断中…\n";
+        StatusText = $"正在诊断「{row.Name}」…";
+
+        try
+        {
+            var report = await AppServices.Cloud.DiagnoseAsync(row.Target,
+                new Progress<string>(m => { if (_diagRunning) DiagnosticText = $"诊断中… {m}"; }));
+
+            var sb = new System.Text.StringBuilder();
+            foreach (var step in report.Steps)
+                sb.AppendLine($"{(step.Ok ? "✓" : "✗")} {step.Name}  [{step.ElapsedMs}ms]  {step.Detail}");
+            sb.AppendLine();
+            sb.AppendLine(report.Summary);
+            sb.AppendLine($"日志：{AppPaths.LogFilePath}");
+
+            _diagRunning = false;
+            DiagnosticText = sb.ToString();
+            DiagnosticOk = report.Ok;
+            StatusText = report.Summary;
+
+            if (report.Ok) AppEvents.SetStatus($"「{row.Name}」连接正常");
+            else AppEvents.SetError($"「{row.Name}」连接异常：{report.Summary}");
+        }
+        catch (Exception ex)
+        {
+            DiagnosticOk = false;
+            DiagnosticText = $"诊断失败：{ex.Message}\n日志：{AppPaths.LogFilePath}";
+            StatusText = "诊断失败：" + ex.Message;
+            Log.Warn("云同步连接诊断失败", ex);
+        }
+    }
+
+    public void OpenLogFile()
+    {
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(AppPaths.LogFilePath)
+            {
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("打开日志文件失败", ex);
+            AppEvents.SetError("打不开日志文件：" + ex.Message);
+        }
+    }
+
+    private bool _diagRunning;
+
+    [ObservableProperty] private string _diagnosticText = "";
+    [ObservableProperty] private string _diagnosticTitle = "";
+    [ObservableProperty] private bool _diagnosticOk = true;
+    [ObservableProperty] private Visibility _diagnosticVisibility = Visibility.Collapsed;
 
     [RelayCommand]
     private void CancelCurrent()

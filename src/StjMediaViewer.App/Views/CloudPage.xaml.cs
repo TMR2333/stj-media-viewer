@@ -22,6 +22,13 @@ public sealed partial class CloudPage : Page
     {
         await ViewModel.InitializeAsync();
         SyncEditorSelections();
+
+        // 截图 / 验收用：自动对第一个目标跑一次连接诊断
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_CLOUD_DIAG") == "1" &&
+            ViewModel.Targets.Count > 0)
+        {
+            await ViewModel.DiagnoseAsync(ViewModel.Targets[0]);
+        }
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e)
@@ -167,4 +174,15 @@ public sealed partial class CloudPage : Page
 
     private async void ExecutePlan_Click(object sender, RoutedEventArgs e)
         => await ViewModel.SyncNowCommand.ExecuteAsync((object?)ViewModel.SelectedTarget);
+
+    private async void Diagnose_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is CloudTargetRow row)
+            await ViewModel.DiagnoseAsync(row);
+    }
+
+    private void OpenLog_Click(object sender, RoutedEventArgs e) => ViewModel.OpenLogFile();
+
+    private void CloseDiagnostic_Click(object sender, RoutedEventArgs e)
+        => ViewModel.DiagnosticVisibility = Microsoft.UI.Xaml.Visibility.Collapsed;
 }

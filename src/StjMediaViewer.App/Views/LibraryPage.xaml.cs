@@ -61,6 +61,8 @@ public sealed partial class LibraryPage : Page
         InspectorViewModel.Shared.Show(ViewModel.PrimaryAsset);
         UpdateShellCounts();
         _ = CheckLibraryAvailabilityAsync();
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_ONLY_RAW") == "1")
+            ViewModel.OnlyRaw = true;
         _ = ShellViewModel.Shared.RefreshCacheSizeAsync();
         TryHookScrollViewer();
     }

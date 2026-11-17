@@ -69,6 +69,38 @@
                     </StackPanel>
                 </Border>
 
+                <!-- ============ 连接诊断结果 ============ -->
+                <Border Visibility="{x:Bind ViewModel.DiagnosticVisibility, Mode=OneWay}"
+                        Background="{ThemeResource AppSurfaceBrush}"
+                        BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                        BorderThickness="{ThemeResource AppCardStrokeThickness}"
+                        CornerRadius="{ThemeResource AppRadiusMedium}"
+                        Padding="14,10">
+                    <StackPanel Spacing="8">
+                        <Grid>
+                            <TextBlock Text="{x:Bind ViewModel.DiagnosticTitle, Mode=OneWay}"
+                                       Style="{ThemeResource AppCaptionTextStyle}"
+                                       Foreground="{ThemeResource TextPrimaryBrush}" />
+                            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+                                <Button Content="打开日志" Style="{ThemeResource AppSubtleButtonStyle}"
+                                        Click="OpenLog_Click" />
+                                <Button Style="{ThemeResource AppIconButtonStyle}"
+                                        Click="CloseDiagnostic_Click"
+                                        ToolTipService.ToolTip="关闭诊断结果">
+                                    <FontIcon Glyph="&#xE711;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                        <ScrollViewer MaxHeight="220" VerticalScrollBarVisibility="Auto">
+                            <TextBlock Text="{x:Bind ViewModel.DiagnosticText, Mode=OneWay}"
+                                       Style="{ThemeResource AppMicroTextStyle}"
+                                       Foreground="{ThemeResource TextSecondaryBrush}"
+                                       TextWrapping="Wrap" IsTextSelectionEnabled="True"
+                                       FontFamily="Consolas" />
+                        </ScrollViewer>
+                    </StackPanel>
+                </Border>
+
                 <!-- ============ 目标列表 ============ -->
                 <ItemsControl ItemsSource="{x:Bind ViewModel.Targets, Mode=OneWay}">
                     <ItemsControl.ItemTemplate>
@@ -124,6 +156,9 @@
                                                     Tag="{x:Bind}" Click="Preview_Click" />
                                             <Button Content="立即同步" Style="{ThemeResource AppSubtleButtonStyle}"
                                                     Tag="{x:Bind}" Click="SyncOne_Click" />
+                                            <Button Content="连接诊断" Style="{ThemeResource AppSubtleButtonStyle}"
+                                                    Tag="{x:Bind}" Click="Diagnose_Click"
+                                                    ToolTipService.ToolTip="逐步检查 连通 / 鉴权 / 列目录 / 上传 / 校验 / 清理" />
                                             <Button Style="{ThemeResource AppIconButtonStyle}"
                                                     Tag="{x:Bind}" Click="Edit_Click"
                                                     ToolTipService.ToolTip="编辑">

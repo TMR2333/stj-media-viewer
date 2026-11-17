@@ -74,6 +74,7 @@ public static partial class Program
             await Section("按细分位置分类（GPS 聚类）", async () => await CheckGeoClustering(s, tempData));
             await Section("云同步断线重试", async () => await CheckCloudRetry(s, tempData));
             await Section("媒体库重新定位", async () => await CheckLibraryRelocate(s, tempData));
+            await Section("筛选/多选/云诊断回归", async () => await CheckFilterAndBatchFixes(s, tempData));
             await Section("设置持久化", async () => await CheckSettings(s, tempData));
             await Section("AI 客户端(dry-run)", async () => await CheckAi(s));
             var aiUrl = ArgValue(args, "--ai-url");

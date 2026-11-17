@@ -7,6 +7,7 @@ using System.Xml.Linq;
 using StjMediaViewer.Core.Abstractions;
 using StjMediaViewer.Core.Models;
 using StjMediaViewer.Core.Settings;
+using StjMediaViewer.Core.Util;
 
 namespace StjMediaViewer.Core.Cloud;
 
@@ -153,8 +154,7 @@ public sealed class WebDavCloudStorage : ICloudStorage
         {
             using var request = CreateRequest(PropFindMethod, _rootAbsoluteUri, depth: "0");
             request.Content = new StringContent(PropFindBody, Encoding.UTF8, "application/xml");
-            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct)
-                .ConfigureAwait(false);
+            using var response = await SendLoggedAsync(request, ct).ConfigureAwait(false);
             var code = (int)response.StatusCode;
             if (code == HttpMultiStatus || (code >= 200 && code < 300)) return (true, null);
 
@@ -214,8 +214,7 @@ public sealed class WebDavCloudStorage : ICloudStorage
 
             using var request = CreateRequest(PropFindMethod, directoryUri, depth: "1");
             request.Content = new StringContent(PropFindBody, Encoding.UTF8, "application/xml");
-            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct)
-                .ConfigureAwait(false);
+            using var response = await SendLoggedAsync(request, ct).ConfigureAwait(false);
             if ((int)response.StatusCode != HttpMultiStatus)
                 throw await BuildHttpErrorAsync(response, "列出云端目录", relativeDir, ct).ConfigureAwait(false);
 
@@ -263,8 +262,7 @@ public sealed class WebDavCloudStorage : ICloudStorage
         try
         {
             using var request = CreateRequest(HttpMethod.Get, uri);
-            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct)
-                .ConfigureAwait(false);
+            using var response = await SendLoggedAsync(request, ct).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
                 throw await BuildHttpErrorAsync(response, "下载云端文件", relativePath, ct).ConfigureAwait(false);
 
@@ -313,14 +311,45 @@ public sealed class WebDavCloudStorage : ICloudStorage
             content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
             request.Content = content;
 
-            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct)
-                .ConfigureAwait(false);
+            using var response = await SendLoggedAsync(request, ct).ConfigureAwait(false);
             if (!response.IsSuccessStatusCode)
                 throw await BuildHttpErrorAsync(response, "上传文件", relativePath, ct).ConfigureAwait(false);
         }
         catch (OperationCanceledException) { throw; }
         catch (IOException) { throw; }
         catch (Exception ex) { throw Wrap("上传文件", relativePath, ex); }
+    }
+
+    /// <summary>
+    /// 统一发请求并记录一行 [webdav] 日志：方法 / 完整 URL / 状态码 / 耗时 / 上传字节数。
+    /// 同步失败时排查"到底是哪一步、服务器回了什么"就靠这些日志。
+    /// </summary>
+    private async Task<HttpResponseMessage> SendLoggedAsync(HttpRequestMessage request, CancellationToken ct)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        try
+        {
+            var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
+            sw.Stop();
+            var bytes = request.Content?.Headers.ContentLength;
+            Log.Info($"[webdav] {request.Method.Method} {request.RequestUri} → {(int)response.StatusCode} " +
+                     $"{(bytes.HasValue ? bytes.Value.ToString() + "B " : "")}{sw.ElapsedMilliseconds}ms " +
+                     $"user={_target.WebDavUsername ?? "-"}");
+            return response;
+        }
+        catch (OperationCanceledException)
+        {
+            Log.Warn($"[webdav] {request.Method.Method} {request.RequestUri} 已取消（{sw.ElapsedMilliseconds}ms）");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            var bytes = request.Content?.Headers.ContentLength;
+            Log.Warn($"[webdav] {request.Method.Method} {request.RequestUri} ✗ {sw.ElapsedMilliseconds}ms " +
+                     $"{(bytes.HasValue ? bytes.Value.ToString() + "B " : "")}{ex.GetType().Name}: {ex.Message}");
+            throw;
+        }
     }
 
     private static readonly HttpMethod MoveMethod = new("MOVE");
@@ -341,8 +370,7 @@ public sealed class WebDavCloudStorage : ICloudStorage
             request.Headers.TryAddWithoutValidation("Destination", toUri);
             request.Headers.TryAddWithoutValidation("Overwrite", "F");
 
-            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct)
-                .ConfigureAwait(false);
+            using var response = await SendLoggedAsync(request, ct).ConfigureAwait(false);
             if (response.IsSuccessStatusCode) return;
 
             var status = (int)response.StatusCode;
@@ -364,6 +392,24 @@ public sealed class WebDavCloudStorage : ICloudStorage
 
     private static string NormalizeRelative(string relative) =>
         relative.Replace('\\', '/').Trim('/');
+
+    public async Task DeleteAsync(string relativePath, CancellationToken ct = default)
+    {
+        EnsureConfigured();
+        if (string.IsNullOrWhiteSpace(relativePath)) return;
+
+        try
+        {
+            using var request = CreateRequest(HttpMethod.Delete, BuildFileUri(relativePath));
+            using var response = await SendLoggedAsync(request, ct).ConfigureAwait(false);
+            var status = (int)response.StatusCode;
+            if (response.IsSuccessStatusCode || status == 404) return;
+            throw await BuildHttpErrorAsync(response, "删除文件", relativePath, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (IOException) { throw; }
+        catch (Exception ex) { throw Wrap("删除文件", relativePath, ex); }
+    }
 
     public async Task EnsureFolderAsync(string relativePath, CancellationToken ct = default)
     {
@@ -392,8 +438,7 @@ public sealed class WebDavCloudStorage : ICloudStorage
 
             ct.ThrowIfCancellationRequested();
             using var request = CreateRequest(MkColMethod, CombineUri(_rootAbsoluteUri, relative, isDirectory: true));
-            using var response = await _http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct)
-                .ConfigureAwait(false);
+            using var response = await SendLoggedAsync(request, ct).ConfigureAwait(false);
             var code = (int)response.StatusCode;
             // 201 = 建好；405 = 已存在（WebDAV 标准做法）；2xx 其余也当成功。
             if ((code >= 200 && code < 300) || code == HttpMethodNotAllowed)

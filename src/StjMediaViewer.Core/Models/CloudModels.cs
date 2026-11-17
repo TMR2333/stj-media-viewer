@@ -229,3 +229,25 @@ public sealed class CloudSyncProgress
         ? Math.Round(100.0 * FilesProcessed / FilesTotal, 1)
         : (BytesTotal > 0 ? Math.Round(100.0 * BytesProcessed / BytesTotal, 1) : 0);
 }
+
+/// <summary>连接诊断的一步（连接 / 鉴权 / 列目录 / 上传探针…）。</summary>
+public sealed record CloudDiagnosticStep(string Name, bool Ok, long ElapsedMs, string Detail);
+
+/// <summary>云同步连接诊断报告：用来排查"到底卡在哪一步"。</summary>
+public sealed class CloudDiagnosticReport
+{
+    public List<CloudDiagnosticStep> Steps { get; } = new();
+    public bool Ok => Steps.Count > 0 && Steps.All(s => s.Ok);
+
+    public string Summary
+    {
+        get
+        {
+            if (Steps.Count == 0) return "没有执行诊断";
+            var failed = Steps.FirstOrDefault(s => !s.Ok);
+            return failed is null
+                ? $"连接正常（{Steps.Count} 项全部通过，用时 {Steps.Sum(s => s.ElapsedMs)}ms）"
+                : $"{failed.Name} 失败：{failed.Detail}";
+        }
+    }
+}

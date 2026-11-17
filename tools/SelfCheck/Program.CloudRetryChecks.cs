@@ -94,6 +94,8 @@ public static partial class Program
 
         public Task MoveAsync(string fromRelativePath, string toRelativePath, CancellationToken ct = default) => Task.CompletedTask;
 
+        public Task DeleteAsync(string relativePath, CancellationToken ct = default) => Task.CompletedTask;
+
         public ValueTask DisposeAsync() => ValueTask.CompletedTask;
     }
 }

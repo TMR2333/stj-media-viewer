@@ -457,7 +457,11 @@ public sealed partial class InspectorViewModel : ObservableObject
     partial void OnSelectedThemeChanged(OptionItem? value)
     {
         if (_suppressEdits || CurrentAsset is null) return;
-        CurrentAsset.Theme = string.IsNullOrEmpty(value?.Id) ? null : value!.Id;
+        var theme = string.IsNullOrEmpty(value?.Id) ? null : value!.Id;
+        if (ApplyToMultiSelection(new BatchEditPatch { Theme = theme ?? "" },
+                                  a => { a.Theme = theme; a.Provenance[ClassDimension.Theme] = FieldProvenance.Of(ClassSource.Manual); }))
+            return;
+        CurrentAsset.Theme = theme;
         CurrentAsset.Provenance[ClassDimension.Theme] = FieldProvenance.Of(ClassSource.Manual);
         MarkDirty();
     }
@@ -465,7 +469,11 @@ public sealed partial class InspectorViewModel : ObservableObject
     partial void OnSelectedToneChanged(OptionItem? value)
     {
         if (_suppressEdits || CurrentAsset is null) return;
-        CurrentAsset.Tone = string.IsNullOrEmpty(value?.Id) ? null : value!.Id;
+        var tone = string.IsNullOrEmpty(value?.Id) ? null : value!.Id;
+        if (ApplyToMultiSelection(new BatchEditPatch { Tone = tone ?? "" },
+                                  a => { a.Tone = tone; a.Provenance[ClassDimension.Tone] = FieldProvenance.Of(ClassSource.Manual); }))
+            return;
+        CurrentAsset.Tone = tone;
         CurrentAsset.Provenance[ClassDimension.Tone] = FieldProvenance.Of(ClassSource.Manual);
         MarkDirty();
     }
@@ -473,12 +481,16 @@ public sealed partial class InspectorViewModel : ObservableObject
     partial void OnProcessedValueChanged(bool? value)
     {
         if (_suppressEdits || CurrentAsset is null) return;
-        CurrentAsset.PostProcess = value switch
+        var state = value switch
         {
             true => PostProcessState.Processed,
             false => PostProcessState.Unprocessed,
             _ => PostProcessState.Unknown,
         };
+        if (ApplyToMultiSelection(new BatchEditPatch { PostProcess = (int)state },
+                                  a => { a.PostProcess = state; a.Provenance[ClassDimension.PostProcess] = FieldProvenance.Of(ClassSource.Manual); }))
+            return;
+        CurrentAsset.PostProcess = state;
         CurrentAsset.Provenance[ClassDimension.PostProcess] = FieldProvenance.Of(ClassSource.Manual);
         MarkDirty();
     }
@@ -487,6 +499,9 @@ public sealed partial class InspectorViewModel : ObservableObject
     {
         if (CurrentAsset is null) return;
         var value = string.IsNullOrWhiteSpace(city) ? null : city!.Trim();
+        if (ApplyToMultiSelection(new BatchEditPatch { City = value ?? "" },
+                                  a => { a.City = value; a.CitySource = value is null ? null : "manual"; a.Provenance[ClassDimension.City] = FieldProvenance.Of(ClassSource.Manual); }))
+            return;
         if (string.Equals(CurrentAsset.City, value, StringComparison.Ordinal)) return;
         CurrentAsset.City = value;
         CurrentAsset.CitySource = value is null ? null : "manual";
@@ -498,6 +513,12 @@ public sealed partial class InspectorViewModel : ObservableObject
     {
         if (CurrentAsset is null) return;
         var value = Math.Clamp(rating, 0, 5);
+        if (ApplyToMultiSelection(new BatchEditPatch { Rating = value },
+                                  a => a.Rating = value))
+        {
+            Rating = value;
+            return;
+        }
         if (CurrentAsset.Rating == value) return;
         CurrentAsset.Rating = value;
         Rating = value;
@@ -509,6 +530,12 @@ public sealed partial class InspectorViewModel : ObservableObject
     {
         if (CurrentAsset is null) return;
         var value = string.IsNullOrWhiteSpace(label) || label.Equals("none", StringComparison.OrdinalIgnoreCase) ? null : label;
+        if (ApplyToMultiSelection(new BatchEditPatch { ColorLabel = value ?? "" },
+                                  a => a.ColorLabel = value))
+        {
+            ColorLabel = value ?? "none";
+            return;
+        }
         if (string.Equals(CurrentAsset.ColorLabel, value, StringComparison.OrdinalIgnoreCase)) return;
         CurrentAsset.ColorLabel = value;
         ColorLabel = value ?? "none";
@@ -518,9 +545,64 @@ public sealed partial class InspectorViewModel : ObservableObject
     public void SetPick(bool? pick)
     {
         if (CurrentAsset is null) return;
+        if (ApplyToMultiSelection(new BatchEditPatch { IsPick = pick },
+                                  a => a.IsPick = pick))
+        {
+            PickValue = pick;
+            return;
+        }
         CurrentAsset.IsPick = pick;
         PickValue = pick;
         MarkDirty();
+    }
+
+    /// <summary>
+    /// 多选时把分类改动一次性写到**所有选中素材**（不只是检视面板里的那一张）。
+    /// 返回 true 表示已按批量方式处理，调用方不要再改单张。
+    /// </summary>
+    private bool ApplyToMultiSelection(BatchEditPatch patch, Action<MediaAsset> applyLocal)
+    {
+        var targets = MultiSelectionTargets();
+        if (targets.Count <= 1) return false;
+
+        foreach (var asset in targets) applyLocal(asset);
+        _ = PersistMultiAsync(targets, patch);
+        return true;
+    }
+
+    private static List<MediaAsset> MultiSelectionTargets()
+    {
+        try
+        {
+            var selected = LibraryViewModel.Shared.SelectedItems;
+            if (selected.Count > 1) return selected.Select(i => i.Asset).ToList();
+        }
+        catch
+        {
+            // 忽略：退化成单张编辑
+        }
+        return new List<MediaAsset>();
+    }
+
+    private async Task PersistMultiAsync(List<MediaAsset> targets, BatchEditPatch patch)
+    {
+        try
+        {
+            var ids = targets.Select(a => a.Id).ToList();
+            var affected = await AppServices.Store.ApplyBatchEditAsync(ids, patch);
+            foreach (var asset in targets) AppServices.Thumbs.Invalidate(asset.Id);
+            IsDirty = false;
+            SetStatus($"已应用到 {affected} 张素材", false);
+            foreach (var asset in targets) AppEvents.RaiseAssetUpdated(asset);
+            if (CurrentAsset is not null) BuildGroups(CurrentAsset);
+            LibraryViewModel.Shared.RequestRefresh();
+            Log.Info($"[inspector] 多选分类写入 {affected} 张：{patch.Describe()}");
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("多选分类写入失败", ex);
+            SetStatus($"多选写入失败：{ex.Message}", true);
+        }
     }
 
     private void MarkDirty()

@@ -554,6 +554,120 @@ public sealed class CloudSyncService : ICloudSyncService
         return await ExecuteAsync(normalPlan, dryRun, progress, ct).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// 连接诊断：逐步验证 连接 → 鉴权 → 列目录 → 上传探针 → 校验 → 清理，
+    /// 每一步都记进日志（[webdav] 前缀），界面直接显示哪一步失败、服务器回了什么。
+    /// </summary>
+    public async Task<CloudDiagnosticReport> DiagnoseAsync(
+        CloudTarget target,
+        IProgress<string>? progress = null,
+        CancellationToken ct = default)
+    {
+        var report = new CloudDiagnosticReport();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        void Add(string name, bool ok, string detail)
+        {
+            report.Steps.Add(new CloudDiagnosticStep(name, ok, sw.ElapsedMilliseconds, detail));
+            Log.Info($"[cloud][diag] {name}: {(ok ? "OK" : "FAIL")} {sw.ElapsedMilliseconds}ms — {detail}");
+        }
+
+        ICloudStorage? storage = null;
+        string? probeRelative = null;
+        try
+        {
+            progress?.Report("创建连接…");
+            sw.Restart();
+            storage = CreateStorage(target);
+            Add("创建连接", true, $"{target.DisplayKind} · {target.RemoteDescription} · 本地 {target.LocalFolderPath}");
+
+            sw.Restart();
+            progress?.Report("测试连通性与鉴权…");
+            string? testError = null;
+            bool reachable;
+            try { reachable = await storage.TestAsync(out testError, ct).ConfigureAwait(false); }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex) { reachable = false; testError = ex.Message; }
+            if (!reachable)
+            {
+                Add("连通性 / 鉴权", false, testError ?? "服务器无响应（或账号 / 密码 / 路径不对）");
+                return report;
+            }
+            Add("连通性 / 鉴权", true, "服务器有响应，账号可用");
+
+            sw.Restart();
+            progress?.Report("列出云端目录…");
+            IReadOnlyList<CloudEntry> entries;
+            try { entries = await storage.ListAllAsync(new Progress<string>(m => progress?.Report(m)), ct).ConfigureAwait(false); }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex) { Add("列出云端目录", false, ex.Message); return report; }
+            Add("列出云端目录", true, $"{entries.Count} 个文件");
+
+            probeRelative = $".stj-connect-test-{DateTime.Now:HHmmss}.txt";
+            var probeLocal = Path.Combine(Path.GetTempPath(), probeRelative);
+            await File.WriteAllTextAsync(probeLocal, "ok", ct).ConfigureAwait(false);
+            try
+            {
+                sw.Restart();
+                progress?.Report("上传测试文件…");
+                await storage.UploadAsync(probeLocal, probeRelative, ct).ConfigureAwait(false);
+                Add("上传测试文件", true, $"4 B → {probeRelative}");
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                Add("上传测试文件", false, ex.Message);
+                return report;
+            }
+
+            sw.Restart();
+            progress?.Report("确认文件已上传…");
+            try
+            {
+                var after = await storage.ListAllAsync(null, ct).ConfigureAwait(false);
+                var found = after.FirstOrDefault(e => string.Equals(e.RelativePath, probeRelative, StringComparison.OrdinalIgnoreCase));
+                Add("确认文件已上传", found is not null,
+                    found is null ? "上传接口返回成功，但云端列表里没有这个文件" : $"已确认（{found.SizeBytes} B）");
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                Add("确认文件已上传", false, ex.Message);
+            }
+
+            sw.Restart();
+            progress?.Report("清理测试文件…");
+            try
+            {
+                await storage.DeleteAsync(probeRelative, ct).ConfigureAwait(false);
+                Add("清理测试文件", true, "已删除探针文件");
+                probeRelative = null;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                Add("清理测试文件", false, $"{ex.Message}（云端可能残留一个很小的占位文件）");
+            }
+
+            progress?.Report(report.Summary);
+            return report;
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            Add("诊断过程异常", false, ex.Message);
+            return report;
+        }
+        finally
+        {
+            if (probeRelative is not null && storage is not null)
+            {
+                try { await storage.DeleteAsync(probeRelative, CancellationToken.None).ConfigureAwait(false); } catch { }
+            }
+            if (storage is not null) await storage.DisposeAsync().ConfigureAwait(false);
+        }
+    }
+
     /// <summary>WebDAV 同步会话全局串行锁（同一进程内）。</summary>
     private static readonly SemaphoreSlim WebDavSessionGate = new(1, 1);
 

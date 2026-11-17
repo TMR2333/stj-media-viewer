@@ -423,12 +423,21 @@ internal sealed class FallbackCloudStorage : ICloudStorage
     public Task EnsureFolderAsync(string relativePath, CancellationToken ct = default) => Task.CompletedTask;
     public Task MoveAsync(string fromRelativePath, string toRelativePath, CancellationToken ct = default)
         => throw new NotSupportedException("演示模式不执行移动");
+    public Task DeleteAsync(string relativePath, CancellationToken ct = default)
+        => throw new NotSupportedException("演示模式不执行删除");
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 }
 
 internal sealed class FallbackCloudSyncService : ICloudSyncService
 {
     public ICloudStorage CreateStorage(CloudTarget target) => new FallbackCloudStorage(target);
+
+    public Task<CloudDiagnosticReport> DiagnoseAsync(CloudTarget target, IProgress<string>? progress = null, CancellationToken ct = default)
+    {
+        var report = new CloudDiagnosticReport();
+        report.Steps.Add(new CloudDiagnosticStep("连接诊断", false, 0, "演示模式不联网，无法诊断"));
+        return Task.FromResult(report);
+    }
 
     public Task<CloudSyncPlan> BuildPlanAsync(CloudTarget target, IProgress<CloudSyncProgress>? progress = null, CancellationToken ct = default)
         => Task.FromResult(new CloudSyncPlan { Target = target });

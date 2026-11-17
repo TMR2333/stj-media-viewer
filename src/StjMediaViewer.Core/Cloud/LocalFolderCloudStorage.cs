@@ -149,6 +149,21 @@ public sealed class LocalFolderCloudStorage : ICloudStorage
         return Task.CompletedTask;
     }
 
+    public Task DeleteAsync(string relativePath, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(relativePath)) return Task.CompletedTask;
+        try
+        {
+            var full = ToAbsolute(relativePath);
+            if (File.Exists(full)) File.Delete(full);
+            return Task.CompletedTask;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new IOException($"删除失败：{ex.Message}", ex);
+        }
+    }
+
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
 
     // ------------------------------------------------------------------ 路径

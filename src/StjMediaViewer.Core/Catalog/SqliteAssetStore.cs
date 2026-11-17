@@ -1133,8 +1133,9 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
         if (q.OnlyProblems)
             w.And("((last_error IS NOT NULL AND last_error<>'') OR metadata_parsed_at IS NULL)");
 
-        // JPG+RAW 分组折叠：网格里一张照片只出现一次（取组代表）
-        if (q.CollapseGroups) w.And("is_group_cover = 1");
+        // JPG+RAW 分组折叠：网格里一张照片只出现一次（取组代表 = JPG）。
+        // 例外：筛「只看 RAW」时必须放行非代表的 RAW 行，否则 RAW 全被折叠掉、结果永远是 0 条。
+        if (q.CollapseGroups && q.IsRaw != true) w.And("is_group_cover = 1");
         return w;
     }
 
