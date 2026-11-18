@@ -170,6 +170,72 @@ public sealed partial class LibraryPage : Page
             });
         }
 
+        // 验收用：STJ_DEMO_MARQUEE_SCROLL=1 框选 → 自动滚动 → 继续框选，检查上面的选中是否被清掉
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_MARQUEE_SCROLL") == "1")
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(2600);
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    // 模拟一次"从空白处按下开始拖"
+                    _marqueeActive = true;
+                    _marqueeAdditive = false;
+                    _marqueeBase.Clear();
+                    _marqueeHits.Clear();
+                    ApplyMarqueeSelection(new Windows.Foundation.Rect(380, 190, 700, 200));
+                    Core.Util.Log.Info($"[marquee-scroll] top: vm={ViewModel.SelectedItems.Count}");
+                });
+
+                await Task.Delay(700);
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    FindDescendant<ScrollViewer>(AssetList)?.ChangeView(null, 900, null, true);
+                });
+
+                await Task.Delay(900);
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    ApplyMarqueeSelection(new Windows.Foundation.Rect(380, 400, 700, 200));
+                    EndMarquee();
+                    _marqueeActive = false;
+                    Core.Util.Log.Info($"[marquee-scroll] after scroll+bottom: vm={ViewModel.SelectedItems.Count} " +
+                                       $"list={AssetList.SelectedItems.Count} firstStill={ViewModel.Items.FirstOrDefault()?.IsSelected}");
+                });
+            });
+        }
+
+        // 验收用：STJ_DEMO_SELECT_SCROLL=1 选中第 1 张 → 滚到下面 → 再选中第 N 张，检查第 1 张是否还在
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_SELECT_SCROLL") == "1")
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(2600);
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    var first = ViewModel.Items.FirstOrDefault();
+                    if (first is null) return;
+                    first.IsSelected = true;
+                    AssetList.SelectedItems.Add(first);
+                    Core.Util.Log.Info($"[select-scroll] after first: list={AssetList.SelectedItems.Count} vm={ViewModel.SelectedItems.Count}");
+
+                    var scroller = FindDescendant<ScrollViewer>(AssetList);
+                    scroller?.ChangeView(null, 1200, null, true);
+                });
+
+                await Task.Delay(1200);
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    var visible = ViewModel.Items.FirstOrDefault(i => AssetList.ContainerFromItem(i) is not null && !i.IsSelected);
+                    if (visible is null) return;
+                    visible.IsSelected = true;
+                    AssetList.SelectedItems.Add(visible);
+                    Core.Util.Log.Info($"[select-scroll] after scroll+second: list={AssetList.SelectedItems.Count} vm={ViewModel.SelectedItems.Count} " +
+                                       $"firstStillSelected={ViewModel.Items.FirstOrDefault()?.IsSelected}");
+                });
+            });
+        }
+
         // 验收用：STJ_DEMO_SELECT_TEST=1 框选 2 张后再"Ctrl 单击"追加 1 张，检查旧选中是否保留
         if (Environment.GetEnvironmentVariable("STJ_DEMO_SELECT_TEST") == "1")
         {
@@ -789,6 +855,8 @@ public sealed partial class LibraryPage : Page
     private bool _marqueeAdditive;
     private Windows.Foundation.Point _marqueeStart;
     private readonly List<AssetCardItem> _marqueeBase = new();
+    /// <summary>本次框选累计命中的卡片：列表往下滚动时，上面的容器会被回收，不能只按当前视口算。</summary>
+    private readonly HashSet<AssetCardItem> _marqueeHits = new();
     private ScrollViewer? _assetListScroller;
 
     private void AssetList_PointerPressed(object sender, PointerRoutedEventArgs e)
@@ -819,6 +887,7 @@ public sealed partial class LibraryPage : Page
             _marqueeStart = e.GetCurrentPoint(MarqueeCanvas).Position;
 
             _marqueeBase.Clear();
+            _marqueeHits.Clear();
             if (_marqueeAdditive) _marqueeBase.AddRange(ViewModel.SelectedItems);
 
             ShowMarquee(new Windows.Foundation.Rect(_marqueeStart, _marqueeStart));
@@ -899,7 +968,10 @@ public sealed partial class LibraryPage : Page
     /// <summary>把与框选矩形相交的（已实现出来的）卡片选上。</summary>
     private void ApplyMarqueeSelection(Windows.Foundation.Rect rect)
     {
+        // 先并入本次拖动已经命中过的（可能已滚出视口、容器被回收）
         var selected = new List<AssetCardItem>(_marqueeBase);
+        foreach (var item in _marqueeHits)
+            if (!selected.Contains(item)) selected.Add(item);
         for (int i = 0; i < ViewModel.Items.Count; i++)
         {
             if (AssetList.ContainerFromIndex(i) is not ListViewItem container) continue;
@@ -920,6 +992,7 @@ public sealed partial class LibraryPage : Page
                              rect.Y < bounds.Y + bounds.Height && rect.Y + rect.Height > bounds.Y;
             if (!intersects) continue;
             var item = ViewModel.Items[i];
+            _marqueeHits.Add(item);
             if (!selected.Contains(item)) selected.Add(item);
         }
 

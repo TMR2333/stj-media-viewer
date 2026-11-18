@@ -768,12 +768,39 @@ public sealed partial class LibraryViewModel : ObservableObject
         return cards;
     }
 
+    /// <summary>
+    /// 媒体类型分组的可见性：分库模式下照片库/视频库已经限定了类型，这个分组就是多余的，整组隐藏；
+    /// 不分库（单个素材库）时恢复图片/视频/音频三个选项。
+    /// </summary>
+    private void SyncKindGroupForScope(FacetCounts facets)
+    {
+        if (Scope == LibraryScope.All)
+        {
+            if (KindGroup.Options.Count == 0)
+            {
+                KindGroup.ResetOptions(new[]
+                {
+                    ("Image", "图片", 0), ("Video", "视频", 0), ("Audio", "音频", 0),
+                });
+            }
+            KindGroup.UpdateCounts(facets.ByKind);
+            return;
+        }
+
+        if (KindGroup.Options.Count > 0)
+        {
+            KindGroup.ClearSilently();
+            KindGroup.IsExpanded = false;
+            KindGroup.ResetOptions(Array.Empty<(string Id, string Display, int Count)>());
+        }
+    }
+
     private void ApplyFacets(FacetCounts facets)
     {
         _suppressRefresh = true;
         try
         {
-            KindGroup.UpdateCounts(facets.ByKind);
+            SyncKindGroupForScope(facets);
 
             // 关键：可选值不是"只建一次"，而是每次按最新计数同步 ——
             // 否则启动时库还是空的（或还没跑 AI 分类），之后新出现的主题/城市/设备
