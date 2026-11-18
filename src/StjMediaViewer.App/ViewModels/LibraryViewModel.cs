@@ -277,6 +277,83 @@ public sealed partial class LibraryViewModel : ObservableObject
 
     public string ScopeTitle => LibraryScopeRules.Title(Scope);
 
+    // ---------------- 视图状态栈（合并组"点开 → 返回上一步"用） ----------------
+    /// <summary>素材库视图快照：各筛选组的选中项 + 库范围 + 快捷筛选 + 搜索词。</summary>
+    public sealed record LibraryViewState(
+        Dictionary<FilterGroupKind, HashableStringSet> Groups,
+        LibraryScope Scope,
+        bool OnlyRaw,
+        bool OnlyLog,
+        bool OnlyColored,
+        bool OnlyUncolored,
+        string SearchText);
+
+    /// <summary>可比较的字符串集合（快照用）。</summary>
+    public sealed class HashableStringSet : HashSet<string>
+    {
+        public HashableStringSet() : base(StringComparer.OrdinalIgnoreCase) { }
+        public HashableStringSet(IEnumerable<string> items) : base(items, StringComparer.OrdinalIgnoreCase) { }
+    }
+
+    private readonly Stack<LibraryViewState> _viewStates = new();
+
+    public bool CanGoBack => _viewStates.Count > 0;
+
+    [ObservableProperty] private string _mergeGroupBannerText = "";
+    [ObservableProperty] private Visibility _mergeGroupBannerVisibility = Visibility.Collapsed;
+
+    /// <summary>把当前视图状态压栈（打开合并组之前调用）。</summary>
+    public void PushViewState()
+    {
+        var groups = new Dictionary<FilterGroupKind, HashableStringSet>();
+        foreach (var group in Groups)
+            groups[group.Kind] = new HashableStringSet(group.SelectedIds);
+        _viewStates.Push(new LibraryViewState(
+            groups, Scope, OnlyRaw, OnlyLog, OnlyColored, OnlyUncolored,
+            ShellViewModel.Shared.SearchText ?? ""));
+        OnPropertyChanged(nameof(CanGoBack));
+    }
+
+    /// <summary>返回上一步视图状态。</summary>
+    public void PopViewState()
+    {
+        if (_viewStates.Count == 0) return;
+        var state = _viewStates.Pop();
+        OnPropertyChanged(nameof(CanGoBack));
+
+        _suppressRefresh = true;
+        try
+        {
+            // 库范围
+            Scope = state.Scope;
+            OnPropertyChanged(nameof(Scope));
+            OnPropertyChanged(nameof(ScopeTitle));
+
+            // 筛选组：先全清，再按快照勾选
+            foreach (var group in Groups)
+            {
+                group.ClearSilently();
+                if (!state.Groups.TryGetValue(group.Kind, out var ids)) continue;
+                foreach (var option in group.Options)
+                    if (ids.Contains(option.Id)) option.SetSelectedSilently(true);
+            }
+
+            OnlyRaw = state.OnlyRaw;
+            OnlyLog = state.OnlyLog;
+            OnlyColored = state.OnlyColored;
+            OnlyUncolored = state.OnlyUncolored;
+            ShellViewModel.Shared.SearchText = state.SearchText;
+        }
+        finally
+        {
+            _suppressRefresh = false;
+        }
+
+        UpdateActiveFilterSummary();
+        UpdateKindChipVisibility();
+        RequestRefresh(immediate: true);
+    }
+
     // ---------------- 影像合集横幅（筛选到单个合集时出现操作入口） ----------------
     [ObservableProperty] private string _collectionBannerText = "";
     [ObservableProperty] private Visibility _collectionBannerVisibility = Visibility.Collapsed;
@@ -304,6 +381,24 @@ public sealed partial class LibraryViewModel : ObservableObject
             ActiveCollectionCount = 0;
             CollectionBannerText = "";
             CollectionBannerVisibility = Visibility.Collapsed;
+        }
+    }
+
+    /// <summary>筛选到单个合并组时显示横幅（带「返回」）。</summary>
+    private void RefreshMergeGroupBanner(FacetCounts facets)
+    {
+        var selected = MergeGroupGroup.SelectedIds.ToList();
+        if (selected.Count == 1)
+        {
+            var group = MergeGroups.FirstOrDefault(g => g.Id == selected[0]);
+            var count = facets.ByMergeGroup.TryGetValue(selected[0], out var n) ? n : 0;
+            MergeGroupBannerText = $"合并组：{group?.DisplayName ?? "合并组"} · {count} 张（只显示组内素材）";
+            MergeGroupBannerVisibility = Visibility.Visible;
+        }
+        else
+        {
+            MergeGroupBannerText = "";
+            MergeGroupBannerVisibility = Visibility.Collapsed;
         }
     }
 
@@ -687,6 +782,8 @@ public sealed partial class LibraryViewModel : ObservableObject
     public void OpenMergeGroup(string groupId)
     {
         if (string.IsNullOrWhiteSpace(groupId)) return;
+        // 打开之前记住"上一步"；已经在看这个组就不重复压栈
+        if (!MergeGroupGroup.SelectedIds.Contains(groupId)) PushViewState();
         _suppressRefresh = true;
         try
         {
@@ -818,6 +915,7 @@ public sealed partial class LibraryViewModel : ObservableObject
                 .ToDictionary(kv => kv.Key, kv => kv.Value, StringComparer.Ordinal);
             SyncOptions(MergeGroupGroup, mergeCounts, key => mergeNames[key]);
             RefreshCollectionBanner(facets);
+            RefreshMergeGroupBanner(facets);
             SyncOptions(CollectionGroup, collectionCounts, key => collectionNames[key],
                 unsetCount: facets.CollectionUnsetCount, unsetDisplay: "未加入合集");
             Log.Info($"[collections] group options={CollectionGroup.Options.Count}, vis={CollectionGroup.GroupVisibility}");

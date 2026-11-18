@@ -170,6 +170,33 @@ public sealed partial class LibraryPage : Page
             });
         }
 
+        // 验收用：STJ_DEMO_MERGE_OPEN=1 打开第一个合并组；=2 打开后立刻测「返回」
+        var mergeDemo = Environment.GetEnvironmentVariable("STJ_DEMO_MERGE_OPEN");
+        if (!string.IsNullOrEmpty(mergeDemo))
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(2800);
+                DispatcherQueue.TryEnqueue(async () =>
+                {
+                    await ViewModel.RefreshMergeGroupsAsync();
+                    var group = ViewModel.MergeGroups.FirstOrDefault();
+                    if (group is null) return;
+                    var before = ViewModel.Items.Count;
+                    OpenMergeGroupCard(group);
+
+                    if (mergeDemo != "2") return;
+                    await Task.Delay(1800);
+                    var opened = ViewModel.Items.Count;
+                    var banner = ViewModel.MergeGroupBannerVisibility;
+                    MergeGroupBack_Click(this, new RoutedEventArgs());
+                    await Task.Delay(1800);
+                    Core.Util.Log.Info($"[merge-open] before={before} opened={opened} banner={banner} " +
+                                       $"back={ViewModel.Items.Count} canGoBack={ViewModel.CanGoBack}");
+                });
+            });
+        }
+
         // 验收用：STJ_DEMO_MARQUEE_SCROLL=1 框选 → 自动滚动 → 继续框选，检查上面的选中是否被清掉
         if (Environment.GetEnvironmentVariable("STJ_DEMO_MARQUEE_SCROLL") == "1")
         {
@@ -1088,10 +1115,29 @@ public sealed partial class LibraryPage : Page
     }
 
     /// <summary>打开合并组：切到"合并组"筛选，只显示组内成员（此时不折叠，可逐张操作）。</summary>
+    private double _mergeGroupBackScroll;
+
     private void OpenMergeGroupCard(MergeGroup group)
     {
+        _mergeGroupBackScroll = FindDescendant<ScrollViewer>(AssetList)?.VerticalOffset ?? 0;
         ViewModel.OpenMergeGroup(group.Id);
         AppEvents.SetStatus($"已打开合并组「{group.DisplayName}」（{group.AssetCount} 张）");
+    }
+
+    /// <summary>「返回」：回到打开合并组之前的视图（筛选 + 滚动位置）。</summary>
+    private void MergeGroupBack_Click(object sender, RoutedEventArgs e)
+    {
+        ViewModel.PopViewState();
+        AppEvents.SetStatus("已返回上一步视图");
+        _ = DispatcherQueue.TryEnqueue(async () =>
+        {
+            await Task.Delay(400);   // 等清单按恢复后的筛选刷新完
+            try
+            {
+                FindDescendant<ScrollViewer>(AssetList)?.ChangeView(null, _mergeGroupBackScroll, null, true);
+            }
+            catch { }
+        });
     }
 
     private void AssetList_KeyDown(object sender, KeyRoutedEventArgs e)

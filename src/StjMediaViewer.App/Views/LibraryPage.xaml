@@ -602,6 +602,40 @@
                            Visibility="{x:Bind ViewModel.ActiveFilterSummaryVisibility, Mode=OneWay}"
                            TextTrimming="CharacterEllipsis" />
 
+                <!-- 打开单个合并组时：只显示组内素材 + 返回上一步 -->
+                <Border x:Name="MergeGroupBanner"
+                        Background="{ThemeResource AppSurfaceRaisedBrush}"
+                        BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{ThemeResource AppRadiusMedium}"
+                        Padding="10,6"
+                        Visibility="{x:Bind ViewModel.MergeGroupBannerVisibility, Mode=OneWay}">
+                    <Grid ColumnSpacing="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Grid.Column="0" Glyph="&#xE8B7;" FontSize="{ThemeResource AppFontCaptionSize}"
+                                  Foreground="{ThemeResource AccentBrush}" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1"
+                                   Text="{x:Bind ViewModel.MergeGroupBannerText, Mode=OneWay}"
+                                   Style="{ThemeResource AppCaptionTextStyle}"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis" />
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6">
+                            <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="10,2,10,2" MinHeight="28"
+                                    Click="MergeGroupBack_Click"
+                                    ToolTipService.ToolTip="返回打开合并组之前的素材库视图">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <FontIcon Glyph="&#xE72B;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                                    <TextBlock Text="返回" Style="{ThemeResource AppMicroTextStyle}" />
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
                 <!-- 选中单个影像合集时：合集级的编辑入口（批量编辑 / 元数据 / 重命名 / 删除） -->
                 <Border x:Name="CollectionBanner"
                         Background="{ThemeResource AppSurfaceRaisedBrush}"
