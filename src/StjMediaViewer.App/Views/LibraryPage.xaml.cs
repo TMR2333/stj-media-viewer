@@ -170,6 +170,35 @@ public sealed partial class LibraryPage : Page
             });
         }
 
+        // 验收用：STJ_DEMO_SELECT_TEST=1 框选 2 张后再"Ctrl 单击"追加 1 张，检查旧选中是否保留
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_SELECT_TEST") == "1")
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(2600);
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    var rect = new Windows.Foundation.Rect(456, 250, 760, 470);
+                    ShowMarquee(rect);
+                    ApplyMarqueeSelection(rect);
+                });
+
+                await Task.Delay(1200);
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    var afterMarquee = ViewModel.SelectedItems.Count;
+                    var extra = ViewModel.Items.FirstOrDefault(i => !i.IsSelected);
+                    if (extra is null) return;
+                    extra.IsSelected = true;                 // 模拟 Ctrl+单击追加
+                    AssetList.SelectedItems.Add(extra);
+                    var afterCtrl = ViewModel.SelectedItems.Count;
+                    var listCount = AssetList.SelectedItems.Count;
+                    Core.Util.Log.Info($"[select-test] marquee={afterMarquee} ctrl={afterCtrl} list={listCount} " +
+                                       $"keep={afterCtrl > afterMarquee} sync={(listCount == afterCtrl)}");
+                });
+            });
+        }
+
         // 截图用：STJ_DEMO_MARQUEE=1 模拟一次框选（画框 + 选中框内卡片）
         if (Environment.GetEnvironmentVariable("STJ_DEMO_MARQUEE") == "1")
         {
@@ -899,7 +928,39 @@ public sealed partial class LibraryPage : Page
             return;
 
         ViewModel.SetSelection(selected);
+        SyncListViewSelection(selected);
     }
+
+    /// <summary>
+    /// 把选中集同步进 ListView。
+    /// 关键：框选只写了 ViewModel 的选中集，ListView 自己还是空的；
+    /// 之后按 Ctrl 单击时 ListView 会用"自己的"选中集去追加，于是把框选结果全丢掉。
+    /// </summary>
+    private void SyncListViewSelection(IReadOnlyList<AssetCardItem> selected)
+    {
+        if (_syncingListSelection) return;
+        _syncingListSelection = true;
+        try
+        {
+            var wanted = selected.ToHashSet();
+            foreach (var item in AssetList.SelectedItems.OfType<AssetCardItem>().ToList())
+                if (!wanted.Contains(item)) AssetList.SelectedItems.Remove(item);
+
+            var present = AssetList.SelectedItems.OfType<AssetCardItem>().ToHashSet();
+            foreach (var item in selected)
+                if (!present.Contains(item)) AssetList.SelectedItems.Add(item);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("同步列表选中失败", ex);
+        }
+        finally
+        {
+            _syncingListSelection = false;
+        }
+    }
+
+    private bool _syncingListSelection;
 
     /// <summary>拖到列表上下边缘时自动滚动（资源管理器的手感）。</summary>
     private void AutoScrollOnEdge(Windows.Foundation.Point positionInList)
@@ -936,6 +997,7 @@ public sealed partial class LibraryPage : Page
 
     private void AssetList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (_syncingListSelection) return;
         var selected = AssetList.SelectedItems.OfType<AssetCardItem>().ToList();
         ViewModel.SetSelection(selected);
     }
