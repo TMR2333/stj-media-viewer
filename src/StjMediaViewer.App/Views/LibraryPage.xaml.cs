@@ -170,6 +170,38 @@ public sealed partial class LibraryPage : Page
             });
         }
 
+        // 验收用：STJ_DEMO_MARQUEE_EDGE=1 模拟"按住鼠标拖到列表下边缘"连续滚动框选
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_MARQUEE_EDGE") == "1")
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(3200);
+                DispatcherQueue.TryEnqueue(async () =>
+                {
+                    for (int i = 0; i < 40 && ViewModel.IsLoading; i++) await Task.Delay(250);
+                    _marqueeActive = true;
+                    _marqueeAdditive = false;
+                    _marqueeBase.Clear(); _marqueeBaseSet.Clear(); _marqueeHits.Clear();
+                    _marqueeStart = new Windows.Foundation.Point(420, 20);
+                    _marqueePending = new Windows.Foundation.Point(900, 1400);
+                    _marqueePendingListPoint = new Windows.Foundation.Point(600, AssetList.ActualHeight - 6);
+                    ShowMarquee(new Windows.Foundation.Rect(420, 20, 480, 1380));
+                    StartMarqueeAutoScroll();
+
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    await Task.Delay(2500);
+                    sw.Stop();
+                    var offset = FindDescendant<ScrollViewer>(AssetList)?.VerticalOffset ?? -1;
+                    Core.Util.Log.Info($"[marquee-edge] after2.5s selected={ViewModel.SelectedItems.Count} " +
+                                       $"offset={offset:0} elapsed={sw.ElapsedMilliseconds}ms");
+                    StopMarqueeAutoScroll();
+                    EndMarquee();
+                    _marqueeActive = false;
+                    Core.Util.Log.Info($"[marquee-edge] released selected={ViewModel.SelectedItems.Count} list={AssetList.SelectedItems.Count}");
+                });
+            });
+        }
+
         // 验收用：STJ_DEMO_MARQUEE_PERF=1 连续 40 帧框选，量一下每帧耗时
         if (Environment.GetEnvironmentVariable("STJ_DEMO_MARQUEE_PERF") == "1")
         {
@@ -1044,6 +1076,9 @@ public sealed partial class LibraryPage : Page
 
             ShowMarquee(new Windows.Foundation.Rect(_marqueeStart, _marqueeStart));
             AssetList.CapturePointer(e.Pointer);
+            StartMarqueeAutoScroll();
+            // 拖动期间暂停缩略图解码，减少和 UI 抢线程
+            (AppServices.Thumbs as Services.ThumbnailLoader)?.Pause();
             e.Handled = true;
         }
         catch (Exception ex)
@@ -1078,7 +1113,6 @@ public sealed partial class LibraryPage : Page
             Canvas.SetTop(MarqueeRect, rect.Y);
 
             ApplyMarqueeSelection(rect);
-            AutoScrollOnEdge(_marqueePendingListPoint);
         }
         catch (Exception ex)
         {
@@ -1108,6 +1142,8 @@ public sealed partial class LibraryPage : Page
 
     private void EndMarquee()
     {
+        StopMarqueeAutoScroll();
+        (AppServices.Thumbs as Services.ThumbnailLoader)?.Resume();
         if (_marqueeNeedsListSync)
         {
             _marqueeNeedsListSync = false;
@@ -1218,7 +1254,45 @@ public sealed partial class LibraryPage : Page
 
     private bool _syncingListSelection;
 
-    /// <summary>拖到列表上下边缘时自动滚动（资源管理器的手感）。</summary>
+    private void StartMarqueeAutoScroll()
+    {
+        if (_marqueeScrollTimer is null)
+        {
+            _marqueeScrollTimer = DispatcherQueue.CreateTimer();
+            _marqueeScrollTimer.Interval = TimeSpan.FromMilliseconds(16);
+            _marqueeScrollTimer.IsRepeating = true;
+            _marqueeScrollTimer.Tick += (_, _) => MarqueeAutoScrollTick();
+        }
+        _marqueeScrollTimer.Start();
+    }
+
+    private void StopMarqueeAutoScroll() => _marqueeScrollTimer?.Stop();
+
+    /// <summary>按住拖动到边缘时连续滚动：越靠边越快（2–20px/帧），并重新计算框选。</summary>
+    private void MarqueeAutoScrollTick()
+    {
+        if (!_marqueeActive) { StopMarqueeAutoScroll(); return; }
+        _assetListScroller ??= FindDescendant<ScrollViewer>(AssetList);
+        if (_assetListScroller is null) return;
+
+        var height = AssetList.ActualHeight;
+        if (height <= 0) return;
+        const double edge = 64;
+        var y = _marqueePendingListPoint.Y;
+        double delta = 0;
+        if (y < edge) delta = -(2 + (edge - Math.Max(0, y)) / edge * 18);
+        else if (y > height - edge) delta = 2 + (Math.Min(height, y) - (height - edge)) / edge * 18;
+        if (Math.Abs(delta) < 0.5) return;
+
+        var max = _assetListScroller.ScrollableHeight;
+        var target = Math.Clamp(_assetListScroller.VerticalOffset + delta, 0, max);
+        if (Math.Abs(target - _assetListScroller.VerticalOffset) < 0.5) return;
+
+        _assetListScroller.ChangeView(null, target, null, true);
+        ApplyMarqueeSelection(NormalizeRect(_marqueeStart, _marqueePending));
+    }
+
+    /// <summary>拖到列表上下边缘时自动滚动（保留旧入口，点击测试用）。</summary>
     private void AutoScrollOnEdge(Windows.Foundation.Point positionInList)
     {
         _assetListScroller ??= FindDescendant<ScrollViewer>(AssetList);
@@ -1276,8 +1350,8 @@ public sealed partial class LibraryPage : Page
 
     /// <summary>打开合并组：切到"合并组"筛选，只显示组内成员（此时不折叠，可逐张操作）。</summary>
     private double _mergeGroupBackScroll;
-    /// <summary>框选累计耗时（demo 性能日志用）。</summary>
-    private double _marqueeTotalMs;
+    /// <summary>框选边缘自动滚动定时器（按住鼠标拖到上下边缘时连续滚动）。</summary>
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _marqueeScrollTimer;
 
     private void OpenMergeGroupCard(MergeGroup group)
     {

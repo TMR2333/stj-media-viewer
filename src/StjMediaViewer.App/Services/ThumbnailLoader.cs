@@ -41,9 +41,21 @@ public sealed class ThumbnailLoader : IThumbnailLoader
         Environment.GetEnvironmentVariable("STJ_DISABLE_THUMBS") == "1";
 
 
+    /// <summary>框选拖动期间暂停解码：否则拖到边缘自动滚动时，新进视口的缩略图解码会和 UI 抢线程，表现为卡顿。</summary>
+    private volatile bool _paused;
+
+    public void Pause() => _paused = true;
+
+    public void Resume() => _paused = false;
+
     public async Task<ImageSource?> LoadAsync(MediaAsset asset, int size, CancellationToken ct = default)
     {
         if (asset is null || string.IsNullOrEmpty(asset.Id)) return null;
+        // 拖动框选时先挂起，松手后继续（不会丢请求）
+        while (_paused && !ct.IsCancellationRequested)
+        {
+            try { await Task.Delay(60, ct); } catch (OperationCanceledException) { return null; }
+        }
         // 诊断开关：STJ_DISABLE_THUMBS=1 时完全不解码缩略图（定位崩溃用）
         if (DisableThumbs) return null;
         // LUT 参与缓存键：同一素材换 LUT 是另一张图
