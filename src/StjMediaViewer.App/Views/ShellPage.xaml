@@ -214,6 +214,11 @@
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItem Content="AI 队列" Tag="aiqueue" Icon="Bullets" />
+                <NavigationViewItem Content="水印" Tag="watermark">
+                    <NavigationViewItem.Icon>
+                        <ImageIcon Source="ms-appx:///Assets/Watermark/logo.png" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
                 <NavigationViewItem Content="整理" Tag="organize">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE8B7;" />

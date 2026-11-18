@@ -297,6 +297,7 @@ public sealed partial class ShellPage : Page
         "duplicates" => typeof(DuplicatesPage),
         "cloud" => typeof(CloudPage),
         "aiqueue" => typeof(AiQueuePage),
+        "watermark" => typeof(WatermarkPage),
         "organize" => typeof(OrganizePage),
         "settings" => typeof(SettingsPage),
         "about" => typeof(AboutPage),

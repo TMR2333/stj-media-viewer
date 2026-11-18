@@ -14,7 +14,7 @@
     <AssemblyName>STJMediaViewer-Setup</AssemblyName>
     <RootNamespace>StjMediaViewer.Installer</RootNamespace>
     <ApplicationIcon>installer.ico</ApplicationIcon>
-    <Version>1.15.0</Version>
+    <Version>1.16.0</Version>
     <Company>Stjarna Perspective</Company>
     <Product>STJ Media Viewer</Product>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
