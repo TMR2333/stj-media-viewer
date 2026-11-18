@@ -1185,9 +1185,11 @@ public sealed partial class LibraryViewModel : ObservableObject
     {
         if (!keepBulk) ClearBulkSelection();
         SelectedItems = selected;
+        // HashSet 匹配：框选每次移动都会调用，不能 List.Contains 做 O(n²)
+        var set = new HashSet<AssetCardItem>(selected);
         foreach (var item in Items)
         {
-            var isSelected = selected.Contains(item);
+            var isSelected = set.Contains(item);
             if (item.IsSelected != isSelected) item.IsSelected = isSelected;
         }
 

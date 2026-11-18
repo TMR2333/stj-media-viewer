@@ -170,6 +170,34 @@ public sealed partial class LibraryPage : Page
             });
         }
 
+        // 验收用：STJ_DEMO_MARQUEE_PERF=1 连续 40 帧框选，量一下每帧耗时
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_MARQUEE_PERF") == "1")
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(3200);
+                DispatcherQueue.TryEnqueue(async () =>
+                {
+                    for (int i = 0; i < 40 && ViewModel.IsLoading; i++) await Task.Delay(250);
+                    _marqueeActive = true;
+                    _marqueeAdditive = false;
+                    _marqueeBase.Clear(); _marqueeBaseSet.Clear(); _marqueeHits.Clear();
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    var frames = 0;
+                    for (double y = 180; y <= 900; y += 18, frames++)
+                    {
+                        _marqueeStart = new Windows.Foundation.Point(380, 180);
+                        ApplyMarqueeSelection(new Windows.Foundation.Rect(380, 180, 900, y - 180));
+                        await Task.Delay(16);
+                    }
+                    sw.Stop();
+                    Core.Util.Log.Info($"[marquee-perf] frames={frames} total={sw.ElapsedMilliseconds}ms avg={sw.ElapsedMilliseconds / Math.Max(1, frames)}ms selected={ViewModel.SelectedItems.Count}");
+                    EndMarquee();
+                    _marqueeActive = false;
+                });
+            });
+        }
+
         // 截图用：STJ_DEMO_GROUP_BATCH=1 选中合并组封面 → 批量填写（验证组员被展开）
         if (Environment.GetEnvironmentVariable("STJ_DEMO_GROUP_BATCH") == "1")
         {
@@ -348,8 +376,12 @@ public sealed partial class LibraryPage : Page
                 DispatcherQueue.TryEnqueue(() =>
                 {
                     var rect = new Windows.Foundation.Rect(456, 250, 760, 470);
+                    _marqueeActive = true;
+                    _marqueeBase.Clear(); _marqueeBaseSet.Clear(); _marqueeHits.Clear();
                     ShowMarquee(rect);
                     ApplyMarqueeSelection(rect);
+                    EndMarquee();          // 模拟松手：这时候才同步进 ListView
+                    _marqueeActive = false;
                 });
 
                 await Task.Delay(1200);
@@ -472,7 +504,8 @@ public sealed partial class LibraryPage : Page
 
     private void OnPrimaryAssetChanged(object? sender, MediaAsset? asset)
     {
-        InspectorViewModel.Shared.Show(asset);
+        // 框选拖动期间主选中项每帧都在变，检视面板跟不上也没意义，松手后统一刷新
+        if (!_marqueeActive) InspectorViewModel.Shared.Show(asset);
         UpdateShellCounts();
     }
 
@@ -961,8 +994,16 @@ public sealed partial class LibraryPage : Page
     private bool _marqueeAdditive;
     private Windows.Foundation.Point _marqueeStart;
     private readonly List<AssetCardItem> _marqueeBase = new();
+    private readonly HashSet<AssetCardItem> _marqueeBaseSet = new();
+    /// <summary>框选结束时需要把结果同步进 ListView（拖动过程中不动，避免每帧刷容器）。</summary>
+    private bool _marqueeNeedsListSync;
     /// <summary>本次框选累计命中的卡片：列表往下滚动时，上面的容器会被回收，不能只按当前视口算。</summary>
     private readonly HashSet<AssetCardItem> _marqueeHits = new();
+    /// <summary>指针移动合并到一帧一次（高频拖动时不再每个 PointerMoved 都全量算）。</summary>
+    private bool _marqueeTickQueued;
+    private Windows.Foundation.Point _marqueePending;
+    private Windows.Foundation.Point _marqueePendingListPoint;
+    private long _lastAutoScrollTicks;
     private ScrollViewer? _assetListScroller;
 
     private void AssetList_PointerPressed(object sender, PointerRoutedEventArgs e)
@@ -993,8 +1034,13 @@ public sealed partial class LibraryPage : Page
             _marqueeStart = e.GetCurrentPoint(MarqueeCanvas).Position;
 
             _marqueeBase.Clear();
+            _marqueeBaseSet.Clear();
             _marqueeHits.Clear();
-            if (_marqueeAdditive) _marqueeBase.AddRange(ViewModel.SelectedItems);
+            if (_marqueeAdditive)
+            {
+                _marqueeBase.AddRange(ViewModel.SelectedItems);
+                foreach (var baseItem in _marqueeBase) _marqueeBaseSet.Add(baseItem);
+            }
 
             ShowMarquee(new Windows.Foundation.Rect(_marqueeStart, _marqueeStart));
             AssetList.CapturePointer(e.Pointer);
@@ -1009,9 +1055,22 @@ public sealed partial class LibraryPage : Page
     private void AssetList_PointerMoved(object sender, PointerRoutedEventArgs e)
     {
         if (!_marqueeActive) return;
+        // 高频指针事件 → 每帧只算一次，避免拖动时一卡一卡
+        _marqueePending = e.GetCurrentPoint(MarqueeCanvas).Position;
+        _marqueePendingListPoint = e.GetCurrentPoint(AssetList).Position;
+        e.Handled = true;
+        if (_marqueeTickQueued) return;
+        _marqueeTickQueued = true;
+        DispatcherQueue.TryEnqueue(MarqueeTick);
+    }
+
+    private void MarqueeTick()
+    {
+        _marqueeTickQueued = false;
+        if (!_marqueeActive) return;
         try
         {
-            var pos = e.GetCurrentPoint(MarqueeCanvas).Position;
+            var pos = _marqueePending;
             var rect = NormalizeRect(_marqueeStart, pos);
             MarqueeRect.Width = rect.Width;
             MarqueeRect.Height = rect.Height;
@@ -1019,8 +1078,7 @@ public sealed partial class LibraryPage : Page
             Canvas.SetTop(MarqueeRect, rect.Y);
 
             ApplyMarqueeSelection(rect);
-            AutoScrollOnEdge(e.GetCurrentPoint(AssetList).Position);
-            e.Handled = true;
+            AutoScrollOnEdge(_marqueePendingListPoint);
         }
         catch (Exception ex)
         {
@@ -1050,6 +1108,12 @@ public sealed partial class LibraryPage : Page
 
     private void EndMarquee()
     {
+        if (_marqueeNeedsListSync)
+        {
+            _marqueeNeedsListSync = false;
+            SyncListViewSelection(ViewModel.SelectedItems);
+        }
+        InspectorViewModel.Shared.Show(ViewModel.PrimaryAsset);
         MarqueeRect.Visibility = Visibility.Collapsed;
         MarqueeRect.Width = 0;
         MarqueeRect.Height = 0;
@@ -1074,13 +1138,14 @@ public sealed partial class LibraryPage : Page
     /// <summary>把与框选矩形相交的（已实现出来的）卡片选上。</summary>
     private void ApplyMarqueeSelection(Windows.Foundation.Rect rect)
     {
-        // 先并入本次拖动已经命中过的（可能已滚出视口、容器被回收）
-        var selected = new List<AssetCardItem>(_marqueeBase);
-        foreach (var item in _marqueeHits)
-            if (!selected.Contains(item)) selected.Add(item);
-        for (int i = 0; i < ViewModel.Items.Count; i++)
+        // 只遍历"已经实现出来的"容器（视口内 30 个左右），不再对全部 Index 逐个找容器
+        var panel = AssetList.ItemsPanelRoot;
+        if (panel is null) return;
+
+        var newHits = false;
+        foreach (var child in panel.Children)
         {
-            if (AssetList.ContainerFromIndex(i) is not ListViewItem container) continue;
+            if (child is not ListViewItem container) continue;
             if (container.ActualWidth <= 0 || container.ActualHeight <= 0) continue;
 
             Windows.Foundation.Rect bounds;
@@ -1097,17 +1162,29 @@ public sealed partial class LibraryPage : Page
             var intersects = rect.X < bounds.X + bounds.Width && rect.X + rect.Width > bounds.X &&
                              rect.Y < bounds.Y + bounds.Height && rect.Y + rect.Height > bounds.Y;
             if (!intersects) continue;
-            var item = ViewModel.Items[i];
-            _marqueeHits.Add(item);
-            if (!selected.Contains(item)) selected.Add(item);
+            if (AssetList.ItemFromContainer(container) is AssetCardItem item && _marqueeHits.Add(item))
+                newHits = true;
         }
 
-        if (selected.Count == ViewModel.SelectedItems.Count &&
-            selected.SequenceEqual(ViewModel.SelectedItems))
+        // 选中集只增不减（累计命中），没有新增命中就不必重算/刷 UI
+        if (!newHits && _marqueeHits.Count == ViewModel.SelectedItems.Count) return;
+
+        var selected = new List<AssetCardItem>(_marqueeBase.Count + _marqueeHits.Count);
+        foreach (var item in _marqueeBase) selected.Add(item);
+        foreach (var item in _marqueeHits) selected.Add(item);
+
+        var ordered = new List<AssetCardItem>(selected.Count);
+        foreach (var item in ViewModel.Items)
+            if (_marqueeBaseSet.Contains(item) || _marqueeHits.Contains(item))
+                ordered.Add(item);
+
+        if (ordered.Count == ViewModel.SelectedItems.Count &&
+            new HashSet<AssetCardItem>(ordered).SetEquals(ViewModel.SelectedItems))
             return;
+        selected = ordered;
 
         ViewModel.SetSelection(selected);
-        SyncListViewSelection(selected);
+        _marqueeNeedsListSync = true;
     }
 
     /// <summary>
@@ -1149,6 +1226,10 @@ public sealed partial class LibraryPage : Page
 
         const double edge = 28;
         const double step = 24;
+        // 滚动也节流：每个指针事件都 ChangeView 会打断虚拟化，反而更卡
+        var now = Environment.TickCount64;
+        if (now - _lastAutoScrollTicks < 70) return;
+        _lastAutoScrollTicks = now;
         if (positionInList.Y < edge)
             _assetListScroller.ChangeView(null, Math.Max(0, _assetListScroller.VerticalOffset - step), null, true);
         else if (positionInList.Y > AssetList.ActualHeight - edge)
@@ -1195,6 +1276,8 @@ public sealed partial class LibraryPage : Page
 
     /// <summary>打开合并组：切到"合并组"筛选，只显示组内成员（此时不折叠，可逐张操作）。</summary>
     private double _mergeGroupBackScroll;
+    /// <summary>框选累计耗时（demo 性能日志用）。</summary>
+    private double _marqueeTotalMs;
 
     private void OpenMergeGroupCard(MergeGroup group)
     {
