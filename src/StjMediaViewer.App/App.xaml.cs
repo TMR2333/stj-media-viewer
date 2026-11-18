@@ -8,6 +8,23 @@ public partial class App : Application
     public static App Instance { get; private set; } = null!;
     public static Window? MainWindow { get; private set; }
 
+    /// <summary>FirstChanceException 的递归保护（写日志失败时不能再次进入）。</summary>
+    [ThreadStatic] private static bool _firstChanceHandling;
+    private static int _firstChanceCount;
+
+    /// <summary>日志/IO 类异常：常见且无害（文件被占用），绝不能在其处理器里再写日志。</summary>
+    private static bool IsLoggingOrIoNoise(Exception ex)
+    {
+        for (var cur = ex; cur is not null; cur = cur.InnerException)
+        {
+            if (cur is UnauthorizedAccessException or IOException or System.Security.SecurityException) return true;
+            var stack = cur.StackTrace ?? "";
+            if (stack.Contains("StjMediaViewer.Core.Util.Log", StringComparison.Ordinal)) return true;
+            if (stack.Contains("System.IO.File.AppendAllText", StringComparison.Ordinal)) return true;
+        }
+        return false;
+    }
+
     public App()
     {
         Instance = this;
@@ -20,9 +37,22 @@ public partial class App : Application
         {
             if (e.Exception is OperationCanceledException) return;
             if (IsWinUiProbeNoise(e.Exception)) return;
+            // 关键：异常处理器里再写日志，一旦写日志本身失败（文件被占用/权限被改），
+            // 就会无限递归 FirstChance → 栈溢出（0xC00000FD），表现为"双击打不开"。
+            if (IsLoggingOrIoNoise(e.Exception)) return;
+            if (_firstChanceHandling) return;
+            if (Interlocked.Increment(ref _firstChanceCount) > 200) return;
 
-            Core.Util.Log.Warn("[first-chance] " + e.Exception.GetType().Name + ": " +
-                               e.Exception.Message + "\n" + (e.Exception.StackTrace ?? ""));
+            _firstChanceHandling = true;
+            try
+            {
+                Core.Util.Log.Warn("[first-chance] " + e.Exception.GetType().Name + ": " +
+                                   e.Exception.Message + "\n" + (e.Exception.StackTrace ?? ""));
+            }
+            finally
+            {
+                _firstChanceHandling = false;
+            }
         };
 
         UnhandledException += (_, e) =>

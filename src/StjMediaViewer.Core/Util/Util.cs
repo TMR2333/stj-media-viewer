@@ -171,7 +171,12 @@ public static class Log
                     File.Move(_path, old, true);
                     _written = 0;
                 }
-                File.AppendAllText(_path, line + Environment.NewLine);
+                // FileShare.ReadWrite：多开/被杀毒软件扫描时不会因为独占打开而 Access denied
+                using (var fs = new FileStream(_path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
+                using (var writer = new StreamWriter(fs))
+                {
+                    writer.Write(line + Environment.NewLine);
+                }
                 _written += line.Length;
             }
             catch { }

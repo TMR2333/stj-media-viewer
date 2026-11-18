@@ -30,7 +30,7 @@ internal static class Program
 {
     private const string AppName = "STJ Media Viewer";
     private const string AppId = "StjMediaViewer";
-    private const string Version = "1.18.0";
+    private const string Version = "1.18.1";
     private const string Publisher = "Stjarna Perspective";
     private const string ExeName = "StjMediaViewer.exe";
     private const string UninstallSubKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\" + AppId;
@@ -495,17 +495,39 @@ internal static class Program
 
     private static void StartApp(string dir)
     {
+        var exe = TargetExeIn(dir);
+        Log($"start app: exe={exe} exists={File.Exists(exe)} interactive={Environment.UserInteractive}");
+
+        // 先直接 CreateProcess：ShellExecute 在某些环境下会让子进程刚启动就崩（0xC00000FD 栈溢出），
+        // 直接启动最稳；失败再退回 ShellExecute（例如需要 shell 关联的场景）。
         try
         {
-            Process.Start(new ProcessStartInfo(TargetExeIn(dir))
+            var started = Process.Start(new ProcessStartInfo(exe)
+            {
+                WorkingDirectory = dir,
+                UseShellExecute = false,
+            });
+            Log($"start app (direct) pid={started?.Id}");
+            if (started is not null) return;
+        }
+        catch (Exception ex)
+        {
+            Log($"start app direct failed: {ex.GetType().Name}: {ex.Message}");
+        }
+
+        try
+        {
+            var started = Process.Start(new ProcessStartInfo(exe)
             {
                 WorkingDirectory = dir,
                 UseShellExecute = true,
             });
+            Log($"start app (shell) pid={started?.Id}");
+            if (started is not null) return;
         }
         catch (Exception ex)
         {
-            Log($"start app failed: {ex.Message}");
+            Log($"start app shell failed: {ex.GetType().Name}: {ex.Message}");
             if (Environment.UserInteractive) Error($"启动失败：{ex.Message}");
         }
     }
