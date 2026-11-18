@@ -170,6 +170,51 @@ public sealed partial class LibraryPage : Page
             });
         }
 
+        // 截图用：STJ_DEMO_GROUP_BATCH=1 选中合并组封面 → 批量填写（验证组员被展开）
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_GROUP_BATCH") == "1")
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(3200);
+                DispatcherQueue.TryEnqueue(async () =>
+                {
+                    for (int i = 0; i < 40 && ViewModel.IsLoading; i++) await Task.Delay(250);
+                    await ViewModel.RefreshMergeGroupsAsync();
+                    var groupCard = ViewModel.Items.FirstOrDefault(i => i.IsMergeGroupCard);
+                    if (groupCard is null) return;
+                    ViewModel.SetSelection(new[] { groupCard });
+                    BatchEdit_Click(this, new RoutedEventArgs());
+                });
+            });
+        }
+
+        // 验收用：STJ_DEMO_BATCH_TARGETS=1 先验证"全选=全部筛选结果"，再验证"合并组封面展开成组员"
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_BATCH_TARGETS") == "1")
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(3200);
+                DispatcherQueue.TryEnqueue(async () =>
+                {
+                    for (int i = 0; i < 40 && ViewModel.IsLoading; i++) await Task.Delay(250);
+
+                    var selectedAll = await ViewModel.SelectAllFilteredAsync();
+                    var expandedAll = await ViewModel.ResolveOperationTargetsAsync();
+                    Core.Util.Log.Info($"[batch-targets] selectAll={selectedAll} filtered={ViewModel.FilteredCount} " +
+                                       $"expanded={expandedAll.Count}");
+
+                    // 找一张合并组封面卡片，单独选中后看展开结果
+                    await ViewModel.RefreshMergeGroupsAsync();
+                    var groupCard = ViewModel.Items.FirstOrDefault(i => i.IsMergeGroupCard);
+                    if (groupCard is null) return;
+                    ViewModel.SetSelection(new[] { groupCard });
+                    var targets = await ViewModel.ResolveOperationTargetsAsync();
+                    Core.Util.Log.Info($"[batch-targets] groupCard cover={groupCard.Asset?.FileName} " +
+                                       $"groupSize={groupCard.MergeGroup?.AssetCount} expandedTargets={targets.Count}");
+                });
+            });
+        }
+
         // 验收用：STJ_DEMO_MERGE_LOADMORE=1 合并组跨页时"加载更多"是否仍然只保留封面
         if (Environment.GetEnvironmentVariable("STJ_DEMO_MERGE_LOADMORE") == "1")
         {
@@ -665,10 +710,11 @@ public sealed partial class LibraryPage : Page
     // ==================================================================================
     //  影像合集：合集级编辑入口（批量编辑 / 查看元数据 / 重命名 / 删除 / 全选）
     // ==================================================================================
-    private void SelectAll_Click(object sender, RoutedEventArgs e)
+    private async void SelectAll_Click(object sender, RoutedEventArgs e)
     {
-        var count = ViewModel.SelectAllLoaded();
-        AppEvents.SetStatus(count > 0 ? $"已全选 {count} 张" : "当前清单为空");
+        // 全选"全部筛选结果"：不再只选已加载的 200 张，批量填写/删除都会覆盖全部
+        var count = await ViewModel.SelectAllFilteredAsync();
+        AppEvents.SetStatus(count > 0 ? $"已全选 {count} 张（含未加载页）" : "当前清单为空");
     }
 
     private async void CollectionSelectAll_Click(object sender, RoutedEventArgs e)
@@ -814,13 +860,15 @@ public sealed partial class LibraryPage : Page
             : $"已移入回收站 {deleted} / {assets.Count} 个{label}（其余可能已被占用或已删除）");
     }
 
-    private void BatchEdit_Click(object sender, RoutedEventArgs e)
+    private async void BatchEdit_Click(object sender, RoutedEventArgs e)
     {
-        if (ViewModel.SelectedItems.Count == 0)
+        var targets = await ViewModel.ResolveOperationTargetsAsync();
+        if (targets.Count == 0)
         {
             AppEvents.SetError("先在图库里选中素材，再批量填写信息");
             return;
         }
+        BatchEditViewModel.PendingAssets = targets;
         Frame.Navigate(typeof(BatchEditPage));
     }
 

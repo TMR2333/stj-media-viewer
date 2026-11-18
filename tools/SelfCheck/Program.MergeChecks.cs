@@ -68,6 +68,21 @@ public static partial class Program
         var afterAdd = await s.Store.QueryAsync(new AssetQuery { LibraryId = "mg-lib", MergeGroups = { group.Id }, Limit = 0 });
         Check("合并组：再加回成员", added == 1 && afterAdd.Count == 3, $"新增 {added}，共 {afterAdd.Count}");
 
+        // 批量操作展开：组封面 → 全组员
+        var cover = (await s.Store.GetByIdsAsync(new[] { "mg-0" })).FirstOrDefault();
+        if (cover is not null)
+        {
+            var expanded = await SelectionExpander.ExpandMergeGroupsAsync(s.Store, new[] { cover });
+            Check("合并组：操作目标展开成组员", expanded.Count == 3 && expanded.All(a => a.Id.StartsWith("mg-")),
+                  $"{expanded.Count} 个");
+
+            var lone = NewAsset("mg-lone", "mg-lib", Path.Combine(dir, "lone.jpg"), "lone.jpg");
+            await s.Store.UpsertManyAsync(new[] { lone });
+            var mixed = await SelectionExpander.ExpandMergeGroupsAsync(s.Store, new[] { cover, lone });
+            Check("合并组：非组员素材原样保留", mixed.Count == 4 && mixed.Any(a => a.Id == "mg-lone"),
+                  $"{mixed.Count} 个");
+        }
+
         await s.Store.DeleteMergeGroupAsync(group.Id);
         var afterDelete = await s.Store.GetMergeGroupsAsync();
         var memberAfterDelete = await s.Store.GetMergeMembershipAsync(new[] { "mg-0", "mg-1", "mg-2" });
