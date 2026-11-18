@@ -67,6 +67,26 @@ public static partial class Program
         Check("批量填写：空值清空字段", cleared?.City is null && cleared?.ColorLabel is null,
               $"{cleared?.City ?? "null"} / {cleared?.ColorLabel ?? "null"}");
 
+        // 拍摄地点"未分类"伪选项：分面计数 + __unset__ 过滤
+        var unsetFacets = await s.Store.GetFacetsAsync(new AssetQuery { Limit = 0 });
+        Check("拍摄地点：未分类分面计数", unsetFacets.CityUnsetCount >= ids.Count,
+              $"未分类 {unsetFacets.CityUnsetCount} 条");
+
+        var unsetQuery = await s.Store.QueryAsync(new AssetQuery
+        {
+            Cities = new List<string> { "__unset__" },
+            Limit = 0,
+        });
+        Check("拍摄地点：只看未分类", unsetQuery.Count == unsetFacets.CityUnsetCount,
+              $"{unsetQuery.Count} 条");
+
+        var parisBefore = (await s.Store.QueryAsync(new AssetQuery { Cities = new List<string> { "巴黎" }, Limit = 0 })).Count;
+        await s.Store.ApplyBatchEditAsync(ids.Take(1).ToList(), new BatchEditPatch { City = "巴黎" });
+        var parisAfter = (await s.Store.QueryAsync(new AssetQuery { Cities = new List<string> { "巴黎" }, Limit = 0 })).Count;
+        var unsetAfter = (await s.Store.QueryAsync(new AssetQuery { Cities = new List<string> { "__unset__" }, Limit = 0 })).Count;
+        Check("拍摄地点：未分类不含已填写", parisAfter == parisBefore + 1 && unsetAfter == unsetFacets.CityUnsetCount - 1,
+              $"巴黎 {parisBefore}→{parisAfter} / 未分类 {unsetAfter}");
+
         Check("批量填写：空 patch 不写库",
               await s.Store.ApplyBatchEditAsync(ids, new BatchEditPatch()) == 0, null);
     }

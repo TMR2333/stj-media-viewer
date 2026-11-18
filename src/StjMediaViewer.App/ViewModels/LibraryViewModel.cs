@@ -450,6 +450,59 @@ public sealed partial class LibraryViewModel : ObservableObject
 
     public bool HasBulkSelection => _bulkAssets is { Count: > 0 };
 
+    /// <summary>
+    /// 把剩下的分页一次性全部取回来（全选用）。不走 LoadMoreAsync，避免被 IsLoading / 版本号打断，
+    /// 用"取到的条数 < 一页"作为结束条件，保证不漏。
+    /// </summary>
+    public async Task<int> LoadAllRemainingAsync(IProgress<int>? progress = null, CancellationToken ct = default)
+    {
+        var pages = 0;
+        while (pages++ < 400 && !ct.IsCancellationRequested)
+        {
+            List<MediaAsset> page;
+            try
+            {
+                var query = BuildQuery(_loadedRawCount, PageSize);
+                page = (await AppServices.Store.QueryAsync(query, ct)).ToList();
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("加载全部素材失败", ex);
+                break;
+            }
+            if (page.Count == 0) { HasMore = false; break; }
+
+            _loadedRawCount += page.Count;
+            var displayItems = await BuildDisplayItemsAsync(page, ct, _collapsedMergeGroups);
+            foreach (var card in displayItems) Items.Add(card);
+
+            progress?.Report(Items.Count);
+            if (page.Count < PageSize) { HasMore = false; break; }
+        }
+        LoadMoreVisibility = HasMore ? Visibility.Visible : Visibility.Collapsed;
+        UpdateResultText();
+        return Items.Count;
+    }
+
+    /// <summary>全选：把当前筛选结果全部分页加载进网格再全选（上限 2 万张，超过则退化为批量选中）。</summary>
+    public async Task<(int Selected, bool LoadedAll)> SelectAllAsync(IProgress<int>? progress = null)
+    {
+        var total = FilteredCount;
+        if (total > 20000)
+        {
+            var bulkCount = await SelectAllFilteredAsync();
+            return (bulkCount, false);
+        }
+
+        await LoadAllRemainingAsync(progress);
+        // 网格里 RAW/JPEG 默认折叠成一张卡，所以"全部加载"后卡片数仍可能小于筛选数；
+        // 选中集以筛选结果为准（批量操作覆盖隐藏的副本），并把已显示的卡片全部高亮。
+        var allCount = await SelectAllFilteredAsync();
+        SelectionCount = allCount;
+        SelectionText = $"已全选 {allCount} 张";
+        return (allCount, true);
+    }
+
     /// <summary>全选当前筛选结果：查询全部命中素材（不受 200 张分页限制）。</summary>
     public async Task<int> SelectAllFilteredAsync(CancellationToken ct = default)
     {
@@ -985,7 +1038,8 @@ public sealed partial class LibraryViewModel : ObservableObject
             var frequent = DeviceNames.Frequent(facets.ByDevice);
             SyncOptions(FrequentDeviceGroup, frequent.ToDictionary(kv => kv.Key, kv => kv.Value),
                 key => AppServices.DeviceAlias(key));
-            SyncOptions(CityGroup, facets.ByCity, static key => key);
+            SyncOptions(CityGroup, facets.ByCity, static key => key,
+                unsetCount: facets.CityUnsetCount, unsetDisplay: "未分类");
             SyncOptions(YearGroup, facets.ByYear, static key => key, descendingKeys: true);
             SyncOptions(ThemeGroup, facets.ByTheme, key => Vocabularies.ThemeDisplay(key, "zh-CN"),
                 unsetCount: facets.ThemeUnsetCount);

@@ -170,6 +170,48 @@ public sealed partial class LibraryPage : Page
             });
         }
 
+        // 截图用：STJ_DEMO_FILTER_CITY=1 展开"拍摄地点"分组（看「未分类」选项）
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_FILTER_CITY") == "1")
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(2600);
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    foreach (var g in ViewModel.Groups) if (g != ViewModel.CityGroup) g.IsExpanded = false;
+                    ViewModel.CityGroup.IsExpanded = true;
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(600);
+                        DispatcherQueue.TryEnqueue(() =>
+                        {
+                            var sv = FindDescendant<ScrollViewer>(FilterHost);
+                            sv?.ChangeView(null, sv.ScrollableHeight, null, true);
+                        });
+                    });
+                });
+            });
+        }
+
+        // 验收用：STJ_DEMO_SELECTALL=1 点「全选」：全部页加载 + 全选，检查有没有漏
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_SELECTALL") == "1")
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(3200);
+                DispatcherQueue.TryEnqueue(async () =>
+                {
+                    for (int i = 0; i < 40 && ViewModel.IsLoading; i++) await Task.Delay(250);
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    var (count, loadedAll) = await ViewModel.SelectAllAsync();
+                    sw.Stop();
+                    var targets = await ViewModel.ResolveOperationTargetsAsync();
+                    Core.Util.Log.Info($"[selectall] loaded={ViewModel.Items.Count} filtered={ViewModel.FilteredCount} " +
+                                       $"selected={count} all={loadedAll} batchTargets={targets.Count} elapsed={sw.ElapsedMilliseconds}ms");
+                });
+            });
+        }
+
         // 验收用：STJ_DEMO_MARQUEE_EDGE=1 模拟"按住鼠标拖到列表下边缘"连续滚动框选
         if (Environment.GetEnvironmentVariable("STJ_DEMO_MARQUEE_EDGE") == "1")
         {
@@ -777,9 +819,27 @@ public sealed partial class LibraryPage : Page
     // ==================================================================================
     private async void SelectAll_Click(object sender, RoutedEventArgs e)
     {
-        // 全选"全部筛选结果"：不再只选已加载的 200 张，批量填写/删除都会覆盖全部
-        var count = await ViewModel.SelectAllFilteredAsync();
-        AppEvents.SetStatus(count > 0 ? $"已全选 {count} 张（含未加载页）" : "当前清单为空");
+        // 全选"全部筛选结果"：先把所有分页真正加载进网格，再全选
+        try
+        {
+            if (ViewModel.FilteredCount > 20000)
+            {
+                var bulk = await ViewModel.SelectAllFilteredAsync();
+                AppEvents.SetStatus(bulk > 0 ? $"已全选 {bulk} 张（超大数据集，批量操作仍覆盖全部）" : "当前清单为空");
+                return;
+            }
+            AppEvents.SetStatus($"正在加载全部 {ViewModel.FilteredCount} 张…");
+            var (count, loadedAll) = await ViewModel.SelectAllAsync(new Progress<int>(n =>
+                DispatcherQueue.TryEnqueue(() => AppEvents.SetStatus($"正在加载全部素材… 已加载 {n} / {ViewModel.FilteredCount}"))));
+            AppEvents.SetStatus(count > 0
+                ? (loadedAll ? $"已全选 {count} 张（已全部加载）" : $"已全选 {count} 张")
+                : "当前清单为空");
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("全选失败", ex);
+            AppEvents.SetError("全选失败：" + ex.Message);
+        }
     }
 
     private async void CollectionSelectAll_Click(object sender, RoutedEventArgs e)

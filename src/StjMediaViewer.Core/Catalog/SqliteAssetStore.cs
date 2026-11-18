@@ -804,6 +804,8 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
                 AndWhere(w, "(theme IS NULL OR theme='') AND (themes_json IS NULL OR themes_json='' OR themes_json='[]')"), w);
             f.ToneUnsetCount = (int)Scalar1(
                 "SELECT COUNT(*) FROM assets" + w.Sql + AndWhere(w, "(tone IS NULL OR tone='')"), w);
+            f.CityUnsetCount = (int)Scalar1(
+                "SELECT COUNT(*) FROM assets" + w.Sql + AndWhere(w, "(city IS NULL OR city='')"), w);
 
             f.UnclassifiedCount = (int)Scalar1(
                 "SELECT COUNT(*) FROM assets" + w.Sql +
@@ -1504,7 +1506,7 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
         if (q.Kinds.Count > 0) AddIn(w, "kind", q.Kinds.Cast<object?>().ToList());
         if (q.Formats.Count > 0) AddIn(w, "format_code", q.Formats.Cast<object?>().ToList());
         if (q.Devices.Count > 0) AddIn(w, "device_key", q.Devices.Cast<object?>().ToList());
-        if (q.Cities.Count > 0) AddIn(w, "city", q.Cities.Cast<object?>().ToList());
+        AddInOrUnset(w, "city", q.Cities);
         // 主题/影调支持"未填写"（__unset__）伪选项：选它 = 只要还没分类的素材
         ApplyThemeFilter(w, q.Themes);
         ApplyCollectionFilter(w, q.Collections);

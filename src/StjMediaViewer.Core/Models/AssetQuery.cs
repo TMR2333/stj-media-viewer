@@ -111,6 +111,9 @@ public sealed class FacetCounts
 
     public int ThemeUnsetCount { get; set; }
 
+    /// <summary>拍摄地点为空（未分类）的素材数。</summary>
+    public int CityUnsetCount { get; set; }
+
     /// <summary>影像合集分面：合集 id → 素材数。</summary>
     public Dictionary<string, int> ByCollection { get; set; } = new(StringComparer.Ordinal);
 
