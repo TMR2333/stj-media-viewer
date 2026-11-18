@@ -3,6 +3,16 @@
 版本号规则：`主版本.次版本.修订号`。**每次对外更新都要 +1 修订号**（功能/修复都算），
 然后同步 GitCode 仓库并打 `v<版本>` 标签、创建发行版。
 
+## v1.16.2 — 2026-11-18
+
+### 关于页：又加了两位作者
+
+- **一个货成**（TMR 下面一行）：简介「Stjarna PERSPECTIVE 组织社长、参与开发水印功能」，
+  点整行跳转抖音主页 <https://www.douyin.com/user/MS4wLjABAAAAaAohr1ln9GMhbZ21KSG3KvdbMPMfW_d5mXkZvSfRUDY>；
+- **一只马子**：简介「Stjarna PERSPECTIVE 组织成员，参与开发地图功能」，
+  点整行跳转 B 站主页 <https://space.bilibili.com/1236557779>；
+- 两位头像都用了提供的图，圆形裁切，与其他作者行一致。
+
 ## v1.16.1 — 2026-11-18
 
 ### 修复：框选后 Ctrl+单击会清掉之前的选中

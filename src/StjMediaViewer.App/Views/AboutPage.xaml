@@ -135,6 +135,81 @@
 
                     <Border Height="1" Background="{ThemeResource AppDividerBrush}" Margin="10,0" />
 
+                    <!-- 一个货成：点整行打开抖音主页 -->
+                    <Button x:Name="HuoChengAuthorButton"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Stretch"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Padding="10,8"
+                            Click="HuoChengAuthor_Click"
+                            ToolTipService.ToolTip="打开「一个货成」的抖音主页">
+                        <Grid ColumnSpacing="14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Ellipse Grid.Column="0" Width="56" Height="56" VerticalAlignment="Center">
+                                <Ellipse.Fill>
+                                    <ImageBrush ImageSource="ms-appx:///Assets/About/author-huocheng.png" Stretch="UniformToFill" />
+                                </Ellipse.Fill>
+                            </Ellipse>
+                            <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                                <TextBlock Text="一个货成" Style="{ThemeResource AppSubtitleTextStyle}" />
+                                <TextBlock Text="Stjarna PERSPECTIVE 组织社长、参与开发水印功能"
+                                           Style="{ThemeResource AppCaptionTextStyle}"
+                                           Foreground="{ThemeResource TextSecondaryBrush}"
+                                           TextWrapping="Wrap" />
+                                <TextBlock Text="www.douyin.com/user/MS4wLjABAAAAaAohr1ln9GMhbZ21KSG3KvdbMPMfW_d5mXkZvSfRUDY"
+                                           Style="{ThemeResource AppMicroTextStyle}"
+                                           Foreground="{ThemeResource TextTertiaryBrush}"
+                                           TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <FontIcon Grid.Column="2" Glyph="&#xE8A7;" FontSize="{ThemeResource AppFontCaptionSize}"
+                                      Foreground="{ThemeResource TextTertiaryBrush}" VerticalAlignment="Center" />
+                        </Grid>
+                    </Button>
+
+                    <Border Height="1" Background="{ThemeResource AppDividerBrush}" Margin="10,0" />
+
+                    <!-- 一只马子：点整行打开 B 站主页 -->
+                    <Button x:Name="MaZiAuthorButton"
+                            HorizontalAlignment="Stretch"
+                            HorizontalContentAlignment="Stretch"
+                            Background="Transparent"
+                            BorderThickness="0"
+                            Padding="10,8"
+                            Click="MaZiAuthor_Click"
+                            ToolTipService.ToolTip="打开「一只马子」的 B 站主页">
+                        <Grid ColumnSpacing="14">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Ellipse Grid.Column="0" Width="56" Height="56" VerticalAlignment="Center">
+                                <Ellipse.Fill>
+                                    <ImageBrush ImageSource="ms-appx:///Assets/About/author-mazi.png" Stretch="UniformToFill" />
+                                </Ellipse.Fill>
+                            </Ellipse>
+                            <StackPanel Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                                <TextBlock Text="一只马子" Style="{ThemeResource AppSubtitleTextStyle}" />
+                                <TextBlock Text="Stjarna PERSPECTIVE 组织成员，参与开发地图功能"
+                                           Style="{ThemeResource AppCaptionTextStyle}"
+                                           Foreground="{ThemeResource TextSecondaryBrush}"
+                                           TextWrapping="Wrap" />
+                                <TextBlock Text="space.bilibili.com/1236557779"
+                                           Style="{ThemeResource AppMicroTextStyle}"
+                                           Foreground="{ThemeResource TextTertiaryBrush}" />
+                            </StackPanel>
+                            <FontIcon Grid.Column="2" Glyph="&#xE8A7;" FontSize="{ThemeResource AppFontCaptionSize}"
+                                      Foreground="{ThemeResource TextTertiaryBrush}" VerticalAlignment="Center" />
+                        </Grid>
+                    </Button>
+
+                    <Border Height="1" Background="{ThemeResource AppDividerBrush}" Margin="10,0" />
+
                     <!-- 我（DeepSeek Harness） -->
                     <Grid ColumnSpacing="14" Padding="10,8">
                         <Grid.ColumnDefinitions>

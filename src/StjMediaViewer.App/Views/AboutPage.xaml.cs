@@ -90,6 +90,33 @@ public sealed partial class AboutPage : Page
         }
     }
 
+    /// <summary>点「一个货成」：打开抖音主页。</summary>
+    private async void HuoChengAuthor_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await Windows.System.Launcher.LaunchUriAsync(new Uri(
+                "https://www.douyin.com/user/MS4wLjABAAAAaAohr1ln9GMhbZ21KSG3KvdbMPMfW_d5mXkZvSfRUDY"));
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("打开一个货成主页失败", ex);
+        }
+    }
+
+    /// <summary>点「一只马子」：打开 B 站主页。</summary>
+    private async void MaZiAuthor_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            await Windows.System.Launcher.LaunchUriAsync(new Uri("https://space.bilibili.com/1236557779"));
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("打开一只马子主页失败", ex);
+        }
+    }
+
     private void FillStack()
     {
         var items = new (string Name, string Detail)[]
