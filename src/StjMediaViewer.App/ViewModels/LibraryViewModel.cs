@@ -296,6 +296,10 @@ public sealed partial class LibraryViewModel : ObservableObject
     }
 
     private readonly Stack<LibraryViewState> _viewStates = new();
+    /// <summary>已经用"组封面卡片"折叠过的合并组（加载更多时要继续跳过它们的成员）。</summary>
+    private readonly HashSet<string> _collapsedMergeGroups = new(StringComparer.Ordinal);
+    /// <summary>已经取过多少条"原始素材"（分页偏移用；不能拿显示卡片数当偏移，合并组折叠后两者不等）。</summary>
+    private int _loadedRawCount;
 
     public bool CanGoBack => _viewStates.Count > 0;
 
@@ -498,7 +502,9 @@ public sealed partial class LibraryViewModel : ObservableObject
             FilteredCount = filtered;
             IsLibraryEmpty = facets.Total == 0;
 
-            var displayItems = await BuildDisplayItemsAsync(items, ct);
+            _collapsedMergeGroups.Clear();
+            _loadedRawCount = items.Count;
+            var displayItems = await BuildDisplayItemsAsync(items, ct, _collapsedMergeGroups);
             Items.Clear();
             foreach (var card in displayItems) Items.Add(card);
             PrefetchThumbnailsAhead(items);
@@ -551,10 +557,12 @@ public sealed partial class LibraryViewModel : ObservableObject
         try
         {
             IsLoading = true;
-            var query = BuildQuery(Items.Count, PageSize);
+            var query = BuildQuery(_loadedRawCount, PageSize);
             var items = await AppServices.Store.QueryAsync(query);
             if (version != _refreshVersion) return;
-            foreach (var a in items) Items.Add(new AssetCardItem(a));
+            _loadedRawCount += items.Count;
+            var displayItems = await BuildDisplayItemsAsync(items, CancellationToken.None, _collapsedMergeGroups);
+            foreach (var card in displayItems) Items.Add(card);
             HasMore = items.Count >= PageSize;
             LoadMoreVisibility = HasMore ? Visibility.Visible : Visibility.Collapsed;
             AppEvents.SetStatus($"已加载 {Items.Count} / {FilteredCount} 张素材");
@@ -798,7 +806,8 @@ public sealed partial class LibraryViewModel : ObservableObject
     /// 网格折叠：合并组里的成员只出现一张卡片（封面 + 数量）。
     /// 正在按"合并组"筛选时不折叠，方便逐张查看/设封面。
     /// </summary>
-    private async Task<List<AssetCardItem>> BuildDisplayItemsAsync(IReadOnlyList<MediaAsset> items, CancellationToken ct)
+    private async Task<List<AssetCardItem>> BuildDisplayItemsAsync(
+        IReadOnlyList<MediaAsset> items, CancellationToken ct, HashSet<string>? collapsedGroups = null)
     {
         var cards = new List<AssetCardItem>(items.Count);
         if (items.Count == 0) return cards;
@@ -846,7 +855,7 @@ public sealed partial class LibraryViewModel : ObservableObject
             catch (Exception ex) { Log.Warn("读取合并组封面失败", ex); }
         }
 
-        var placed = new HashSet<string>(StringComparer.Ordinal);
+        var placed = collapsedGroups ?? new HashSet<string>(StringComparer.Ordinal);
         foreach (var asset in items)
         {
             if (!membership.TryGetValue(asset.Id, out var groupId) || !groups.TryGetValue(groupId, out var group))

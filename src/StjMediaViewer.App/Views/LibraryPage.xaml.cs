@@ -170,6 +170,37 @@ public sealed partial class LibraryPage : Page
             });
         }
 
+        // 验收用：STJ_DEMO_MERGE_LOADMORE=1 合并组跨页时"加载更多"是否仍然只保留封面
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_MERGE_LOADMORE") == "1")
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(3200);
+                DispatcherQueue.TryEnqueue(async () =>
+                {
+                    await ViewModel.RefreshMergeGroupsAsync();
+                    var group = ViewModel.MergeGroups.OrderByDescending(g => g.AssetCount).FirstOrDefault();
+                    if (group is null) return;
+                    var memberIds = (await AppServices.Store.GetMergeGroupAssetIdsAsync(group.Id)).ToHashSet(StringComparer.Ordinal);
+
+                    void LogState(string label)
+                    {
+                        var leaked = ViewModel.Items.Count(i => i.MergeGroup is null && memberIds.Contains(i.Id));
+                        var groupCards = ViewModel.Items.Count(i => i.MergeGroup?.Id == group.Id);
+                        Core.Util.Log.Info($"[merge-loadmore] {label} items={ViewModel.Items.Count} groupCards={groupCards} leakedMembers={leaked} " +
+                                           $"hasMore={ViewModel.HasMore} loading={ViewModel.IsLoading} filtered={ViewModel.FilteredCount}");
+                    }
+
+                    // 等首屏刷新收尾（缩略图预热时 IsLoading 仍为 true，LoadMore 会被跳过）
+                    for (int i = 0; i < 40 && ViewModel.IsLoading; i++) await Task.Delay(250);
+                    LogState("page1");
+                    await ViewModel.LoadMoreAsync();
+                    await Task.Delay(900);
+                    LogState("afterLoadMore");
+                });
+            });
+        }
+
         // 验收用：STJ_DEMO_MERGE_OPEN=1 打开第一个合并组；=2 打开后立刻测「返回」
         var mergeDemo = Environment.GetEnvironmentVariable("STJ_DEMO_MERGE_OPEN");
         if (!string.IsNullOrEmpty(mergeDemo))
