@@ -29,6 +29,8 @@
                                Style="{ThemeResource AppCaptionTextStyle}" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                    <Button Content="AI 整理" Click="AiOrganize_Click" Style="{ThemeResource AppSubtleButtonStyle}"
+                            ToolTipService.ToolTip="直接按 AI 分析出的「主题 / 影调」生成两级目录并预览计划（没分析过的归「未分析」）" />
                     <Button Content="预览计划" Click="Preview_Click" Style="{ThemeResource AppSubtleButtonStyle}" />
                     <Button Content="执行整理" Click="Execute_Click" Style="{StaticResource AccentButtonStyle}" />
                     <Button Content="找回未转移的 XMP" Click="RepairXmp_Click" Style="{ThemeResource AppSubtleButtonStyle}"

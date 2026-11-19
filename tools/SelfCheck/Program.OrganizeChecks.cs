@@ -71,6 +71,25 @@ public static partial class Program
               deduped.Count(c => c == '/') == 1,
               deduped);
 
+        // AI 整理：一次选择展开成「AI 主题 / 影调」两层；没分析的归「未分析」
+        var aiAsset = new MediaAsset
+        {
+            Id = "ai-org-1", LibraryId = lib.Id, FullPath = assets[0].FullPath, FileName = assets[0].FileName,
+            Kind = MediaKind.Image, FormatCode = "JPG",
+        };
+        aiAsset.SetThemes(new[] { "portrait" });
+        aiAsset.Tone = "lowkey";
+        var aiPath = OrganizerService.CategoryPathFor(aiAsset, new OrganizeOptions { Primary = OrganizeDimension.AiCategory });
+        Check("AI 整理：主题/影调两层目录", aiPath == "人像/低调", aiPath);
+
+        var unknownAi = new MediaAsset
+        {
+            Id = "ai-org-2", LibraryId = lib.Id, FullPath = assets[0].FullPath, FileName = assets[0].FileName,
+            Kind = MediaKind.Image, FormatCode = "JPG",
+        };
+        var unknownPath = OrganizerService.CategoryPathFor(unknownAi, new OrganizeOptions { Primary = OrganizeDimension.AiCategory });
+        Check("AI 整理：没分析的归未分析", unknownPath == "未分析/未分类影调", unknownPath);
+
         var options = new OrganizeOptions { Primary = OrganizeDimension.Device };
         var rootMap = new Dictionary<string, string>(StringComparer.Ordinal) { [lib.Id] = tempLib };
 

@@ -27,6 +27,8 @@ public enum OrganizeDimension
     Extension = 15,
     /// <summary>细分位置：GPS 半径范围内的归一个文件夹（城市-区县）。</summary>
     GeoArea = 16,
+    /// <summary>AI 整理：按 AI 分析出的「主题 / 影调」分文件夹（一次选择两层）。</summary>
+    AiCategory = 17,
 }
 
 public static class OrganizeDimensions
@@ -52,6 +54,7 @@ public static class OrganizeDimensions
         OrganizeDimension.ColorLabel => "颜色标签",
         OrganizeDimension.Extension => "扩展名",
         OrganizeDimension.GeoArea => "细分位置",
+        OrganizeDimension.AiCategory => "AI 整理（主题/影调）",
         _ => dimension.ToString(),
     };
 
@@ -74,6 +77,7 @@ public static class OrganizeDimensions
         OrganizeDimension.ColorLabel => "红 / 黄 / 绿 …",
         OrganizeDimension.Extension => "jpg / arw / mov",
         OrganizeDimension.GeoArea => "上海-黄浦区 / 杭州-西湖区（范围内的算一个）",
+        OrganizeDimension.AiCategory => "AI 主题 / 影调（如 人像/低调、风光/高调；没分析的归「未分析」）",
         _ => "",
     };
 }

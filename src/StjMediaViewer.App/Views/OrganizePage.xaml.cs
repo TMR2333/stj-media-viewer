@@ -22,6 +22,15 @@ public sealed partial class OrganizePage : Page
         {
             await ViewModel.InitializeAsync();
 
+            // 截图/验收用：STJ_DEMO_AI_ORGANIZE=1 直接按 AI 主题/影调生成计划
+            if (Environment.GetEnvironmentVariable("STJ_DEMO_AI_ORGANIZE") == "1")
+            {
+                await Task.Delay(1200);
+                await ViewModel.AiOrganizeCommand.ExecuteAsync(null);
+                Core.Util.Log.Info($"[ai-organize] status={ViewModel.Status} | summary={ViewModel.Summary} | rows={ViewModel.PreviewRows.Count} | " +
+                                   string.Join(" ; ", ViewModel.PreviewRows.Take(3).Select(r => r.Target)));
+            }
+
             // 验收用：STJ_DEMO_XMP_REPAIR=1 直接跑「找回未转移的 XMP」并记录结果
             if (Environment.GetEnvironmentVariable("STJ_DEMO_XMP_REPAIR") == "1")
             {
@@ -33,6 +42,12 @@ public sealed partial class OrganizePage : Page
         {
             Core.Util.Log.Warn("整理页初始化失败", ex);
         }
+    }
+
+    private async void AiOrganize_Click(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.AiOrganizeCommand.ExecuteAsync(null);
+        if (!string.IsNullOrEmpty(ViewModel.WarningText)) AppEvents.SetError(ViewModel.WarningText);
     }
 
     private async void Preview_Click(object sender, RoutedEventArgs e) => await ViewModel.PreviewCommand.ExecuteAsync(null);

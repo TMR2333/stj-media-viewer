@@ -79,6 +79,9 @@ public sealed class OrganizerService
             OrganizeDimension.Extension => Blank(Path.GetExtension(asset.FileName).TrimStart('.'))
                 ? "无扩展名"
                 : Path.GetExtension(asset.FileName).TrimStart('.').ToUpperInvariant(),
+            OrganizeDimension.AiCategory => Blank(asset.PrimaryTheme)
+                ? "未分析"
+                : Vocabularies.ThemeDisplay(asset.PrimaryTheme!, "zh-CN"),
             _ => "未分类",
         };
     }
@@ -102,6 +105,14 @@ public sealed class OrganizerService
         Add(options.Primary);
         Add(options.Secondary);
         Add(options.Tertiary);
+
+        // AI 整理：用户只选它一个，就自动展开成「AI 主题 / 影调」两层，省得再选两级
+        if (options.Primary == OrganizeDimension.AiCategory &&
+            options.Secondary is null && options.Tertiary is null)
+        {
+            var tone = Blank(asset.Tone) ? "未分类影调" : Vocabularies.ToneDisplay(asset.Tone!, "zh-CN");
+            parts.Add(SanitizeFolder(tone));
+        }
 
         return string.Join('/', parts.Where(p => !string.IsNullOrWhiteSpace(p)).Select(SanitizeFolder));
     }

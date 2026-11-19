@@ -354,6 +354,28 @@ public sealed partial class OrganizeViewModel : ObservableObject
     }
 
     /// <summary>找回以前"转移时没跟着走"的 XMP：扫描媒体库目录里的孤立 XMP，复制到素材现在的位置。</summary>
+    /// <summary>「AI 整理」快捷入口：选 AI 主题/影调两层，然后直接预览计划。</summary>
+    [RelayCommand]
+    private async Task AiOrganizeAsync()
+    {
+        var index = DimensionChoices.IndexOf(OrganizeDimension.AiCategory.Display());
+        if (index > 0)
+        {
+            SelectedPrimaryIndex = index;
+            SelectedSecondaryIndex = 0;
+            SelectedTertiaryIndex = 0;
+        }
+        await PreviewCommand.ExecuteAsync(null);
+
+        // AI 整理只按"已有的分析结果"分；还没分析的会落到「未分析」，先提示一下
+        var unanalyzed = PreviewRows.Count(r => r.Category.StartsWith("未分析", StringComparison.Ordinal));
+        if (unanalyzed > 0)
+        {
+            WarningText = $"有 {unanalyzed} 张还没做 AI 分析，会归到「未分析」；先到「AI 队列」跑一遍分析，再点 AI 整理效果最好";
+            Status = $"AI 整理计划已生成（{unanalyzed} 张未分析）";
+        }
+    }
+
     [RelayCommand]
     private async Task RepairXmpAsync()
     {
