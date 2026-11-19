@@ -136,6 +136,16 @@
                                     <ComboBoxItem Content="覆盖目标文件" />
                                 </ComboBox>
                             </StackPanel>
+                            <ToggleSwitch Header="自定义类别单独成文件夹"
+                                          OnContent="单独" OffContent="不"
+                                          IsOn="{x:Bind ViewModel.SplitCustomCategory, Mode=TwoWay}"
+                                          ToolTipService.ToolTip="勾选后：素材在该自定义维度下有值（如 记录=卓越）就放进「卓越」文件夹，没值的仍按上面的维度分类" />
+                            <StackPanel Spacing="4" Visibility="{x:Bind ViewModel.SplitCustomDimensionVisibility, Mode=OneWay}">
+                                <TextBlock Text="自定义维度名（如 记录）" Style="{ThemeResource AppMicroTextStyle}"
+                                           Foreground="{ThemeResource TextTertiaryBrush}" />
+                                <TextBox Width="180" Text="{x:Bind ViewModel.CustomDimension, Mode=TwoWay}"
+                                         PlaceholderText="记录 / 项目 / 客户" />
+                            </StackPanel>
                             <ToggleSwitch Header="删除空的原文件夹"
                                           OnContent="删" OffContent="留"
                                           IsOn="{x:Bind ViewModel.DeleteEmptySourceFolders, Mode=TwoWay}"

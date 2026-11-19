@@ -106,6 +106,13 @@ public sealed class OrganizeOptions
     /// <summary>当维度是「自定义类别」时用哪个维度名（项目 / 客户 / 场地……）。</summary>
     public string? CustomDimensionName { get; set; }
 
+    /// <summary>
+    /// 自定义类别「单独成文件夹」：勾了这项、并且素材在这个维度下有值时，
+    /// 直接放进以该值命名的文件夹（如 记录 = 卓越 → `卓越/`），不再套用一级/二级/三级；
+    /// 没有值的素材仍按原来的维度分类。
+    /// </summary>
+    public bool SplitCustomCategoryIntoFolders { get; set; }
+
     /// <summary>目标根目录；为空 = 每个文件仍留在它自己媒体库的根目录下。</summary>
     public string? RootPath { get; set; }
 

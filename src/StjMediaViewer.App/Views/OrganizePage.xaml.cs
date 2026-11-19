@@ -22,6 +22,22 @@ public sealed partial class OrganizePage : Page
         {
             await ViewModel.InitializeAsync();
 
+            // 截图/验收用：STJ_DEMO_SPLIT_ORGANIZE=1 验证「自定义类别单独成文件夹」（记录=卓越）
+            if (Environment.GetEnvironmentVariable("STJ_DEMO_SPLIT_ORGANIZE") == "1")
+            {
+                await Task.Delay(1200);
+                ViewModel.SplitCustomCategory = true;
+                ViewModel.CustomDimension = "记录";
+                ViewModel.SelectedPrimaryIndex = ViewModel.DimensionChoices.IndexOf("拍摄年份");
+                ViewModel.SelectedSecondaryIndex = ViewModel.SecondaryChoices.IndexOf("拍摄月份");
+                await ViewModel.PreviewCommand.ExecuteAsync(null);
+                Core.Util.Log.Info($"[split-organize] status={ViewModel.Status} | summary={ViewModel.Summary} | rows={ViewModel.PreviewRows.Count}");
+                foreach (var row in ViewModel.PreviewRows.Where(r => r.Target.Contains("卓越")).Take(3))
+                    Core.Util.Log.Info($"[split-organize] sample={row.Target}");
+                foreach (var row in ViewModel.PreviewRows.Where(r => !r.Target.Contains("卓越")).Take(2))
+                    Core.Util.Log.Info($"[split-organize] normal={row.Target}");
+            }
+
             // 截图/验收用：STJ_DEMO_AI_ORGANIZE=1 直接按 AI 主题/影调生成计划
             if (Environment.GetEnvironmentVariable("STJ_DEMO_AI_ORGANIZE") == "1")
             {

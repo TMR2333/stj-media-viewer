@@ -203,6 +203,19 @@ public sealed partial class OrganizeViewModel : ObservableObject
     /// <summary>转移后删除已经空了的原文件夹（只删完全空的，且必须在媒体库根内）。</summary>
     [ObservableProperty] private bool _deleteEmptySourceFolders = true;
 
+    /// <summary>自定义类别单独成文件夹：有值（如 记录=卓越）的进「卓越」，没值的照常按维度分。</summary>
+    [ObservableProperty] private bool _splitCustomCategory;
+
+    public Visibility SplitCustomDimensionVisibility =>
+        SplitCustomCategory ? Visibility.Visible : Visibility.Collapsed;
+
+    partial void OnSplitCustomCategoryChanged(bool value)
+    {
+        OnPropertyChanged(nameof(SplitCustomDimensionVisibility));
+        ClearPlans();
+        Status = "";
+    }
+
     // ---------------- 计划 ----------------
     private OrganizeOptions BuildOptions() => new()
     {
@@ -213,6 +226,7 @@ public sealed partial class OrganizeViewModel : ObservableObject
         RootPath = IsCloudSource ? null : (string.IsNullOrWhiteSpace(RootPath) ? null : RootPath.Trim()),
         GeoRadiusMeters = GeoRadiusMeters > 0 ? GeoRadiusMeters : 500,
         DeleteEmptySourceFolders = DeleteEmptySourceFolders,
+        SplitCustomCategoryIntoFolders = SplitCustomCategory,
         DeviceAliases = AppServices.Settings.Current.DeviceAliases,
         GeoPlaceResolver = ResolveGeoPlace,
         ConflictPolicy = SelectedConflictIndex switch
@@ -242,6 +256,7 @@ public sealed partial class OrganizeViewModel : ObservableObject
     }
 
     private bool NeedsCustom(OrganizeOptions options) =>
+        options.SplitCustomCategoryIntoFolders ||
         options.Primary == OrganizeDimension.CustomCategory ||
         options.Secondary == OrganizeDimension.CustomCategory ||
         options.Tertiary == OrganizeDimension.CustomCategory;

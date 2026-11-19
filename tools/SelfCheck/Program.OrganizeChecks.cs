@@ -90,6 +90,32 @@ public static partial class Program
         var unknownPath = OrganizerService.CategoryPathFor(unknownAi, new OrganizeOptions { Primary = OrganizeDimension.AiCategory });
         Check("AI 整理：没分析的归未分析", unknownPath == "未分析/未分类影调", unknownPath);
 
+        // 自定义类别单独成文件夹：有值的进「卓越」，没值的照常按 年/月
+        var special = new MediaAsset
+        {
+            Id = "split-1", LibraryId = lib.Id, FullPath = assets[0].FullPath, FileName = assets[0].FileName,
+            Kind = MediaKind.Image, FormatCode = "JPG",
+            CapturedAt = new DateTimeOffset(2026, 11, 8, 12, 0, 0, TimeSpan.FromHours(8)),
+        };
+        var normal = new MediaAsset
+        {
+            Id = "split-2", LibraryId = lib.Id, FullPath = assets[0].FullPath, FileName = assets[0].FileName,
+            Kind = MediaKind.Image, FormatCode = "JPG",
+            CapturedAt = new DateTimeOffset(2026, 11, 8, 12, 0, 0, TimeSpan.FromHours(8)),
+        };
+        var splitOptions = new OrganizeOptions
+        {
+            Primary = OrganizeDimension.Year,
+            Secondary = OrganizeDimension.Month,
+            SplitCustomCategoryIntoFolders = true,
+            CustomDimensionName = "记录",
+            CustomValuesByAssetId = new Dictionary<string, string> { ["split-1"] = "卓越" },
+        };
+        var splitPath = OrganizerService.ResolveCategoryPath(special, splitOptions);
+        var normalPath = OrganizerService.ResolveCategoryPath(normal, splitOptions);
+        Check("整理：自定义类别单独成文件夹", splitPath == "卓越", splitPath);
+        Check("整理：没自定义值的照常三级分类", normalPath == "2026/11", normalPath);
+
         var options = new OrganizeOptions { Primary = OrganizeDimension.Device };
         var rootMap = new Dictionary<string, string>(StringComparer.Ordinal) { [lib.Id] = tempLib };
 

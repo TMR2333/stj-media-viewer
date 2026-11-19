@@ -117,6 +117,27 @@ public sealed class OrganizerService
         return string.Join('/', parts.Where(p => !string.IsNullOrWhiteSpace(p)).Select(SanitizeFolder));
     }
 
+    /// <summary>
+    /// 最终目录：如果开了「自定义类别单独成文件夹」且这条素材在该维度下有值，
+    /// 就直接用这个值当文件夹（不叠加一级/二级/三级）；否则走正常维度组合。
+    /// </summary>
+    public static string ResolveCategoryPath(
+        MediaAsset asset,
+        OrganizeOptions options,
+        string? customValue = null,
+        string? geoValue = null)
+    {
+        if (options.SplitCustomCategoryIntoFolders &&
+            !string.IsNullOrWhiteSpace(options.CustomDimensionName) &&
+            options.CustomValuesByAssetId is not null &&
+            options.CustomValuesByAssetId.TryGetValue(asset.Id, out var splitValue) &&
+            !string.IsNullOrWhiteSpace(splitValue))
+        {
+            return SanitizeFolder(splitValue!.Trim());
+        }
+        return CategoryPathFor(asset, options, customValue, geoValue);
+    }
+
     private static bool Blank(string? value) => string.IsNullOrWhiteSpace(value);
 
     /// <summary>把任意文本变成安全的文件夹名（Windows 非法字符、首尾点号、结尾空格）。</summary>
@@ -184,7 +205,7 @@ public sealed class OrganizerService
             string category;
             try
             {
-                category = CategoryPathFor(asset, options, customValue, geoValue);
+                category = ResolveCategoryPath(asset, options, customValue, geoValue);
             }
             catch (Exception ex)
             {
@@ -676,7 +697,7 @@ public sealed class OrganizerService
             string? geoValue = null;
             geoFolders?.TryGetValue(asset.Id, out geoValue);
 
-            var category = CategoryPathFor(asset, options, customValue, geoValue);
+            var category = ResolveCategoryPath(asset, options, customValue, geoValue);
             var to = string.IsNullOrEmpty(category) ? file.FileName : category + "/" + file.FileName;
 
             if (string.Equals(NormalizeRel(to), rel, StringComparison.OrdinalIgnoreCase)) continue;
