@@ -243,15 +243,13 @@ public sealed class OrganizerService
         var stem = Path.GetFileNameWithoutExtension(full);
         if (string.IsNullOrWhiteSpace(dir)) return found;
 
-        // 主文件全名 + .xmp（DSC001.ARW.xmp）
-        Add(Path.Combine(dir, fileName + ".xmp"));
-        Add(Path.Combine(dir, fileName + ".XMP"));
-        // 同名 + .xmp（DSC001.xmp）
-        Add(Path.Combine(dir, stem + ".xmp"));
-        Add(Path.Combine(dir, stem + ".XMP"));
-        // 备份边车（整理时以前也会带走，保持一致）
-        Add(Path.Combine(dir, fileName + ".xmp.bak"));
-        Add(Path.Combine(dir, stem + ".xmp.bak"));
+        // 主文件全名 + 边车扩展 / 同名 + 边车扩展；.acr / .dop / .pp3 是相机厂商或修图软件的边车
+        string[] sidecarSuffixes = { ".xmp", ".XMP", ".acr", ".ACR", ".dop", ".pp3", ".xmp.bak" };
+        foreach (var suffix in sidecarSuffixes)
+        {
+            Add(Path.Combine(dir, fileName + suffix));
+            Add(Path.Combine(dir, stem + suffix));
+        }
 
         return found;
     }
