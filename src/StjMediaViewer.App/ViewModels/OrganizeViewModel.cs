@@ -200,6 +200,9 @@ public sealed partial class OrganizeViewModel : ObservableObject
         }
     }
 
+    /// <summary>转移后删除已经空了的原文件夹（只删完全空的，且必须在媒体库根内）。</summary>
+    [ObservableProperty] private bool _deleteEmptySourceFolders = true;
+
     // ---------------- 计划 ----------------
     private OrganizeOptions BuildOptions() => new()
     {
@@ -209,6 +212,7 @@ public sealed partial class OrganizeViewModel : ObservableObject
         CustomDimensionName = string.IsNullOrWhiteSpace(CustomDimension) ? null : CustomDimension.Trim(),
         RootPath = IsCloudSource ? null : (string.IsNullOrWhiteSpace(RootPath) ? null : RootPath.Trim()),
         GeoRadiusMeters = GeoRadiusMeters > 0 ? GeoRadiusMeters : 500,
+        DeleteEmptySourceFolders = DeleteEmptySourceFolders,
         DeviceAliases = AppServices.Settings.Current.DeviceAliases,
         GeoPlaceResolver = ResolveGeoPlace,
         ConflictPolicy = SelectedConflictIndex switch
@@ -347,6 +351,36 @@ public sealed partial class OrganizeViewModel : ObservableObject
         PreviewRows.Clear();
         foreach (var row in rows.Take(2000)) PreviewRows.Add(row);
         RefreshRowState();
+    }
+
+    /// <summary>找回以前"转移时没跟着走"的 XMP：扫描媒体库目录里的孤立 XMP，复制到素材现在的位置。</summary>
+    [RelayCommand]
+    private async Task RepairXmpAsync()
+    {
+        if (IsBusy) return;
+        IsBusy = true;
+        Status = "正在扫描遗留的 XMP…";
+        try
+        {
+            var roots = AppServices.Settings.Current.Libraries
+                .Select(l => l.Path)
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var progress = new Progress<string>(message => Status = message);
+            var report = await XmpRepairService.RepairAsync(AppServices.Store, roots, progress);
+            IsBusy = false;
+            Status = report.Describe();
+            Summary = $"扫描 {report.ScannedXmp} 个 XMP · 遗留 {report.Orphans} 个 · 找回 {report.Copied} 个";
+            WarningText = report.Details.Count == 0 ? "" : string.Join("；", report.Details.Take(5));
+            if (report.Copied > 0) AppEvents.SetStatus($"已找回 {report.Copied} 个 XMP");
+        }
+        catch (Exception ex)
+        {
+            IsBusy = false;
+            Status = "找回 XMP 失败：" + ex.Message;
+            Log.Warn("找回 XMP 失败", ex);
+        }
     }
 
     // ---------------- 执行 ----------------

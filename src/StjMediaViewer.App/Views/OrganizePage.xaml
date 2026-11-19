@@ -31,6 +31,8 @@
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <Button Content="预览计划" Click="Preview_Click" Style="{ThemeResource AppSubtleButtonStyle}" />
                     <Button Content="执行整理" Click="Execute_Click" Style="{StaticResource AccentButtonStyle}" />
+                    <Button Content="找回未转移的 XMP" Click="RepairXmp_Click" Style="{ThemeResource AppSubtleButtonStyle}"
+                            ToolTipService.ToolTip="扫描媒体库里孤立的 .xmp（主文件已被转移走），按文件名复制到素材现在的位置" />
                     <Button Content="撤销上次整理" Click="Undo_Click" Style="{ThemeResource AppSubtleButtonStyle}"
                             Visibility="{x:Bind ViewModel.UndoVisibility, Mode=OneWay}" />
                 </StackPanel>
@@ -132,6 +134,10 @@
                                     <ComboBoxItem Content="覆盖目标文件" />
                                 </ComboBox>
                             </StackPanel>
+                            <ToggleSwitch Header="删除空的原文件夹"
+                                          OnContent="删" OffContent="留"
+                                          IsOn="{x:Bind ViewModel.DeleteEmptySourceFolders, Mode=TwoWay}"
+                                          ToolTipService.ToolTip="转移完成后，源文件夹如果已经完全空了就删掉；里面还有任何文件（包括没整理的媒体）就保留" />
                         </StackPanel>
 
                         <StackPanel Spacing="4" Visibility="{x:Bind ViewModel.LocalOptionsVisibility, Mode=OneWay}">

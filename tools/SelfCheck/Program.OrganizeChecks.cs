@@ -31,8 +31,10 @@ public static partial class Program
             .ToList();
         if (sourceFiles.Count == 0) { Warn("样本里没有 JPG，跳过整理检查"); return; }
 
+        var sourceDir = Path.Combine(tempLib, "src");
+        Directory.CreateDirectory(sourceDir);
         foreach (var file in sourceFiles)
-            File.Copy(file, Path.Combine(tempLib, Path.GetFileName(file)), overwrite: true);
+            File.Copy(file, Path.Combine(sourceDir, Path.GetFileName(file)), overwrite: true);
 
         var lib = await s.Library.AddLibraryAsync(tempLib);
         await s.Library.ScanLibraryAsync(lib, new ScanOptions { ComputeQuickHash = false }, new Progress<ScanProgress>(_ => { }));
@@ -40,6 +42,11 @@ public static partial class Program
         var assets = await s.Store.QueryAsync(new AssetQuery { LibraryId = lib.Id, Limit = 0 });
         Check("整理：临时库已入库", assets.Count >= 1, $"{assets.Count} 条");
         if (assets.Count == 0) return;
+
+        // 边车只存在于磁盘、没登记进索引（用户遇到的情况）：整理计划也必须带上它
+        var sidecarOwner = assets[0];
+        var diskSidecar = sidecarOwner.FullPath + ".xmp";
+        File.WriteAllText(diskSidecar, "<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"></x:xmpmeta>");
 
         var organizer = new OrganizerService(tempData);
 
@@ -74,8 +81,17 @@ public static partial class Program
                   e.TargetPath.Contains(e.CategoryPath.Replace('/', Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase)),
               plan.Entries.FirstOrDefault(e => !e.IsSidecar)?.TargetPath ?? "");
 
+        Check("整理：磁盘上的边车进计划",
+              plan.Entries.Any(e => e.IsSidecar && string.Equals(e.SourcePath, diskSidecar, StringComparison.OrdinalIgnoreCase)),
+              $"{plan.SidecarCount} 个边车");
+
         var result = await organizer.ExecuteLocalAsync(plan, s.Store, options);
         Check("整理：执行成功", result.Moved >= 1 && result.Failed == 0, result.Summary);
+        Check("整理：边车跟着主文件走",
+              plan.Entries.Where(e => e.IsSidecar).All(e => !File.Exists(e.SourcePath) && File.Exists(e.TargetPath)),
+              $"{plan.SidecarCount} 个边车");
+        Check("整理：源目录还有没整理的文件就保留（安全）", Directory.Exists(sourceDir),
+              "src 里还有隐藏/未入库文件，必须保留");
         Check("整理：文件真的被移动了",
               plan.Entries.Where(e => !e.IsSidecar).All(e => !File.Exists(e.SourcePath) && File.Exists(e.TargetPath)));
 
@@ -92,6 +108,24 @@ public static partial class Program
               plan.Entries.Where(e => !e.IsSidecar).All(e => File.Exists(e.SourcePath) && !File.Exists(e.TargetPath)));
         Check("整理：撤销后索引路径恢复",
               (await s.Store.GetByIdsAsync(new[] { assets[0].Id })).FirstOrDefault()?.FullPath == assets[0].FullPath);
+
+        // 专门造一个"会被搬空"的源目录：手工登记 1 个 JPG（避免扫描去重干扰）
+        var cleanSrc = Path.Combine(tempLib, "clean-src");
+        Directory.CreateDirectory(cleanSrc);
+        var cleanFile = Path.Combine(cleanSrc, "CLEAN_SRC_0001.jpg");
+        var altSample = sourceFiles.LastOrDefault() ?? plan.Entries.First(e => !e.IsSidecar).TargetPath;
+        File.Copy(altSample, cleanFile, overwrite: true);
+        var cleanAsset = NewAsset("clean-src-1", lib.Id, cleanFile, "CLEAN_SRC_0001.jpg");
+        await s.Store.UpsertManyAsync(new[] { cleanAsset });
+        cleanAsset = (await s.Store.GetByIdsAsync(new[] { cleanAsset.Id })).FirstOrDefault() ?? cleanAsset;
+
+        var cleanOptions = new OrganizeOptions { Primary = OrganizeDimension.Kind, DeleteEmptySourceFolders = true };
+        var cleanPlan = organizer.BuildLocalPlan(new[] { cleanAsset }, rootMap, cleanOptions);
+        var cleanResult = await organizer.ExecuteLocalAsync(cleanPlan, s.Store, cleanOptions);
+        Check("整理：搬空后的源文件夹被删除",
+              !Directory.Exists(cleanSrc) && cleanResult.DeletedFolders >= 1 && cleanResult.Failed == 0,
+              $"plan={cleanPlan.FileCount} moved={cleanResult.Moved} deleted={cleanResult.DeletedFolders} exists={Directory.Exists(cleanSrc)}");
+
 
         // ---------------- 云端整理（LocalFolder 适配器当"云盘"） ----------------
         var cloudRoot = Path.Combine(tempData, "organize-cloud");

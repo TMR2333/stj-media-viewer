@@ -110,6 +110,12 @@ public sealed class OrganizeOptions
     /// <summary>把 XMP 边车一起搬走（默认开）。</summary>
     public bool IncludeSidecars { get; set; } = true;
 
+    /// <summary>
+    /// 转移完把**已经空了**的原文件夹删掉（默认开）。
+    /// 只会删「空目录」——里面还有任何文件（包括没被整理的媒体）就保留。
+    /// </summary>
+    public bool DeleteEmptySourceFolders { get; set; } = true;
+
     /// <summary>本地整理时：素材 id → 自定义类别值（只在一级/二级用到自定义类别时需要）。</summary>
     public IReadOnlyDictionary<string, string>? CustomValuesByAssetId { get; set; }
 
@@ -154,6 +160,9 @@ public sealed class OrganizeResult
 {
     public int Moved { get; set; }
     public int Skipped { get; set; }
+
+    /// <summary>整理后删掉的空源文件夹数量。</summary>
+    public int DeletedFolders { get; set; }
     public int Failed { get; set; }
     public long Bytes { get; set; }
     public List<string> Errors { get; } = new();
@@ -162,6 +171,7 @@ public sealed class OrganizeResult
     public string Summary => Moved == 0 && Failed == 0 && Skipped == 0
         ? "没有需要移动的文件"
         : $"移动 {Moved} 个文件" + (Skipped > 0 ? $" · 跳过 {Skipped}" : "") +
+          (DeletedFolders > 0 ? $" · 清理空文件夹 {DeletedFolders} 个" : "") +
           (Failed > 0 ? $" · 失败 {Failed}" : "") + $" · {FormatSize(Bytes)}";
 
     private static string FormatSize(long bytes) => bytes switch

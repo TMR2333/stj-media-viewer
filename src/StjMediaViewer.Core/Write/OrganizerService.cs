@@ -198,7 +198,7 @@ public sealed class OrganizerService
 
             if (!options.IncludeSidecars) continue;
 
-            foreach (var sidecar in asset.Sidecars)
+            foreach (var sidecar in DiscoverSidecars(asset))
             {
                 if (!File.Exists(sidecar)) continue;
                 if (string.Equals(Path.GetDirectoryName(sidecar), targetDir, StringComparison.OrdinalIgnoreCase)) continue;
@@ -214,6 +214,103 @@ public sealed class OrganizerService
         }
 
         return plan;
+    }
+
+    /// <summary>
+    /// 找出这个素材真正的边车文件：索引里登记过的 + 磁盘上按常见命名规则存在的。
+    /// 常见规则：`DSC001.ARW.xmp`（Lightroom / Adobe）、`DSC001.xmp`（同名）、以及它们的 `.bak` 备份，
+    /// 大写扩展名在 Windows 下与上面等价，这里统一按路径去重。
+    /// </summary>
+    private static IEnumerable<string> DiscoverSidecars(MediaAsset asset)
+    {
+        var found = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        void Add(string? path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return;
+            if (!seen.Add(path)) return;
+            try { if (File.Exists(path)) found.Add(path); } catch { }
+        }
+
+        foreach (var known in asset.Sidecars) Add(known);
+
+        var full = asset.FullPath;
+        if (string.IsNullOrWhiteSpace(full)) return found;
+
+        var dir = Path.GetDirectoryName(full);
+        var fileName = Path.GetFileName(full);
+        var stem = Path.GetFileNameWithoutExtension(full);
+        if (string.IsNullOrWhiteSpace(dir)) return found;
+
+        // 主文件全名 + .xmp（DSC001.ARW.xmp）
+        Add(Path.Combine(dir, fileName + ".xmp"));
+        Add(Path.Combine(dir, fileName + ".XMP"));
+        // 同名 + .xmp（DSC001.xmp）
+        Add(Path.Combine(dir, stem + ".xmp"));
+        Add(Path.Combine(dir, stem + ".XMP"));
+        // 备份边车（整理时以前也会带走，保持一致）
+        Add(Path.Combine(dir, fileName + ".xmp.bak"));
+        Add(Path.Combine(dir, stem + ".xmp.bak"));
+
+        return found;
+    }
+
+    /// <summary>
+    /// 删除整理后变空的源文件夹（只在媒体库根目录之内，且必须**完全为空**）。
+    /// 目录里还剩任何文件/子目录（包括没被整理的媒体）就不动，保证不会误删。
+    /// </summary>
+    private static int DeleteEmptySourceFolders(
+        IEnumerable<string> sourceDirs,
+        IEnumerable<string> roots,
+        OrganizeResult result)
+    {
+        var rootList = roots
+            .Where(r => !string.IsNullOrWhiteSpace(r))
+            .Select(r => PathUtil.Normalize(r))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (rootList.Count == 0) return 0;
+
+        bool UnderRoot(string dir)
+        {
+            var d = PathUtil.Normalize(dir);
+            return rootList.Any(r => d.Length > r.Length &&
+                                     d.StartsWith(r + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // 候选 = 每个源目录及其所有上级（直到媒体库根，根本身不删）
+        var candidates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var dir in sourceDirs)
+        {
+            if (string.IsNullOrWhiteSpace(dir)) continue;
+            var cur = PathUtil.Normalize(dir);
+            while (UnderRoot(cur))
+            {
+                candidates.Add(cur);
+                cur = Path.GetDirectoryName(cur);
+                if (string.IsNullOrWhiteSpace(cur)) break;
+            }
+        }
+
+        int deleted = 0;
+        // 先删最深的，父目录随后才能变空
+        foreach (var dir in candidates.OrderByDescending(d => d.Length))
+        {
+            if (!UnderRoot(dir)) continue;
+            try
+            {
+                if (!Directory.Exists(dir)) continue;
+                if (Directory.EnumerateFileSystemEntries(dir).Any()) continue;
+                Directory.Delete(dir, recursive: false);
+                deleted++;
+            }
+            catch (Exception ex)
+            {
+                result.Errors.Add($"删除空文件夹失败：{Path.GetFileName(dir)}：{ex.Message}");
+            }
+        }
+        return deleted;
     }
 
     private static bool NeedsCustom(OrganizeOptions options) =>
@@ -310,6 +407,7 @@ public sealed class OrganizerService
 
         // 每个素材移动完成后统一回写索引（主文件 + 边车）
         var movedByAsset = new Dictionary<string, (string Path, List<string> Sidecars)>(StringComparer.Ordinal);
+        var sourceDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         int done = 0, total = plan.Entries.Count;
         foreach (var entry in plan.Entries)
@@ -339,6 +437,10 @@ public sealed class OrganizerService
                     File.Delete(entry.TargetPath);
 
                 MoveFile(entry.SourcePath, entry.TargetPath);
+                var sourceDir = Path.GetDirectoryName(entry.SourcePath);
+                if (!string.IsNullOrWhiteSpace(sourceDir) &&
+                    !string.Equals(sourceDir, Path.GetDirectoryName(entry.TargetPath), StringComparison.OrdinalIgnoreCase))
+                    sourceDirs.Add(sourceDir);
 
                 result.Moved++;
                 if (!entry.IsSidecar) result.Bytes += entry.SizeBytes;
@@ -385,6 +487,19 @@ public sealed class OrganizerService
                 {
                     Log.Warn($"整理后更新索引失败 {assetId}", ex);
                 }
+            }
+        }
+
+        // 删掉整理后变空的源文件夹（只删完全空的，且必须在媒体库根内）
+        if (options.DeleteEmptySourceFolders && sourceDirs.Count > 0)
+        {
+            try
+            {
+                result.DeletedFolders = DeleteEmptySourceFolders(sourceDirs, plan.AssetRoots.Values, result);
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("删除空源文件夹失败", ex);
             }
         }
 
