@@ -204,6 +204,10 @@ public sealed class CloudSyncReport
     public int Downloaded { get; set; }
     public int Conflicts { get; set; }
     public int Failed { get; set; }
+
+    /// <summary>按筛选上传时：筛选命中但不在同步目录里、被跳过的数量。</summary>
+    public int Skipped { get; set; }
+
     public int Verified { get; set; }
     public long BytesUp { get; set; }
     public long BytesDown { get; set; }
@@ -212,6 +216,7 @@ public sealed class CloudSyncReport
     public bool Success => Failed == 0;
     public string Summary =>
         $"上传 {Uploaded} · 下载 {Downloaded} · 冲突 {Conflicts} · 失败 {Failed}" +
+        (Skipped > 0 ? $" · 跳过 {Skipped}" : "") +
         (Verified > 0 ? $" · 核验 {Verified}" : "") +
         $" · 用时 {Elapsed.TotalSeconds:0.0}s";
 }

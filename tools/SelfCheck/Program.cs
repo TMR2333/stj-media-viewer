@@ -84,6 +84,7 @@ public static partial class Program
             await Section("设备 ↔ LUT 绑定", () => { CheckDeviceLutBindings(s, tempData); return Task.CompletedTask; });
             await Section("照片/视频分库", async () => await CheckSplitLibraries(s, tempData));
             await Section("删除废片（回收站）", async () => await CheckRecycleBinDelete(s, tempData));
+            await Section("云同步：按筛选上传", async () => await CheckFilteredUpload(s, tempData));
             await Section("水印工作台", async () => await CheckWatermark(s, tempData));
             await Section("设置持久化", async () => await CheckSettings(s, tempData));
             await Section("AI 客户端(dry-run)", async () => await CheckAi(s));

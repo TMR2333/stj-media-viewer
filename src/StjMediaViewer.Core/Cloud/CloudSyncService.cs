@@ -558,6 +558,173 @@ public sealed class CloudSyncService : ICloudSyncService
     /// 连接诊断：逐步验证 连接 → 鉴权 → 列目录 → 上传探针 → 校验 → 清理，
     /// 每一步都记进日志（[webdav] 前缀），界面直接显示哪一步失败、服务器回了什么。
     /// </summary>
+    // ==================================================================================
+    //  3) 只上传筛选出的素材
+    // ==================================================================================
+
+    /// <summary>
+    /// 只上传符合筛选条件的素材（例如"只要是 RAW / 只要是某个设备"），
+    /// 不参与整目录比对；云端已有同名文件直接覆盖。
+    /// 素材必须位于目标的本地同步目录里，否则跳过并在报告里说明。
+    /// </summary>
+    public async Task<CloudSyncReport> UploadFilteredAsync(
+        CloudTarget target,
+        AssetQuery query,
+        IProgress<CloudSyncProgress>? progress = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(target);
+        ArgumentNullException.ThrowIfNull(query);
+
+        var report = new CloudSyncReport { TargetId = target.Id, TargetName = target.Name };
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
+        if (_store is null)
+        {
+            report.Failed++;
+            report.Messages.Add("没有接上素材索引，无法按筛选上传");
+            report.Elapsed = sw.Elapsed;
+            return report;
+        }
+
+        var root = "";
+        try
+        {
+            if (string.IsNullOrWhiteSpace(target.LocalFolderPath) || !Directory.Exists(target.LocalFolderPath))
+                throw new DirectoryNotFoundException($"本地同步目录不存在：{target.LocalFolderPath}");
+            root = Path.GetFullPath(target.LocalFolderPath);
+        }
+        catch (Exception ex)
+        {
+            report.Failed++;
+            report.Messages.Add(ex.Message);
+            report.Elapsed = sw.Elapsed;
+            return report;
+        }
+
+        query.Limit = 0;
+        query.Offset = 0;
+
+        // 目标目录通常就是某个媒体库（或它的子目录）：把查询限定到该库，避免把别的库的素材也算进来。
+        try
+        {
+            var libraries = await _store.LoadLibraryRootsAsync(ct).ConfigureAwait(false);
+            var match = libraries
+                .Where(l => !string.IsNullOrWhiteSpace(l.Path) &&
+                            root.StartsWith(Path.GetFullPath(l.Path).TrimEnd(Path.DirectorySeparatorChar),
+                                StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(l => l.Path.Length)
+                .FirstOrDefault();
+            if (match is not null) query.LibraryId = match.Id;
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("[cloud] 解析同步目录对应的媒体库失败", ex);
+        }
+
+        var assets = await _store.QueryAsync(query, ct).ConfigureAwait(false);
+
+        await using var storage = CreateStorage(target);
+        progress?.Report(new CloudSyncProgress { Phase = $"准备上传 {assets.Count} 个素材" });
+
+        int index = 0;
+        foreach (var asset in assets)
+        {
+            ct.ThrowIfCancellationRequested();
+            index++;
+            progress?.Report(new CloudSyncProgress
+            {
+                Phase = $"上传 {index}/{assets.Count}：{asset.FileName}",
+                FilesProcessed = index - 1,
+                FilesTotal = assets.Count,
+                CurrentFile = asset.FileName,
+            });
+
+            try
+            {
+                if (string.IsNullOrWhiteSpace(asset.FullPath) || !File.Exists(asset.FullPath))
+                {
+                    report.Failed++;
+                    report.Messages.Add($"文件不存在：{asset.FileName}");
+                    continue;
+                }
+
+                var relative = Path.GetRelativePath(root, asset.FullPath);
+                if (relative.StartsWith("..", StringComparison.Ordinal) || Path.IsPathRooted(relative))
+                {
+                    // 不算失败：只是这个素材不在当前同步目录里
+                    report.Skipped++;
+                    continue;
+                }
+
+                var remotePath = relative.Replace('\\', '/');
+                var size = new FileInfo(asset.FullPath).Length;
+                await storage.UploadAsync(asset.FullPath, remotePath, ct).ConfigureAwait(false);
+                report.Uploaded++;
+                report.BytesUp += size;
+                report.Items.Add(new CloudTransferResult
+                {
+                    Direction = "Upload",
+                    RelativePath = remotePath,
+                    SizeBytes = size,
+                    Ok = true,
+                });
+
+                // 边车跟着走（XMP 等），失败不影响主文件
+                foreach (var sidecar in asset.Sidecars ?? new List<string>())
+                {
+                    ct.ThrowIfCancellationRequested();
+                    try
+                    {
+                        if (!File.Exists(sidecar)) continue;
+                        var sideRel = Path.GetRelativePath(root, sidecar);
+                        if (sideRel.StartsWith("..", StringComparison.Ordinal)) continue;
+                        await storage.UploadAsync(sidecar, sideRel.Replace('\\', '/'), ct).ConfigureAwait(false);
+                        report.Uploaded++;
+                        report.BytesUp += new FileInfo(sidecar).Length;
+                        report.Items.Add(new CloudTransferResult
+                        {
+                            Direction = "Upload",
+                            RelativePath = sideRel.Replace('\\', '/'),
+                            Ok = true,
+                        });
+                    }
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception ex)
+                    {
+                        report.Failed++;
+                        report.Messages.Add($"边车上传失败 {Path.GetFileName(sidecar)}：{ex.Message}");
+                    }
+                }
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                report.Failed++;
+                report.Messages.Add($"上传失败 {asset.FileName}：{ex.Message}");
+                report.Items.Add(new CloudTransferResult
+                {
+                    Direction = "Upload",
+                    RelativePath = asset.FileName ?? "",
+                    Ok = false,
+                    Error = ex.Message,
+                });
+            }
+        }
+
+        sw.Stop();
+        report.Elapsed = sw.Elapsed;
+        progress?.Report(new CloudSyncProgress
+        {
+            Phase = "完成",
+            FilesProcessed = assets.Count,
+            FilesTotal = assets.Count,
+            Done = true,
+        });
+        Log.Info($"[cloud] filtered upload → {target.Name}: {report.Summary}（本地 {root}）");
+        return report;
+    }
+
     public async Task<CloudDiagnosticReport> DiagnoseAsync(
         CloudTarget target,
         IProgress<string>? progress = null,

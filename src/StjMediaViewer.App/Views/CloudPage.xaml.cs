@@ -83,6 +83,20 @@ public sealed partial class CloudPage : Page
             await ViewModel.DeleteTargetCommand.ExecuteAsync((object)row);
     }
 
+    private void FilterKind_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        => ViewModel.FilterKindIndex = Math.Max(0, FilterKindBox.SelectedIndex);
+
+    private void FilterFormat_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        => ViewModel.FilterFormatIndex = Math.Max(0, FilterFormatBox.SelectedIndex);
+
+    private void FilterRating_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        => ViewModel.FilterRatingIndex = Math.Max(0, FilterRatingBox.SelectedIndex);
+
+    private async void UploadFiltered_Click(object sender, RoutedEventArgs e)
+    {
+        await ViewModel.UploadFilteredAsync();
+    }
+
     private async void Preview_Click(object sender, RoutedEventArgs e)
     {
         if (sender is FrameworkElement { Tag: CloudTargetRow row })

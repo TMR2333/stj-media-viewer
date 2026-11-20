@@ -44,6 +44,68 @@ public sealed partial class CloudViewModel : ObservableObject
     [ObservableProperty]
     private bool _isBusy;
 
+    // ---------------- 只上传筛选出的素材 ----------------
+    public ObservableCollection<string> FilterKindOptions { get; } = new() { "全部类型", "只要图片", "只要视频" };
+    public ObservableCollection<string> FilterFormatOptions { get; } = new() { "全部格式", "只要 JPG", "只要 RAW" };
+    public ObservableCollection<string> FilterRatingOptions { get; } = new() { "不限评分", "1 星及以上", "2 星及以上", "3 星及以上", "4 星及以上", "5 星" };
+
+    [ObservableProperty] private int _filterKindIndex;
+    [ObservableProperty] private int _filterFormatIndex;
+    [ObservableProperty] private int _filterRatingIndex;
+    [ObservableProperty] private bool _filterPickedOnly;
+    [ObservableProperty] private bool _filterUploading;
+    [ObservableProperty] private string _filterUploadStatus = "";
+
+    public Microsoft.UI.Xaml.Visibility FilterProgressVisibility =>
+        FilterUploading ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
+
+    partial void OnFilterUploadingChanged(bool value) => OnPropertyChanged(nameof(FilterProgressVisibility));
+
+    /// <summary>只把"符合上述筛选条件"的素材 + 边车上传到当前选中的同步目标。</summary>
+    public async Task UploadFilteredAsync()
+    {
+        if (FilterUploading) return;
+        var row = SelectedTarget ?? Targets.FirstOrDefault();
+        if (row is null)
+        {
+            FilterUploadStatus = "先添加 / 选择一个同步目标";
+            return;
+        }
+
+        var query = new AssetQuery { Limit = 0, Offset = 0 };
+        if (FilterKindIndex == 1) query.Kinds.Add(MediaKind.Image);
+        else if (FilterKindIndex == 2) query.Kinds.Add(MediaKind.Video);
+        if (FilterFormatIndex == 1) query.Formats.Add("JPG");
+        else if (FilterFormatIndex == 2) query.IsRaw = true;
+        if (FilterRatingIndex > 0) query.MinRating = FilterRatingIndex;
+        if (FilterPickedOnly) query.IsPick = true;
+
+        FilterUploading = true;
+        FilterUploadStatus = "正在统计素材…";
+        try
+        {
+            var progress = new Progress<CloudSyncProgress>(p =>
+            {
+                FilterUploadStatus = p.FilesTotal > 0
+                    ? $"{p.Phase}（{p.FilesProcessed}/{p.FilesTotal}）"
+                    : p.Phase;
+            });
+            var report = await AppServices.Cloud.UploadFilteredAsync(row.Target, query, progress);
+            FilterUploadStatus = $"{report.Summary}" +
+                                 (report.Messages.Count > 0 ? $" · {string.Join("；", report.Messages.Take(3))}" : "");
+            if (report.Uploaded > 0) AppEvents.SetStatus($"已按筛选上传 {report.Uploaded} 个文件");
+        }
+        catch (Exception ex)
+        {
+            FilterUploadStatus = "按筛选上传失败：" + ex.Message;
+            Log.Warn("按筛选上传失败", ex);
+        }
+        finally
+        {
+            FilterUploading = false;
+        }
+    }
+
     /// <summary>XAML 里给按钮绑 IsEnabled 用（IsBusy 的反相）。</summary>
     public bool IsNotBusy => !IsBusy;
 

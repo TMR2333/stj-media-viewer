@@ -302,22 +302,58 @@ public sealed class WebDavCloudStorage : ICloudStorage
             // 先保证父目录逐级存在（PUT 不会自动建目录，坚果云/群晖都返回 409）。
             await EnsureFolderCoreAsync(GetParentRelative(relativePath), ct).ConfigureAwait(false);
 
-            using var request = CreateRequest(HttpMethod.Put, BuildFileUri(relativePath));
-            await using var file = new FileStream(localPath, FileMode.Open, FileAccess.Read, FileShare.Read,
-                128 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan);
-            using var content = new StreamContent(file);
-            // 显式给 Content-Length：大文件走 chunked 时部分 WebDAV 网关会 411/截断。
-            content.Headers.ContentLength = file.Length;
-            content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
-            request.Content = content;
+            // 123pan 的 WebDAV 网关对没有 Expect: 100-continue 的 PUT 会直接断开连接
+            // （小文件也许侥幸成功，JPG/RAW 这种几 MB 起的一律 "Response ended prematurely"）。
+            // 先带 Expect 发；服务器若明确拒绝（417）再回退成普通请求，兼容老服务器。
+            var uploaded = await PutOnceAsync(localPath, relativePath, expectContinue: true, ct).ConfigureAwait(false);
+            if (uploaded is null)
+                return;
 
-            using var response = await SendLoggedAsync(request, ct).ConfigureAwait(false);
-            if (!response.IsSuccessStatusCode)
-                throw await BuildHttpErrorAsync(response, "上传文件", relativePath, ct).ConfigureAwait(false);
+            if (uploaded.StatusCode == HttpStatusCode.ExpectationFailed)
+            {
+                uploaded.Dispose();
+                uploaded = await PutOnceAsync(localPath, relativePath, expectContinue: false, ct).ConfigureAwait(false);
+                if (uploaded is null) return;
+            }
+
+            using (uploaded)
+            {
+                if (!uploaded.IsSuccessStatusCode)
+                    throw await BuildHttpErrorAsync(uploaded, "上传文件", relativePath, ct).ConfigureAwait(false);
+            }
         }
         catch (OperationCanceledException) { throw; }
         catch (IOException) { throw; }
         catch (Exception ex) { throw Wrap("上传文件", relativePath, ex); }
+    }
+
+    /// <summary>
+    /// 发一次 PUT。返回 null 表示"带 Expect 被对端在响应前断开"（部分服务器不认 100-continue），
+    /// 调用方可以决定是否回退；其它异常照常抛。
+    /// </summary>
+    private async Task<HttpResponseMessage?> PutOnceAsync(
+        string localPath, string relativePath, bool expectContinue, CancellationToken ct)
+    {
+        using var request = CreateRequest(HttpMethod.Put, BuildFileUri(relativePath));
+        await using var file = new FileStream(localPath, FileMode.Open, FileAccess.Read, FileShare.Read,
+            128 * 1024, FileOptions.Asynchronous | FileOptions.SequentialScan);
+        using var content = new StreamContent(file);
+        // 显式给 Content-Length：大文件走 chunked 时部分 WebDAV 网关会 411/截断。
+        content.Headers.ContentLength = file.Length;
+        content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        request.Content = content;
+        if (expectContinue) request.Headers.ExpectContinue = true;
+
+        try
+        {
+            return await SendLoggedAsync(request, ct).ConfigureAwait(false);
+        }
+        catch (HttpRequestException ex) when (expectContinue)
+        {
+            // 对端在 100-continue 阶段直接断开：回退成普通 PUT 再试一次
+            Log.Warn($"[webdav] PUT 带 Expect 失败，回退重试：{Path.GetFileName(localPath)}（{ex.Message}）");
+            return null;
+        }
     }
 
     /// <summary>

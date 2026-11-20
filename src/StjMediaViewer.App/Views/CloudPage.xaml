@@ -189,6 +189,64 @@
                                 ActionText="添加同步目标"
                                 ActionInvoked="AddTargetFromEmpty_Click" />
 
+                <!-- ============ 只上传筛选出的素材 ============ -->
+                <Border Background="{ThemeResource AppSurfaceBrush}"
+                        BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{ThemeResource AppCardRadius}"
+                        Padding="18,16">
+                    <StackPanel Spacing="12">
+                        <StackPanel Spacing="2">
+                            <TextBlock Text="只上传筛选出的素材" Style="{ThemeResource AppSubtitleTextStyle}" />
+                            <TextBlock Text="不整目录比对，只把符合下面条件的素材（连同 XMP 边车）直接传到选中的同步目标，云端已有同名文件会覆盖。"
+                                       Style="{ThemeResource AppMicroTextStyle}"
+                                       Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Bottom">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="同步目标" Style="{ThemeResource AppMicroTextStyle}"
+                                           Foreground="{ThemeResource TextTertiaryBrush}" />
+                                <ComboBox Width="220" ItemsSource="{x:Bind ViewModel.Targets, Mode=OneWay}"
+                                          DisplayMemberPath="Name"
+                                          SelectedItem="{x:Bind ViewModel.SelectedTarget, Mode=TwoWay}" />
+                            </StackPanel>
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="类型" Style="{ThemeResource AppMicroTextStyle}"
+                                           Foreground="{ThemeResource TextTertiaryBrush}" />
+                                <ComboBox x:Name="FilterKindBox" Width="130" SelectedIndex="0"
+                                          ItemsSource="{x:Bind ViewModel.FilterKindOptions}"
+                                          SelectionChanged="FilterKind_SelectionChanged" />
+                            </StackPanel>
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="格式" Style="{ThemeResource AppMicroTextStyle}"
+                                           Foreground="{ThemeResource TextTertiaryBrush}" />
+                                <ComboBox x:Name="FilterFormatBox" Width="130" SelectedIndex="0"
+                                          ItemsSource="{x:Bind ViewModel.FilterFormatOptions}"
+                                          SelectionChanged="FilterFormat_SelectionChanged" />
+                            </StackPanel>
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="评分" Style="{ThemeResource AppMicroTextStyle}"
+                                           Foreground="{ThemeResource TextTertiaryBrush}" />
+                                <ComboBox x:Name="FilterRatingBox" Width="140" SelectedIndex="0"
+                                          ItemsSource="{x:Bind ViewModel.FilterRatingOptions}"
+                                          SelectionChanged="FilterRating_SelectionChanged" />
+                            </StackPanel>
+                            <CheckBox Content="只看选用" IsChecked="{x:Bind ViewModel.FilterPickedOnly, Mode=TwoWay}"
+                                      VerticalAlignment="Bottom" />
+                            <Button Content="开始上传" Click="UploadFiltered_Click"
+                                    Style="{ThemeResource AppSubtleButtonStyle}"
+                                    IsEnabled="{x:Bind ViewModel.IsNotBusy, Mode=OneWay}" />
+                        </StackPanel>
+
+                        <ProgressBar IsIndeterminate="True"
+                                     Visibility="{x:Bind ViewModel.FilterProgressVisibility, Mode=OneWay}" />
+                        <TextBlock Text="{x:Bind ViewModel.FilterUploadStatus, Mode=OneWay}"
+                                   Style="{ThemeResource AppMicroTextStyle}"
+                                   Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
                 <!-- ============ 添加 / 编辑 ============ -->
                 <Border Visibility="{x:Bind ViewModel.EditorVisibility, Mode=OneWay}"
                         Background="{ThemeResource AppSurfaceBrush}"

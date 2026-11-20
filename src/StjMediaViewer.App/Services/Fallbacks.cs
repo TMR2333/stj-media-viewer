@@ -451,6 +451,15 @@ internal sealed class FallbackCloudSyncService : ICloudSyncService
             Messages = { "演示模式不执行云同步。" },
         });
 
+    public Task<CloudSyncReport> UploadFilteredAsync(CloudTarget target, StjMediaViewer.Core.Models.AssetQuery query,
+        IProgress<CloudSyncProgress>? progress = null, CancellationToken ct = default)
+        => Task.FromResult(new CloudSyncReport
+        {
+            TargetId = target.Id,
+            TargetName = target.Name,
+            Messages = { "演示模式不执行云同步。" },
+        });
+
     public Task<CloudSyncReport> SyncAsync(CloudTarget target, bool dryRun = false, IProgress<CloudSyncProgress>? progress = null, CancellationToken ct = default)
         => Task.FromResult(new CloudSyncReport
         {

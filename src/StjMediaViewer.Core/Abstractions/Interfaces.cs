@@ -444,6 +444,16 @@ public interface ICloudSyncService
         IProgress<CloudSyncProgress>? progress = null,
         CancellationToken ct = default);
 
+    /// <summary>
+    /// 只上传"符合筛选条件"的素材：按 <see cref="AssetQuery"/> 在索引里选素材，
+    /// 把本地文件 + 边车 PUT 到云端对应相对路径（已存在则覆盖）。
+    /// </summary>
+    Task<CloudSyncReport> UploadFilteredAsync(
+        CloudTarget target,
+        AssetQuery query,
+        IProgress<CloudSyncProgress>? progress = null,
+        CancellationToken ct = default);
+
     /// <summary>一步到位：比对 + 执行。</summary>
     Task<CloudSyncReport> SyncAsync(
         CloudTarget target,
