@@ -1,6 +1,9 @@
 # stj-media-viewer
 
 > **Stjarna PERSPECTIVE 出品 · co-worked with DeepSeek Harness**
+>
+> 文档：[项目手册（功能 + 踩坑 + 经验）](docs/PROJECT-HANDBOOK.md) ·
+> [macOS 原生版提示词](docs/MACOS-PROMPT.md) · [架构](docs/ARCHITECTURE.md) · [设计令牌](docs/THEME-TOKENS.md) · [更新日志](CHANGELOG.md)
 
 面向专业创作者的 **Windows 原生素材整理软件**。选一个媒体库文件夹，它递归扫描、排除非媒体、解析元数据、自动分类，并给你一个能按 9 个维度检索的素材库。界面遵循**微软 Fluent 设计语言**（WinUI 3 原生、Mica 背板、Segoe UI Variable 字阶），支持跟随系统 / 浅色 / 深色。
 
@@ -591,7 +594,7 @@ ffmpeg 是可选的：把 `ffmpeg.exe` 放到 `tools/ffmpeg/bin/`（或 PATH）�
 | 产物 | 大小 | 说明 |
 | --- | --- | --- |
 | `STJMediaViewer-Setup.exe` | ≈143 MB | **安装包**，带图形界面：可**自定义安装目录**、可选创建桌面快捷方式；装到用户目录，不需要管理员权限 |
-| `STJMediaViewer-1.24.1-portable.exe` | ≈143 MB | **便携版**：单文件，双击后解压到 `%LOCALAPPDATA%\StjMediaViewerPortable` 并直接启动；不写注册表、不建快捷方式 |
+| `STJMediaViewer-1.25.0-portable.exe` | ≈143 MB | **便携版**：单文件，双击后解压到 `%LOCALAPPDATA%\StjMediaViewerPortable` 并直接启动；不写注册表、不建快捷方式 |
 
 > 旧的 `*-portable-win-x64.zip` 已废弃：压缩包里的 exe 直接双击容易踩「没解压就在压缩包里运行 / SmartScreen 拦截」，
 > 现在改成**单文件便携 exe**，双击即用。
@@ -622,8 +625,8 @@ STJMediaViewer-Setup.exe                      交互式安装（选目录）
 STJMediaViewer-Setup.exe /S                   静默安装到默认目录
 STJMediaViewer-Setup.exe /S /D=D:\Apps\STJ  静默安装到指定目录
 STJMediaViewer-Setup.exe /uninstall           卸载（/S 静默；/D= 指定安装目录）
-STJMediaViewer-1.24.1-portable.exe            便携版：解压 + 启动
-STJMediaViewer-1.24.1-portable.exe /D=D:\STJ 便携版解压到指定目录
+STJMediaViewer-1.25.0-portable.exe            便携版：解压 + 启动
+STJMediaViewer-1.25.0-portable.exe /D=D:\STJ 便携版解压到指定目录
 ```
 
 **卸载**：Windows 设置 → 应用 → 已安装的应用（或 `Setup.exe /uninstall`）。
@@ -643,6 +646,10 @@ STJMediaViewer-1.24.1-portable.exe /D=D:\STJ 便携版解压到指定目录
 ## 3.3 macOS 版（SwiftUI 原生）
 
 Windows 主版本用 WinUI 3；macOS 版是独立的 SwiftUI 原生应用，见 [`macos/README.md`](macos/README.md)。
+
+- **给 macOS 端 DSH 的完整提示词**：[`docs/MACOS-PROMPT.md`](docs/MACOS-PROMPT.md)
+  （原生 SwiftUI/AppKit、Apple HIG、数据契约、分阶段功能清单、验收与已知坑，可直接复制使用）；
+- **项目手册（全部功能 + 踩过的坑 + 工程经验）**：[`docs/PROJECT-HANDBOOK.md`](docs/PROJECT-HANDBOOK.md)。
 
 - **当前阶段 P1 = 只读素材库浏览器**：读同一份 `catalog.db` + 缩略图缓存，原生三栏界面、
   筛选/搜索/排序、检视面板、拖出到其他软件；不做写库与导入（P2–P5 见路线图）。
@@ -673,7 +680,7 @@ tools/MetaSmoke / MediaSmoke / dev
 
 | 指标 | 结果 |
 |---|---|
-| 端到端自检 | **69 项检查全部通过 / 0 失败**；其中 manifest 逐字段断言 **618/618 全过** |
+| 端到端自检 | **451 项检查全部通过 / 0 失败** |
 | 真实 HTTP AI 链路 | 用本地 MockAiServer 实测：连接测试 / 单张分类 / 确定性 / 批量写回 全通过 |
 | 59 个媒体文件全链路扫描 | 1 线程 308ms，8 线程 38ms（结果逐字段一致） |
 | 单文件元数据解析 | 平均 3.3ms（稳态 <5ms），60MB RAW 预览提取 12ms |
@@ -746,9 +753,9 @@ dotnet build tools/SelfCheck/StjMediaViewer.SelfCheck.csproj
 
 ### 3.5 版本号与发行流程
 
-当前版本 **v1.24.1**，历史见 [CHANGELOG.md](CHANGELOG.md)。
+当前版本 **v1.25.0**，历史见 [CHANGELOG.md](CHANGELOG.md)。
 
-- 规则：每次对外更新都 **+1 版本号**（`1.24.0` → `1.24.1` → `1.24.2` → …），同步改应用/安装器/便携版/macOS Info.plist；
+- 规则：每次对外更新都 **+1 版本号**（`1.24.1` → `1.25.0` → `1.25.1` → …），同步改应用/安装器/便携版/macOS Info.plist；
 - 每次发版：`git tag v<版本>` + 推送到 GitCode + 创建发行版（Release）；
 - 一键脚本（版本、构建、提交、打标签、推送、创建发行版）：
 
@@ -759,7 +766,7 @@ powershell -ExecutionPolicy Bypass -File tools/release.ps1 -Version 1.0.4 -Notes
 
 - 仓库：<https://gitcode.com/TMR2333/stj-media-viewer>
 - 发行版：<https://gitcode.com/TMR2333/stj-media-viewer/releases>
-  - v1.24.1：安装包 + 便携版（Release 附件直下）
+  - v1.25.0：安装包 + 便携版（Release 附件直下）
 
 **每次更新都会：**改版本号 → 构建 → 提交 → 打 tag → 推送 → 建发行版并上传安装包/便携版。
 
