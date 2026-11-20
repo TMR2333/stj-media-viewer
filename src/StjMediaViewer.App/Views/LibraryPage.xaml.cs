@@ -55,6 +55,9 @@ public sealed partial class LibraryPage : Page
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_ORIGIN_FILTER") == "1")
+            _ = DemoOriginAsync();
+
         AttachEvents();
         ApplyDensity(_density);
         // 首次布局后按当前窗口尺寸决定三栏开合（之前用固定 true，会在窄窗口把检视面板顶出来）
@@ -567,6 +570,12 @@ public sealed partial class LibraryPage : Page
         }
         _ = ShellViewModel.Shared.RefreshCacheSizeAsync();
         TryHookScrollViewer();
+    }
+
+    private async Task DemoOriginAsync()
+    {
+        await Task.Delay(2500);
+        ViewModel.DemoSelectOrigin();
     }
 
     private void OnUnloaded(object sender, RoutedEventArgs e) => DetachEvents();

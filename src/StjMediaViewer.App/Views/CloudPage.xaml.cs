@@ -25,6 +25,7 @@ public sealed partial class CloudPage : Page
         await ViewModel.InitializeAsync();
         SyncEditorSelections();
         if (Environment.GetEnvironmentVariable("STJ_DEMO_CLOUD_FILTER") == "1") DemoCloudFilterAsync();
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_CLOUD_UPLOAD") == "1") DemoCloudUploadAsync();
 
         // 截图 / 验收用：自动对第一个目标跑一次连接诊断
         if (Environment.GetEnvironmentVariable("STJ_DEMO_CLOUD_DIAG") == "1" &&
@@ -82,6 +83,24 @@ public sealed partial class CloudPage : Page
     {
         if (sender is FrameworkElement { Tag: CloudTargetRow row })
             await ViewModel.DeleteTargetCommand.ExecuteAsync((object)row);
+    }
+
+    // 验收用：STJ_DEMO_CLOUD_UPLOAD=1 → 只上传「拍摄地点 = 第一个分类值」的素材
+    private async void DemoCloudUploadAsync()
+    {
+        try
+        {
+            await Task.Delay(3500);
+            ViewModel.FilterDimensionIndex = 2;
+            await ViewModel.RefreshFilterValuesAsync();
+            await Task.Delay(300);
+            if (ViewModel.FilterValueOptions.Count > 1) ViewModel.FilterValueIndex = 1;
+            Core.Util.Log.Info($"[demo-upload] dim={ViewModel.FilterDimensionIndex} values={ViewModel.FilterValueOptions.Count} " +
+                               $"value={ViewModel.FilterValueOptions.ElementAtOrDefault(ViewModel.FilterValueIndex)}");
+            await ViewModel.UploadFilteredAsync();
+            Core.Util.Log.Info($"[demo-upload] done: {ViewModel.FilterUploadStatus}");
+        }
+        catch (Exception ex) { Core.Util.Log.Warn("[demo-upload] failed", ex); }
     }
 
     // 验收用：STJ_DEMO_CLOUD_FILTER=1 选「拍摄地点」，检查分类值是否加载出来

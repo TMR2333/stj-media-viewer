@@ -252,6 +252,7 @@ public sealed partial class ShellPage : Page
 
     private void NavigateTo(string viewId)
     {
+        Core.Util.Log.Info($"[nav] → {viewId}");
         var pageType = ResolvePageType(viewId);
         if (pageType is not null)
         {

@@ -64,6 +64,8 @@ public partial class App : Application
             }
         };
 
+        Services.CrashGuard.Install();
+
         UnhandledException += (_, e) =>
         {
             Core.Util.Log.Error("未处理异常（UI 线程）", e.Exception);

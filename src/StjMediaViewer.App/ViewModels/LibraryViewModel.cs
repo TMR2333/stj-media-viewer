@@ -566,6 +566,24 @@ public sealed partial class LibraryViewModel : ObservableObject
         RequestRefresh(immediate: true);
     }
 
+    /// <summary>验收用：选中「云同步来源 → 本地文件」并立即刷新，检查筛选链路是否正常。</summary>
+    public void DemoSelectOrigin()
+    {
+        try
+        {
+            _suppressRefresh = true;
+            try
+            {
+                foreach (var o in OriginGroup.Options)
+                    o.SetSelectedSilently(o.Id == "__unset__");
+            }
+            finally { _suppressRefresh = false; }
+            Log.Info($"[demo] origin filter: options={OriginGroup.Options.Count} selected={string.Join(",", OriginGroup.SelectedIds)}");
+            RequestRefresh(immediate: true);
+        }
+        catch (Exception ex) { Log.Warn("[demo] origin filter failed", ex); }
+    }
+
     public void RequestRefresh(bool immediate = false)
     {
         _refreshVersion++;

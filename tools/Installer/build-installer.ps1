@@ -7,7 +7,7 @@
 
 param(
     [switch]$SkipAppPublish,
-    [string]$Version = "1.24.0"
+    [string]$Version = "1.24.1"
 )
 
 $ErrorActionPreference = "Stop"

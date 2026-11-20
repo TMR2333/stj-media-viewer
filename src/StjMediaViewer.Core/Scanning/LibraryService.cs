@@ -272,13 +272,15 @@ public sealed class LibraryService : ILibraryService
             try
             {
                 var origins = SafeSettings().CloudOrigins;
-                if (origins.Count > 0)
+                Dictionary<string, string>? snapshot = null;
+                lock (origins) { if (origins.Count > 0) snapshot = new Dictionary<string, string>(origins); }
+                if (snapshot is { Count: > 0 })
                 {
                     int stamped = 0;
                     foreach (var a in assets)
                     {
                         if (!string.IsNullOrEmpty(a.Origin)) continue;
-                        if (origins.TryGetValue(PathUtil.Normalize(a.FullPath), out var origin) && !string.IsNullOrWhiteSpace(origin))
+                        if (snapshot.TryGetValue(PathUtil.Normalize(a.FullPath), out var origin) && !string.IsNullOrWhiteSpace(origin))
                         {
                             a.Origin = origin;
                             stamped++;

@@ -229,7 +229,7 @@ public static class AppServices
             try
             {
                 var settings = Settings.Current;
-                settings.CloudOrigins[PathUtil.Normalize(path)] = origin;
+                lock (settings.CloudOrigins) settings.CloudOrigins[PathUtil.Normalize(path)] = origin;
                 _ = Settings.SaveAsync();
             }
             catch (Exception ex) { Log.Warn($"[cloud] 记录来源失败：{ex.Message}"); }
