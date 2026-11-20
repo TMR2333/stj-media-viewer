@@ -3,7 +3,9 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Microsoft.UI.Xaml;
 using StjMediaViewer.App.Services;
+using StjMediaViewer.Core.Cloud;
 using StjMediaViewer.Core.Models;
+using StjMediaViewer.Core.Write;
 using StjMediaViewer.Core.Settings;
 using StjMediaViewer.Core.Util;
 
@@ -22,6 +24,24 @@ public sealed partial class CloudViewModel : ObservableObject
     private CloudViewModel()
     {
         AutoText = "自动同步：未启用";
+        foreach (var dim in OrganizeDimensions.All)
+        {
+            var label = dim.Display();
+            LayoutPrimaryOptions.Add(label);
+            LayoutSecondaryOptions.Add(label);
+            LayoutTertiaryOptions.Add(label);
+        }
+        // 注意：这里不能用下方声明的静态字段 FilterableDimensions —— 静态字段初始化顺序在
+        // Shared = new() 之后，构造函数里读到还是 null（早期 WatermarkViewModel 踩过同样的坑）。
+        foreach (var dim in new[]
+                 {
+                     OrganizeDimension.Device, OrganizeDimension.City, OrganizeDimension.Year,
+                     OrganizeDimension.Theme, OrganizeDimension.Tone, OrganizeDimension.Format,
+                     OrganizeDimension.Kind,
+                 })
+        {
+            FilterDimensionOptions.Add(dim.Display());
+        }
     }
 
     // ------------------------------------------------------------------ 列表
@@ -44,14 +64,33 @@ public sealed partial class CloudViewModel : ObservableObject
     [ObservableProperty]
     private bool _isBusy;
 
-    // ---------------- 只上传筛选出的素材 ----------------
-    public ObservableCollection<string> FilterKindOptions { get; } = new() { "全部类型", "只要图片", "只要视频" };
-    public ObservableCollection<string> FilterFormatOptions { get; } = new() { "全部格式", "只要 JPG", "只要 RAW" };
-    public ObservableCollection<string> FilterRatingOptions { get; } = new() { "不限评分", "1 星及以上", "2 星及以上", "3 星及以上", "4 星及以上", "5 星" };
+    // ---------------- 只上传筛选出的素材（按分类 + 三级目录） ----------------
 
-    [ObservableProperty] private int _filterKindIndex;
-    [ObservableProperty] private int _filterFormatIndex;
-    [ObservableProperty] private int _filterRatingIndex;
+    /// <summary>可用来筛选的分类维度（和左侧筛选面板一致）。</summary>
+    private static readonly OrganizeDimension[] FilterableDimensions =
+    {
+        OrganizeDimension.Device,
+        OrganizeDimension.City,
+        OrganizeDimension.Year,
+        OrganizeDimension.Theme,
+        OrganizeDimension.Tone,
+        OrganizeDimension.Format,
+        OrganizeDimension.Kind,
+    };
+
+    public ObservableCollection<string> FilterDimensionOptions { get; } =
+        new() { "不限分类" };
+    public ObservableCollection<string> FilterValueOptions { get; } = new() { "全部分类" };
+
+    public ObservableCollection<string> LayoutPrimaryOptions { get; } = new() { "不分类" };
+    public ObservableCollection<string> LayoutSecondaryOptions { get; } = new() { "不分类" };
+    public ObservableCollection<string> LayoutTertiaryOptions { get; } = new() { "不分类" };
+
+    [ObservableProperty] private int _filterDimensionIndex;
+    [ObservableProperty] private int _filterValueIndex;
+    [ObservableProperty] private int _layoutPrimaryIndex;
+    [ObservableProperty] private int _layoutSecondaryIndex;
+    [ObservableProperty] private int _layoutTertiaryIndex;
     [ObservableProperty] private bool _filterPickedOnly;
     [ObservableProperty] private bool _filterUploading;
     [ObservableProperty] private string _filterUploadStatus = "";
@@ -61,7 +100,111 @@ public sealed partial class CloudViewModel : ObservableObject
 
     partial void OnFilterUploadingChanged(bool value) => OnPropertyChanged(nameof(FilterProgressVisibility));
 
-    /// <summary>只把"符合上述筛选条件"的素材 + 边车上传到当前选中的同步目标。</summary>
+    partial void OnSelectedTargetChanged(CloudTargetRow? value) => _ = RefreshFilterValuesAsync();
+
+    partial void OnFilterDimensionIndexChanged(int value) => _ = RefreshFilterValuesAsync();
+
+    /// <summary>当前可选的分类值（维度 0 = 不限）。</summary>
+    private List<(string Key, string Label)> _filterValues = new();
+
+    /// <summary>并发刷新保护：只有最后一次刷新能写下拉，避免重复项。</summary>
+    private int _filterRefreshVersion;
+
+    /// <summary>按当前维度/目标库读分面，填充"分类值"下拉。</summary>
+    public async Task RefreshFilterValuesAsync()
+    {
+        var version = Interlocked.Increment(ref _filterRefreshVersion);
+        try
+        {
+            var values = await LoadFilterValuesCoreAsync(version);
+            if (version != Volatile.Read(ref _filterRefreshVersion)) return;   // 已有更新的刷新，丢弃本次
+
+            FilterValueOptions.Clear();
+            _filterValues = values;
+            FilterValueOptions.Add("全部分类");
+            foreach (var (_, label) in _filterValues) FilterValueOptions.Add(label);
+            FilterValueIndex = 0;
+            OnPropertyChanged(nameof(FilterValueIndex));
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("读取云同步筛选值失败", ex);
+        }
+    }
+
+    private async Task<List<(string Key, string Label)>> LoadFilterValuesCoreAsync(int version)
+    {
+        if (FilterDimensionIndex <= 0 || FilterDimensionIndex > FilterableDimensions.Length)
+            return new List<(string, string)>();
+
+        var dimension = FilterableDimensions[FilterDimensionIndex - 1];
+        try
+        {
+            var query = new AssetQuery { Limit = 0 };
+            var target = SelectedTarget?.Target;
+            if (target is not null && !string.IsNullOrWhiteSpace(target.LocalFolderPath))
+            {
+                var libraries = await AppServices.Library.GetLibrariesAsync();
+                var match = libraries
+                    .Where(l => !string.IsNullOrWhiteSpace(l.Path) &&
+                                Path.GetFullPath(target.LocalFolderPath)
+                                    .StartsWith(Path.GetFullPath(l.Path).TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(l => l.Path.Length)
+                    .FirstOrDefault();
+                query.LibraryId = match?.Id;
+            }
+
+            var facets = await AppServices.Store.GetFacetsAsync(query);
+            // 分面里同一个城市可能因为空白/大小写出现两份，这里按 key 去重并去掉空值
+            static List<(string Key, string Label)> Dedupe(IEnumerable<(string Key, string Label)> rows) =>
+                rows.Where(r => !string.IsNullOrWhiteSpace(r.Key))
+                    .GroupBy(r => r.Key.Trim(), StringComparer.OrdinalIgnoreCase)
+                    .Select(g => g.First())
+                    .ToList();
+
+            var values = Dedupe(dimension switch
+            {
+                OrganizeDimension.Device => facets.ByDevice
+                    .OrderByDescending(kv => kv.Value)
+                    .Select(kv => (kv.Key, AppServices.DeviceAlias(kv.Key))).ToList(),
+                OrganizeDimension.City => facets.ByCity
+                    .OrderByDescending(kv => kv.Value)
+                    .Select(kv => (kv.Key, kv.Key)).ToList(),
+                OrganizeDimension.Year => facets.ByYear
+                    .OrderByDescending(kv => kv.Key)
+                    .Select(kv => (kv.Key, kv.Key + " 年")).ToList(),
+                OrganizeDimension.Theme => facets.ByTheme
+                    .OrderByDescending(kv => kv.Value)
+                    .Select(kv => (kv.Key, Vocabularies.ThemeDisplay(kv.Key, "zh-CN"))).ToList(),
+                OrganizeDimension.Tone => facets.ByTone
+                    .OrderByDescending(kv => kv.Value)
+                    .Select(kv => (kv.Key, Vocabularies.ToneDisplay(kv.Key, "zh-CN"))).ToList(),
+                OrganizeDimension.Format => facets.ByFormat
+                    .OrderByDescending(kv => kv.Value)
+                    .Select(kv => (kv.Key, kv.Key)).ToList(),
+                OrganizeDimension.Kind => facets.ByKind
+                    .OrderByDescending(kv => kv.Value)
+                    .Select(kv => (kv.Key, kv.Key switch
+                    {
+                        "0" => "未知",
+                        "1" => "图片",
+                        "2" => "视频",
+                        "3" => "音频",
+                        _ => kv.Key,
+                    })).ToList(),
+                _ => new List<(string, string)>(),
+            });
+
+            return values;
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("读取云同步筛选值失败", ex);
+            return new List<(string, string)>();
+        }
+    }
+
+    /// <summary>只把"符合分类筛选"的素材 + 边车上传到当前同步目标；可按三级目录重建云端路径。</summary>
     public async Task UploadFilteredAsync()
     {
         if (FilterUploading) return;
@@ -73,12 +216,50 @@ public sealed partial class CloudViewModel : ObservableObject
         }
 
         var query = new AssetQuery { Limit = 0, Offset = 0 };
-        if (FilterKindIndex == 1) query.Kinds.Add(MediaKind.Image);
-        else if (FilterKindIndex == 2) query.Kinds.Add(MediaKind.Video);
-        if (FilterFormatIndex == 1) query.Formats.Add("JPG");
-        else if (FilterFormatIndex == 2) query.IsRaw = true;
-        if (FilterRatingIndex > 0) query.MinRating = FilterRatingIndex;
+
+        // 分类筛选
+        if (FilterDimensionIndex > 0 && FilterDimensionIndex <= FilterableDimensions.Length &&
+            FilterValueIndex > 0 && FilterValueIndex <= _filterValues.Count)
+        {
+            var dimension = FilterableDimensions[FilterDimensionIndex - 1];
+            var value = _filterValues[FilterValueIndex - 1].Key;
+            switch (dimension)
+            {
+                case OrganizeDimension.Device: query.Devices.Add(value); break;
+                case OrganizeDimension.City: query.Cities.Add(value); break;
+                case OrganizeDimension.Theme: query.Themes.Add(value); break;
+                case OrganizeDimension.Tone: query.Tones.Add(value); break;
+                case OrganizeDimension.Format: query.Formats.Add(value); break;
+                case OrganizeDimension.Kind:
+                    if (int.TryParse(value, out var kind)) query.Kinds.Add((MediaKind)kind);
+                    break;
+                case OrganizeDimension.Year:
+                    if (int.TryParse(value, out var year))
+                    {
+                        query.CapturedFrom = new DateTimeOffset(year, 1, 1, 0, 0, 0, TimeSpan.FromHours(8));
+                        query.CapturedTo = query.CapturedFrom.Value.AddYears(1).AddTicks(-1);
+                    }
+                    break;
+            }
+        }
+
         if (FilterPickedOnly) query.IsPick = true;
+
+        // 云端目录：选了维度就按分类重建
+        var layout = new List<OrganizeDimension>();
+        void AddLayout(int index, IReadOnlyList<string> options)
+        {
+            if (index <= 0 || index >= options.Count) return;
+            var name = options[index];
+            var dim = OrganizeDimensions.All.FirstOrDefault(d => d.Display() == name);
+            if (OrganizeDimensions.All.Contains(dim)) layout.Add(dim);
+        }
+        AddLayout(LayoutPrimaryIndex, LayoutPrimaryOptions);
+        AddLayout(LayoutSecondaryIndex, LayoutSecondaryOptions);
+        AddLayout(LayoutTertiaryIndex, LayoutTertiaryOptions);
+
+        if (AppServices.Cloud is CloudSyncService svc)
+            svc.AliasLookup = AppServices.Settings.Current.DeviceAliases;
 
         FilterUploading = true;
         FilterUploadStatus = "正在统计素材…";
@@ -90,15 +271,16 @@ public sealed partial class CloudViewModel : ObservableObject
                     ? $"{p.Phase}（{p.FilesProcessed}/{p.FilesTotal}）"
                     : p.Phase;
             });
-            var report = await AppServices.Cloud.UploadFilteredAsync(row.Target, query, progress);
-            FilterUploadStatus = $"{report.Summary}" +
+            var report = await AppServices.Cloud.UploadFilteredAsync(
+                row.Target, query, progress, layout.Count > 0 ? layout : null);
+            FilterUploadStatus = report.Summary +
                                  (report.Messages.Count > 0 ? $" · {string.Join("；", report.Messages.Take(3))}" : "");
-            if (report.Uploaded > 0) AppEvents.SetStatus($"已按筛选上传 {report.Uploaded} 个文件");
+            if (report.Uploaded > 0) AppEvents.SetStatus($"已按分类上传 {report.Uploaded} 个文件");
         }
         catch (Exception ex)
         {
-            FilterUploadStatus = "按筛选上传失败：" + ex.Message;
-            Log.Warn("按筛选上传失败", ex);
+            FilterUploadStatus = "按分类上传失败：" + ex.Message;
+            Log.Warn("按分类上传失败", ex);
         }
         finally
         {
@@ -386,6 +568,11 @@ public sealed partial class CloudViewModel : ObservableObject
             case "synology":
                 EditorEndpoint = "https://192.168.1.2:5006/dav";
                 EditorName = "群晖 NAS";
+                break;
+            case "pan123":
+                EditorEndpoint = "https://webdav.123pan.cn/webdav";
+                EditorName = "123 云盘";
+                EditorSubPath = "stj-media-viewer";
                 break;
         }
         EditorKind = "webdav";

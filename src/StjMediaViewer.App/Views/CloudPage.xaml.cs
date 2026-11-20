@@ -24,6 +24,7 @@ public sealed partial class CloudPage : Page
         PageLayout.Fit(PageScroll, PageContent);
         await ViewModel.InitializeAsync();
         SyncEditorSelections();
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_CLOUD_FILTER") == "1") DemoCloudFilterAsync();
 
         // 截图 / 验收用：自动对第一个目标跑一次连接诊断
         if (Environment.GetEnvironmentVariable("STJ_DEMO_CLOUD_DIAG") == "1" &&
@@ -83,14 +84,32 @@ public sealed partial class CloudPage : Page
             await ViewModel.DeleteTargetCommand.ExecuteAsync((object)row);
     }
 
-    private void FilterKind_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        => ViewModel.FilterKindIndex = Math.Max(0, FilterKindBox.SelectedIndex);
+    // 验收用：STJ_DEMO_CLOUD_FILTER=1 选「拍摄地点」，检查分类值是否加载出来
+    private async void DemoCloudFilterAsync()
+    {
+        try
+        {
+            await Task.Delay(2500);
+            ViewModel.FilterDimensionIndex = 2;   // 拍摄地点（FilterableDimensions[1]）
+            await ViewModel.RefreshFilterValuesAsync();
+            Core.Util.Log.Info($"[cloud-filter] dim={ViewModel.FilterDimensionOptions.ElementAtOrDefault(ViewModel.FilterDimensionIndex)} " +
+                               $"values={ViewModel.FilterValueOptions.Count} first={string.Join("/", ViewModel.FilterValueOptions.Take(4))}");
+        }
+        catch (Exception ex) { Core.Util.Log.Warn("[cloud-filter] 失败", ex); }
+    }
 
-    private void FilterFormat_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        => ViewModel.FilterFormatIndex = Math.Max(0, FilterFormatBox.SelectedIndex);
+    private void FilterDimension_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        => ViewModel.FilterDimensionIndex = Math.Max(0, FilterDimensionBox.SelectedIndex);
 
-    private void FilterRating_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        => ViewModel.FilterRatingIndex = Math.Max(0, FilterRatingBox.SelectedIndex);
+    private void FilterValue_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        => ViewModel.FilterValueIndex = Math.Max(0, FilterValueBox.SelectedIndex);
+
+    private void Layout_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        ViewModel.LayoutPrimaryIndex = Math.Max(0, LayoutPrimaryBox.SelectedIndex);
+        ViewModel.LayoutSecondaryIndex = Math.Max(0, LayoutSecondaryBox.SelectedIndex);
+        ViewModel.LayoutTertiaryIndex = Math.Max(0, LayoutTertiaryBox.SelectedIndex);
+    }
 
     private async void UploadFiltered_Click(object sender, RoutedEventArgs e)
     {

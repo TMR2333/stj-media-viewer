@@ -1,5 +1,6 @@
 using StjMediaViewer.Core.Abstractions;
 using StjMediaViewer.Core.Models;
+using StjMediaViewer.Core.Write;
 using StjMediaViewer.Core.Util;
 
 namespace StjMediaViewer.Core.Cloud;
@@ -87,6 +88,9 @@ public sealed class CloudSyncService : ICloudSyncService
     }
 
     private readonly Func<CloudTarget, ICloudStorage>? _storageFactory;
+
+    /// <summary>三级目录里"设备"维度用的别名表（按需注入，缺失就用原名）。</summary>
+    public IReadOnlyDictionary<string, string>? AliasLookup { get; set; }
 
     /// <summary>最近一次本机扫描时被忽略的垃圾文件数。</summary>
     private int _ignoredJunk;
@@ -571,6 +575,7 @@ public sealed class CloudSyncService : ICloudSyncService
         CloudTarget target,
         AssetQuery query,
         IProgress<CloudSyncProgress>? progress = null,
+        IReadOnlyList<OrganizeDimension>? remoteLayout = null,
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(target);
@@ -600,6 +605,19 @@ public sealed class CloudSyncService : ICloudSyncService
             report.Messages.Add(ex.Message);
             report.Elapsed = sw.Elapsed;
             return report;
+        }
+
+        // 云端目录：null / 空 = 保持本地相对路径；给了一/二/三级维度 = 按分类重建目录
+        OrganizeOptions? layoutOptions = null;
+        if (remoteLayout is { Count: > 0 })
+        {
+            layoutOptions = new OrganizeOptions
+            {
+                Primary = remoteLayout[0],
+                Secondary = remoteLayout.Count > 1 ? remoteLayout[1] : null,
+                Tertiary = remoteLayout.Count > 2 ? remoteLayout[2] : null,
+                DeviceAliases = AliasLookup,
+            };
         }
 
         query.Limit = 0;
@@ -658,6 +676,14 @@ public sealed class CloudSyncService : ICloudSyncService
                 }
 
                 var remotePath = relative.Replace('\\', '/');
+                if (layoutOptions is not null)
+                {
+                    string category;
+                    try { category = OrganizerService.CategoryPathFor(asset, layoutOptions); }
+                    catch { category = ""; }
+                    if (!string.IsNullOrWhiteSpace(category))
+                        remotePath = category.Replace('\\', '/') + "/" + Path.GetFileName(asset.FullPath);
+                }
                 var size = new FileInfo(asset.FullPath).Length;
                 await storage.UploadAsync(asset.FullPath, remotePath, ct).ConfigureAwait(false);
                 report.Uploaded++;

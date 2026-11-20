@@ -452,7 +452,9 @@ internal sealed class FallbackCloudSyncService : ICloudSyncService
         });
 
     public Task<CloudSyncReport> UploadFilteredAsync(CloudTarget target, StjMediaViewer.Core.Models.AssetQuery query,
-        IProgress<CloudSyncProgress>? progress = null, CancellationToken ct = default)
+        IProgress<CloudSyncProgress>? progress = null,
+        IReadOnlyList<StjMediaViewer.Core.Write.OrganizeDimension>? remoteLayout = null,
+        CancellationToken ct = default)
         => Task.FromResult(new CloudSyncReport
         {
             TargetId = target.Id,

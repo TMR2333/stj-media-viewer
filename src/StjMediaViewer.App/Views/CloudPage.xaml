@@ -29,7 +29,7 @@
 
                     <StackPanel Spacing="4">
                         <TextBlock Text="云同步" Style="{ThemeResource AppDisplayTextStyle}" />
-                        <TextBlock Text="把素材库同步到坚果云 / Nextcloud / 群晖 NAS，或任意本地挂载目录；支持双向同步与后台自动同步。"
+                        <TextBlock Text="三步：① 添加一个同步目标（云盘 / NAS / 挂载目录）→ ② 先「预览差异」确认要传哪些 → ③ 「立即同步」。只想传某一类素材，用下面的「只上传某一类素材」。"
                                    Style="{ThemeResource AppCaptionTextStyle}"
                                    Foreground="{ThemeResource TextSecondaryBrush}"
                                    TextWrapping="Wrap" />
@@ -189,7 +189,7 @@
                                 ActionText="添加同步目标"
                                 ActionInvoked="AddTargetFromEmpty_Click" />
 
-                <!-- ============ 只上传筛选出的素材 ============ -->
+                <!-- ============ 只上传筛选出的素材（按分类 + 三级目录） ============ -->
                 <Border Background="{ThemeResource AppSurfaceBrush}"
                         BorderBrush="{ThemeResource AppCardStrokeBrush}"
                         BorderThickness="1"
@@ -197,46 +197,67 @@
                         Padding="18,16">
                     <StackPanel Spacing="12">
                         <StackPanel Spacing="2">
-                            <TextBlock Text="只上传筛选出的素材" Style="{ThemeResource AppSubtitleTextStyle}" />
-                            <TextBlock Text="不整目录比对，只把符合下面条件的素材（连同 XMP 边车）直接传到选中的同步目标，云端已有同名文件会覆盖。"
+                            <TextBlock Text="只上传某一类素材" Style="{ThemeResource AppSubtitleTextStyle}" />
+                            <TextBlock Text="先在下面按「分类」挑出要传的素材（设备 / 地点 / 年份 / 主题…），再选云端要不要按三级目录存放。不整目录比对，符合的素材连同 XMP 边车直接上传，云端同名文件会覆盖。"
                                        Style="{ThemeResource AppMicroTextStyle}"
                                        Foreground="{ThemeResource TextSecondaryBrush}" TextWrapping="Wrap" />
                         </StackPanel>
 
-                        <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Bottom">
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="同步目标" Style="{ThemeResource AppMicroTextStyle}"
-                                           Foreground="{ThemeResource TextTertiaryBrush}" />
-                                <ComboBox Width="220" ItemsSource="{x:Bind ViewModel.Targets, Mode=OneWay}"
-                                          DisplayMemberPath="Name"
-                                          SelectedItem="{x:Bind ViewModel.SelectedTarget, Mode=TwoWay}" />
+                        <!-- 第 1 步：挑素材 -->
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="① 上传哪些素材" Style="{ThemeResource AppCaptionTextStyle}" />
+                            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Bottom">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="同步目标" Style="{ThemeResource AppMicroTextStyle}"
+                                               Foreground="{ThemeResource TextTertiaryBrush}" />
+                                    <ComboBox Width="200" ItemsSource="{x:Bind ViewModel.Targets, Mode=OneWay}"
+                                              DisplayMemberPath="Name"
+                                              SelectedItem="{x:Bind ViewModel.SelectedTarget, Mode=TwoWay}" />
+                                </StackPanel>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="分类维度" Style="{ThemeResource AppMicroTextStyle}"
+                                               Foreground="{ThemeResource TextTertiaryBrush}" />
+                                    <ComboBox x:Name="FilterDimensionBox" Width="180" SelectedIndex="0"
+                                              ItemsSource="{x:Bind ViewModel.FilterDimensionOptions}"
+                                              SelectionChanged="FilterDimension_SelectionChanged" />
+                                </StackPanel>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="分类值" Style="{ThemeResource AppMicroTextStyle}"
+                                               Foreground="{ThemeResource TextTertiaryBrush}" />
+                                    <ComboBox x:Name="FilterValueBox" Width="200"
+                                              ItemsSource="{x:Bind ViewModel.FilterValueOptions}"
+                                              SelectedIndex="{x:Bind ViewModel.FilterValueIndex, Mode=OneWay}"
+                                              SelectionChanged="FilterValue_SelectionChanged" />
+                                </StackPanel>
+                                <CheckBox Content="只看选用" IsChecked="{x:Bind ViewModel.FilterPickedOnly, Mode=TwoWay}"
+                                          VerticalAlignment="Bottom" />
                             </StackPanel>
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="类型" Style="{ThemeResource AppMicroTextStyle}"
-                                           Foreground="{ThemeResource TextTertiaryBrush}" />
-                                <ComboBox x:Name="FilterKindBox" Width="130" SelectedIndex="0"
-                                          ItemsSource="{x:Bind ViewModel.FilterKindOptions}"
-                                          SelectionChanged="FilterKind_SelectionChanged" />
+                            <TextBlock Text="例：分类维度选「拍摄地点」、分类值选「平遥」→ 只上传平遥的照片。"
+                                       Style="{ThemeResource AppMicroTextStyle}"
+                                       Foreground="{ThemeResource TextTertiaryBrush}" />
+                        </StackPanel>
+
+                        <!-- 第 2 步：云端目录 -->
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="② 云端要不要按三级目录存放（不选 = 保持本地相对路径）"
+                                       Style="{ThemeResource AppCaptionTextStyle}" />
+                            <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Bottom">
+                                <ComboBox x:Name="LayoutPrimaryBox" Width="180" SelectedIndex="0"
+                                          Header="一级目录" ItemsSource="{x:Bind ViewModel.LayoutPrimaryOptions}"
+                                          SelectionChanged="Layout_SelectionChanged" />
+                                <ComboBox x:Name="LayoutSecondaryBox" Width="180" SelectedIndex="0"
+                                          Header="二级目录" ItemsSource="{x:Bind ViewModel.LayoutSecondaryOptions}"
+                                          SelectionChanged="Layout_SelectionChanged" />
+                                <ComboBox x:Name="LayoutTertiaryBox" Width="180" SelectedIndex="0"
+                                          Header="三级目录" ItemsSource="{x:Bind ViewModel.LayoutTertiaryOptions}"
+                                          SelectionChanged="Layout_SelectionChanged" />
+                                <Button Content="开始上传" Click="UploadFiltered_Click"
+                                        Style="{ThemeResource AppSubtleButtonStyle}"
+                                        IsEnabled="{x:Bind ViewModel.IsNotBusy, Mode=OneWay}" />
                             </StackPanel>
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="格式" Style="{ThemeResource AppMicroTextStyle}"
-                                           Foreground="{ThemeResource TextTertiaryBrush}" />
-                                <ComboBox x:Name="FilterFormatBox" Width="130" SelectedIndex="0"
-                                          ItemsSource="{x:Bind ViewModel.FilterFormatOptions}"
-                                          SelectionChanged="FilterFormat_SelectionChanged" />
-                            </StackPanel>
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="评分" Style="{ThemeResource AppMicroTextStyle}"
-                                           Foreground="{ThemeResource TextTertiaryBrush}" />
-                                <ComboBox x:Name="FilterRatingBox" Width="140" SelectedIndex="0"
-                                          ItemsSource="{x:Bind ViewModel.FilterRatingOptions}"
-                                          SelectionChanged="FilterRating_SelectionChanged" />
-                            </StackPanel>
-                            <CheckBox Content="只看选用" IsChecked="{x:Bind ViewModel.FilterPickedOnly, Mode=TwoWay}"
-                                      VerticalAlignment="Bottom" />
-                            <Button Content="开始上传" Click="UploadFiltered_Click"
-                                    Style="{ThemeResource AppSubtleButtonStyle}"
-                                    IsEnabled="{x:Bind ViewModel.IsNotBusy, Mode=OneWay}" />
+                            <TextBlock Text="例：一级「拍摄设备」+ 二级「拍摄年份」+ 三级「拍摄地点」→ 云端 平遥/Sony A7C II/2026/xxx.jpg。"
+                                       Style="{ThemeResource AppMicroTextStyle}"
+                                       Foreground="{ThemeResource TextTertiaryBrush}" />
                         </StackPanel>
 
                         <ProgressBar IsIndeterminate="True"
@@ -272,6 +293,7 @@
                             <Button Content="坚果云" Tag="nutstore" Click="Preset_Click" Style="{ThemeResource AppSubtleButtonStyle}" />
                             <Button Content="Nextcloud" Tag="nextcloud" Click="Preset_Click" Style="{ThemeResource AppSubtleButtonStyle}" />
                             <Button Content="群晖 NAS" Tag="synology" Click="Preset_Click" Style="{ThemeResource AppSubtleButtonStyle}" />
+                            <Button Content="123 云盘" Tag="pan123" Click="Preset_Click" Style="{ThemeResource AppSubtleButtonStyle}" />
                         </StackPanel>
 
                         <Grid ColumnSpacing="12" RowSpacing="8">
@@ -332,7 +354,7 @@
                                     <TextBlock Text="服务器地址" Style="{ThemeResource AppCaptionTextStyle}" VerticalAlignment="Center" />
                                     <TextBox Grid.Column="1"
                                              Text="{x:Bind ViewModel.EditorEndpoint, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                             PlaceholderText="https://dav.jianguoyun.com/dav/" />
+                                             PlaceholderText="例如 https://webdav.123pan.cn/webdav" />
                                 </Grid>
                                 <Grid ColumnSpacing="12">
                                     <Grid.ColumnDefinitions>
@@ -355,7 +377,7 @@
                                     <TextBlock Text="云端子目录" Style="{ThemeResource AppCaptionTextStyle}" VerticalAlignment="Center" />
                                     <TextBox Grid.Column="1"
                                              Text="{x:Bind ViewModel.EditorSubPath, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                             PlaceholderText="留空 = 同步根目录；例如 照片/2026" />
+                                             PlaceholderText="留空 = 服务器根目录；例如 照片/2026（会自动创建目录）" />
                                 </Grid>
                             </StackPanel>
 

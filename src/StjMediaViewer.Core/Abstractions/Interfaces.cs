@@ -1,5 +1,6 @@
 using StjMediaViewer.Core.Color;
 using StjMediaViewer.Core.Models;
+using StjMediaViewer.Core.Write;
 
 namespace StjMediaViewer.Core.Abstractions;
 
@@ -452,6 +453,7 @@ public interface ICloudSyncService
         CloudTarget target,
         AssetQuery query,
         IProgress<CloudSyncProgress>? progress = null,
+        IReadOnlyList<OrganizeDimension>? remoteLayout = null,
         CancellationToken ct = default);
 
     /// <summary>一步到位：比对 + 执行。</summary>

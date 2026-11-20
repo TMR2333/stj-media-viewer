@@ -69,6 +69,28 @@ public static partial class Program
         Directory.CreateDirectory(remote);
         var reportRaw = await svc.UploadFilteredAsync(target, new AssetQuery { IsRaw = true, Limit = 0 });
         var raws = Directory.Exists(remote) ? Directory.GetFiles(remote).Select(Path.GetFileName).ToList() : new List<string?>();
+        // 云端按三级目录存放：一级"文件格式" → 云端 JPG/xxx.jpg
+        var layoutRemote = Path.Combine(tempData, "filtered-remote-layout");
+        Directory.CreateDirectory(layoutRemote);
+        var layoutTarget = new CloudTarget
+        {
+            Kind = CloudProviderKind.LocalFolder,
+            Name = "筛选上传布局测试",
+            LocalFolderPath = local,
+            RemoteFolderPath = layoutRemote,
+            Direction = CloudSyncDirection.UploadOnly,
+        };
+        var layoutReport = await svc.UploadFilteredAsync(
+            layoutTarget, new AssetQuery { MinRating = 4, Limit = 0 }, progress: null,
+            remoteLayout: new[] { StjMediaViewer.Core.Write.OrganizeDimension.Format });
+        var layoutFiles = Directory.Exists(layoutRemote)
+            ? Directory.GetFiles(layoutRemote, "*", SearchOption.AllDirectories).Select(Path.GetFileName).ToList()
+            : new List<string?>();
+        Check("按筛选上传：云端按三级目录存放",
+              layoutReport.Uploaded == 2 && layoutFiles.Contains("hi.jpg") &&
+              Directory.Exists(Path.Combine(layoutRemote, "JPG")),
+              $"{layoutReport.Summary}（{string.Join(",", Directory.GetDirectories(layoutRemote).Select(Path.GetFileName))}）");
+
         Check("按筛选上传：RAW 筛选生效",
               reportRaw.Uploaded == 2 && raws.Contains("hi.raw") && raws.Contains("lo.raw"),
               $"{reportRaw.Summary}（云端 {raws.Count} 个文件）");
