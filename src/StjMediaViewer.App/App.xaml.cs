@@ -1,5 +1,6 @@
 using Microsoft.UI.Xaml;
 using StjMediaViewer.App.Services;
+using StjMediaViewer.App.ViewModels;
 
 namespace StjMediaViewer.App;
 
@@ -90,6 +91,31 @@ public partial class App : Application
     /// InvalidOperationException（"Operation is not valid due to the current state of the object"），
     /// 外层常被包成 TargetInvocationException。这是正常噪声，不进日志。
     /// </summary>
+    /// <summary>启动后清理失效索引（只处理当前可访问的媒体库根目录）。</summary>
+    private static async Task PurgeMissingAssetsAsync()
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(3));
+            var libraries = await AppServices.Library.GetLibrariesAsync();
+            int removed = 0;
+            foreach (var library in libraries)
+            {
+                if (string.IsNullOrWhiteSpace(library.Path) || !Directory.Exists(library.Path)) continue;
+                removed += await AppServices.Library.PurgeMissingAsync(library.Id);
+            }
+            if (removed > 0)
+            {
+                Core.Util.Log.Info($"[startup] 已清理失效素材记录 {removed} 条（文件已不在磁盘上）");
+                MainWindow?.DispatcherQueue.TryEnqueue(() => AppEvents.RaiseLibraryContentChanged());
+            }
+        }
+        catch (Exception ex)
+        {
+            Core.Util.Log.Warn("清理失效素材记录失败", ex);
+        }
+    }
+
     private static bool IsWinUiProbeNoise(Exception? ex)
     {
         for (var cur = ex; cur is not null; cur = cur.InnerException)
@@ -124,6 +150,10 @@ public partial class App : Application
             }
 
             ScreenCapture.ScheduleIfRequested(MainWindow);
+
+            // 后台清理"索引里有、磁盘上已经没了"的记录（比如在别的软件里移动/删除过文件）。
+            // 库根目录当前不可访问时会整库跳过，避免移动硬盘没插就误删。
+            _ = Task.Run(PurgeMissingAssetsAsync);
         }
         catch (Exception ex)
         {

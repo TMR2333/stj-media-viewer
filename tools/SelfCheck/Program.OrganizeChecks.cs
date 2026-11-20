@@ -116,6 +116,15 @@ public static partial class Program
         Check("整理：自定义类别单独成文件夹", splitPath == "卓越", splitPath);
         Check("整理：没自定义值的照常三级分类", normalPath == "2026/11", normalPath);
 
+        // 清理失效记录：磁盘上已不存在的素材应从索引里删掉
+        var ghostFile = Path.Combine(tempLib, "ghost-file.jpg");
+        File.Copy(assets[0].FullPath, ghostFile, overwrite: true);
+        await s.Store.UpsertManyAsync(new[] { NewAsset("ghost-1", lib.Id, ghostFile, "ghost-file.jpg") });
+        File.Delete(ghostFile);
+        var purged = await s.Library.PurgeMissingAsync(lib.Id);
+        var ghostGone = (await s.Store.GetByIdsAsync(new[] { "ghost-1" })).Count == 0;
+        Check("整理：清理失效索引记录", purged >= 1 && ghostGone, $"删除 {purged} 条");
+
         var options = new OrganizeOptions { Primary = OrganizeDimension.Device };
         var rootMap = new Dictionary<string, string>(StringComparer.Ordinal) { [lib.Id] = tempLib };
 
@@ -143,6 +152,16 @@ public static partial class Program
         var moved = await s.Store.QueryAsync(new AssetQuery { LibraryId = lib.Id, Limit = 0 });
         var movedAsset = moved.FirstOrDefault(a => a.Id == assets[0].Id) ?? moved.First();
         Check("整理：索引路径已更新", File.Exists(movedAsset.FullPath), movedAsset.FullPath);
+        // 路径更新同步文件名：整理重名会加 " (2)"，file_name 必须跟着改
+        var renameAsset = NewAsset("rename-1", lib.Id, Path.Combine(tempLib, "rename-a.jpg"), "rename-a.jpg");
+        File.Copy(plan.Entries.First(e => !e.IsSidecar).TargetPath, renameAsset.FullPath, overwrite: true);
+        await s.Store.UpsertManyAsync(new[] { renameAsset });
+        var renamedPath = Path.Combine(tempLib, "rename-a (2).jpg");
+        await s.Store.UpdateAssetPathAsync("rename-1", renamedPath, "rename-a (2).jpg");
+        var afterRename = (await s.Store.GetByIdsAsync(new[] { "rename-1" })).FirstOrDefault();
+        Check("整理：路径更新同步文件名", afterRename?.FileName == "rename-a (2).jpg",
+              $"{afterRename?.FileName}");
+
         Check("整理：相对路径已更新", !string.IsNullOrEmpty(movedAsset.RelativePath), movedAsset.RelativePath ?? "");
 
         // 撤销

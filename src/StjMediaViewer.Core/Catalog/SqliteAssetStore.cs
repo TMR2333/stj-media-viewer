@@ -659,10 +659,13 @@ public sealed class SqliteAssetStore : IAssetStore, IDisposable
         return RunAsync(() =>
         {
             using var cmd = _conn!.CreateCommand();
+            // 关键：整理时重名会加 " (2)" 后缀，文件改名了 file_name 也必须一起改，
+            // 否则索引里会出现「路径是 C1469 (2).MP4、文件名却是 C1469.MP4」的鬼记录。
             cmd.CommandText =
-                "UPDATE assets SET full_path = @p, relative_path = @r" +
+                "UPDATE assets SET full_path = @p, relative_path = @r, file_name = @f" +
                 (sidecars is null ? "" : ", sidecars_json = @s") +
                 " WHERE id = @id";
+            cmd.Parameters.AddWithValue("@f", Path.GetFileName(fullPath));
             cmd.Parameters.AddWithValue("@p", fullPath);
             cmd.Parameters.AddWithValue("@r", (object?)relativePath ?? DBNull.Value);
             if (sidecars is not null) cmd.Parameters.AddWithValue("@s", AssetMapper.JsonList(sidecars.ToList()));
