@@ -369,7 +369,8 @@ public sealed class CloudSyncService : ICloudSyncService
         CloudSyncPlan plan,
         bool dryRun = false,
         IProgress<CloudSyncProgress>? progress = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        PauseTokenSource? pause = null)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var report = new CloudSyncReport
@@ -536,7 +537,8 @@ public sealed class CloudSyncService : ICloudSyncService
         CloudTarget target,
         bool dryRun = false,
         IProgress<CloudSyncProgress>? progress = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        PauseTokenSource? pause = null)
     {
         // WebDAV（尤其坚果云）同一账号并行两个同步会话会被服务器直接断连，
         // 手动「立即全部同步」和后台自动同步撞在一起时就是这种情况 → 全局串行。
@@ -546,7 +548,7 @@ public sealed class CloudSyncService : ICloudSyncService
             try
             {
                 var plan = await BuildPlanAsync(target, progress, ct).ConfigureAwait(false);
-                return await ExecuteAsync(plan, dryRun, progress, ct).ConfigureAwait(false);
+                return await ExecuteAsync(plan, dryRun, progress, ct, pause).ConfigureAwait(false);
             }
             finally
             {
@@ -576,7 +578,8 @@ public sealed class CloudSyncService : ICloudSyncService
         AssetQuery query,
         IProgress<CloudSyncProgress>? progress = null,
         IReadOnlyList<OrganizeDimension>? remoteLayout = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        PauseTokenSource? pause = null)
     {
         ArgumentNullException.ThrowIfNull(target);
         ArgumentNullException.ThrowIfNull(query);
@@ -649,6 +652,7 @@ public sealed class CloudSyncService : ICloudSyncService
         foreach (var asset in assets)
         {
             ct.ThrowIfCancellationRequested();
+            if (pause is not null) await pause.WaitWhilePausedAsync(ct).ConfigureAwait(false);
             index++;
             progress?.Report(new CloudSyncProgress
             {
@@ -705,13 +709,22 @@ public sealed class CloudSyncService : ICloudSyncService
                         if (!File.Exists(sidecar)) continue;
                         var sideRel = Path.GetRelativePath(root, sidecar);
                         if (sideRel.StartsWith("..", StringComparison.Ordinal)) continue;
-                        await storage.UploadAsync(sidecar, sideRel.Replace('\\', '/'), ct).ConfigureAwait(false);
+
+                        // 关键：边车必须和主文件放在同一个云端目录里。
+                        // 按三级目录重建路径时，主文件已经搬到了新分类目录，边车不能还按原相对路径传，
+                        // 否则就会出现"XMP 和素材分离"。
+                        var remoteSide = layoutOptions is null
+                            ? sideRel.Replace('\\', '/')
+                            : (Path.GetDirectoryName(remotePath) ?? "").Replace('\\', '/').Trim('/') + "/" + Path.GetFileName(sidecar);
+                        remoteSide = remoteSide.TrimStart('/');
+
+                        await storage.UploadAsync(sidecar, remoteSide, ct).ConfigureAwait(false);
                         report.Uploaded++;
                         report.BytesUp += new FileInfo(sidecar).Length;
                         report.Items.Add(new CloudTransferResult
                         {
                             Direction = "Upload",
-                            RelativePath = sideRel.Replace('\\', '/'),
+                            RelativePath = remoteSide,
                             Ok = true,
                         });
                     }

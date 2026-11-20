@@ -98,6 +98,17 @@ public sealed partial class CloudPage : Page
         catch (Exception ex) { Core.Util.Log.Warn("[cloud-filter] 失败", ex); }
     }
 
+    private void FormatFilter_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        => ViewModel.FormatFilterIndex = Math.Max(0, FormatFilterBox.SelectedIndex);
+
+    private void Pause_Click(object sender, RoutedEventArgs e) => ViewModel.PauseOrResumeCommand.Execute(null);
+
+    private void CancelSync_Click(object sender, RoutedEventArgs e)
+    {
+        ViewModel.CancelCurrentCommand.Execute(null);
+        ViewModel.FilterUploadStatus = "已取消";
+    }
+
     private void FilterDimension_SelectionChanged(object sender, SelectionChangedEventArgs e)
         => ViewModel.FilterDimensionIndex = Math.Max(0, FilterDimensionBox.SelectedIndex);
 

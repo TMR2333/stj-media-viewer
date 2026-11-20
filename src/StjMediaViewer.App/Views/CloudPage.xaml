@@ -229,6 +229,14 @@
                                               SelectedIndex="{x:Bind ViewModel.FilterValueIndex, Mode=OneWay}"
                                               SelectionChanged="FilterValue_SelectionChanged" />
                                 </StackPanel>
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="文件格式" Style="{ThemeResource AppMicroTextStyle}"
+                                               Foreground="{ThemeResource TextTertiaryBrush}" />
+                                    <ComboBox x:Name="FormatFilterBox" Width="170"
+                                              ItemsSource="{x:Bind ViewModel.FormatFilterOptions}"
+                                              SelectedIndex="{x:Bind ViewModel.FormatFilterIndex, Mode=OneWay}"
+                                              SelectionChanged="FormatFilter_SelectionChanged" />
+                                </StackPanel>
                                 <CheckBox Content="只看选用" IsChecked="{x:Bind ViewModel.FilterPickedOnly, Mode=TwoWay}"
                                           VerticalAlignment="Bottom" />
                             </StackPanel>
@@ -254,6 +262,12 @@
                                 <Button Content="开始上传" Click="UploadFiltered_Click"
                                         Style="{ThemeResource AppSubtleButtonStyle}"
                                         IsEnabled="{x:Bind ViewModel.IsNotBusy, Mode=OneWay}" />
+                                <Button Content="{x:Bind ViewModel.PauseButtonText, Mode=OneWay}" Click="Pause_Click"
+                                        Style="{ThemeResource AppSubtleButtonStyle}"
+                                        Visibility="{x:Bind ViewModel.BusyControlsVisibility, Mode=OneWay}" />
+                                <Button Content="取消" Click="CancelSync_Click"
+                                        Style="{ThemeResource AppSubtleButtonStyle}"
+                                        Visibility="{x:Bind ViewModel.BusyControlsVisibility, Mode=OneWay}" />
                             </StackPanel>
                             <TextBlock Text="例：一级「拍摄设备」+ 二级「拍摄年份」+ 三级「拍摄地点」→ 云端 平遥/Sony A7C II/2026/xxx.jpg。"
                                        Style="{ThemeResource AppMicroTextStyle}"
@@ -458,6 +472,13 @@
                                    Style="{ThemeResource AppMicroTextStyle}"
                                    Foreground="{ThemeResource TextTertiaryBrush}"
                                    TextTrimming="CharacterEllipsis" />
+                        <StackPanel Orientation="Horizontal" Spacing="8"
+                                    Visibility="{x:Bind ViewModel.BusyControlsVisibility, Mode=OneWay}">
+                            <Button Content="{x:Bind ViewModel.PauseButtonText, Mode=OneWay}" Click="Pause_Click"
+                                    Style="{ThemeResource AppSubtleButtonStyle}" />
+                            <Button Content="取消" Click="CancelSync_Click"
+                                    Style="{ThemeResource AppSubtleButtonStyle}" />
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 

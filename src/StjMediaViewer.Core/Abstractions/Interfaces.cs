@@ -1,4 +1,5 @@
 using StjMediaViewer.Core.Color;
+using StjMediaViewer.Core.Cloud;
 using StjMediaViewer.Core.Models;
 using StjMediaViewer.Core.Write;
 
@@ -443,7 +444,8 @@ public interface ICloudSyncService
         CloudSyncPlan plan,
         bool dryRun = false,
         IProgress<CloudSyncProgress>? progress = null,
-        CancellationToken ct = default);
+        CancellationToken ct = default,
+        PauseTokenSource? pause = null);
 
     /// <summary>
     /// 只上传"符合筛选条件"的素材：按 <see cref="AssetQuery"/> 在索引里选素材，
@@ -454,14 +456,16 @@ public interface ICloudSyncService
         AssetQuery query,
         IProgress<CloudSyncProgress>? progress = null,
         IReadOnlyList<OrganizeDimension>? remoteLayout = null,
-        CancellationToken ct = default);
+        CancellationToken ct = default,
+        PauseTokenSource? pause = null);
 
     /// <summary>一步到位：比对 + 执行。</summary>
     Task<CloudSyncReport> SyncAsync(
         CloudTarget target,
         bool dryRun = false,
         IProgress<CloudSyncProgress>? progress = null,
-        CancellationToken ct = default);
+        CancellationToken ct = default,
+        PauseTokenSource? pause = null);
 }
 
 // ---------------------------- 转码 / 压缩 ----------------------------

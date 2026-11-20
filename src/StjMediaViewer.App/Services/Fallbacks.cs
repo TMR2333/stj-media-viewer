@@ -442,7 +442,7 @@ internal sealed class FallbackCloudSyncService : ICloudSyncService
     public Task<CloudSyncPlan> BuildPlanAsync(CloudTarget target, IProgress<CloudSyncProgress>? progress = null, CancellationToken ct = default)
         => Task.FromResult(new CloudSyncPlan { Target = target });
 
-    public Task<CloudSyncReport> ExecuteAsync(CloudSyncPlan plan, bool dryRun = false, IProgress<CloudSyncProgress>? progress = null, CancellationToken ct = default)
+    public Task<CloudSyncReport> ExecuteAsync(CloudSyncPlan plan, bool dryRun = false, IProgress<CloudSyncProgress>? progress = null, CancellationToken ct = default, StjMediaViewer.Core.Cloud.PauseTokenSource? pause = null)
         => Task.FromResult(new CloudSyncReport
         {
             TargetId = plan.Target.Id,
@@ -454,7 +454,8 @@ internal sealed class FallbackCloudSyncService : ICloudSyncService
     public Task<CloudSyncReport> UploadFilteredAsync(CloudTarget target, StjMediaViewer.Core.Models.AssetQuery query,
         IProgress<CloudSyncProgress>? progress = null,
         IReadOnlyList<StjMediaViewer.Core.Write.OrganizeDimension>? remoteLayout = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        StjMediaViewer.Core.Cloud.PauseTokenSource? pause = null)
         => Task.FromResult(new CloudSyncReport
         {
             TargetId = target.Id,
@@ -462,7 +463,7 @@ internal sealed class FallbackCloudSyncService : ICloudSyncService
             Messages = { "演示模式不执行云同步。" },
         });
 
-    public Task<CloudSyncReport> SyncAsync(CloudTarget target, bool dryRun = false, IProgress<CloudSyncProgress>? progress = null, CancellationToken ct = default)
+    public Task<CloudSyncReport> SyncAsync(CloudTarget target, bool dryRun = false, IProgress<CloudSyncProgress>? progress = null, CancellationToken ct = default, StjMediaViewer.Core.Cloud.PauseTokenSource? pause = null)
         => Task.FromResult(new CloudSyncReport
         {
             TargetId = target.Id,

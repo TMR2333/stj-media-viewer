@@ -80,6 +80,11 @@ public sealed partial class CloudViewModel : ObservableObject
 
     public ObservableCollection<string> FilterDimensionOptions { get; } =
         new() { "不限分类" };
+
+    /// <summary>文件格式筛选：全部 / RAW（所有 RAW 格式）/ JPG / ARW / MP4 …（含视频）。</summary>
+    public ObservableCollection<string> FormatFilterOptions { get; } = new() { "全部格式", "RAW（全部 RAW）" };
+    [ObservableProperty] private int _formatFilterIndex;
+    private List<string> _formatKeys = new();
     public ObservableCollection<string> FilterValueOptions { get; } = new() { "全部分类" };
 
     public ObservableCollection<string> LayoutPrimaryOptions { get; } = new() { "不分类" };
@@ -98,7 +103,11 @@ public sealed partial class CloudViewModel : ObservableObject
     public Microsoft.UI.Xaml.Visibility FilterProgressVisibility =>
         FilterUploading ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
 
-    partial void OnFilterUploadingChanged(bool value) => OnPropertyChanged(nameof(FilterProgressVisibility));
+    partial void OnFilterUploadingChanged(bool value)
+    {
+        OnPropertyChanged(nameof(FilterProgressVisibility));
+        OnPropertyChanged(nameof(BusyControlsVisibility));
+    }
 
     partial void OnSelectedTargetChanged(CloudTargetRow? value) => _ = RefreshFilterValuesAsync();
 
@@ -125,10 +134,53 @@ public sealed partial class CloudViewModel : ObservableObject
             foreach (var (_, label) in _filterValues) FilterValueOptions.Add(label);
             FilterValueIndex = 0;
             OnPropertyChanged(nameof(FilterValueIndex));
+
+            // 文件格式下拉：JPG / ARW / MP4 …（视频格式也在里面）
+            var formats = await LoadFormatOptionsAsync();
+            if (version != Volatile.Read(ref _filterRefreshVersion)) return;
+            FormatFilterOptions.Clear();
+            FormatFilterOptions.Add("全部格式");
+            FormatFilterOptions.Add("RAW（全部 RAW）");
+            _formatKeys = formats;
+            foreach (var f in formats) FormatFilterOptions.Add(f);
+            FormatFilterIndex = 0;
+            OnPropertyChanged(nameof(FormatFilterIndex));
         }
         catch (Exception ex)
         {
             Log.Warn("读取云同步筛选值失败", ex);
+        }
+    }
+
+    /// <summary>当前目标库实际存在的文件格式（按图片→视频→其它排序）。</summary>
+    private async Task<List<string>> LoadFormatOptionsAsync()
+    {
+        try
+        {
+            var query = new AssetQuery { Limit = 0 };
+            var target = SelectedTarget?.Target;
+            if (target is not null && !string.IsNullOrWhiteSpace(target.LocalFolderPath))
+            {
+                var libraries = await AppServices.Library.GetLibrariesAsync();
+                var match = libraries
+                    .Where(l => !string.IsNullOrWhiteSpace(l.Path) &&
+                                Path.GetFullPath(target.LocalFolderPath)
+                                    .StartsWith(Path.GetFullPath(l.Path).TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase))
+                    .OrderByDescending(l => l.Path.Length)
+                    .FirstOrDefault();
+                query.LibraryId = match?.Id;
+            }
+            var facets = await AppServices.Store.GetFacetsAsync(query);
+            return facets.ByFormat
+                .OrderBy(kv => kv.Key is "JPG" ? 0 : kv.Key is "MP4" or "MOV" ? 2 : 1)
+                .ThenByDescending(kv => kv.Value)
+                .Select(kv => kv.Key)
+                .ToList();
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("读取文件格式失败", ex);
+            return new List<string> { "JPG", "ARW", "MP4", "MOV" };
         }
     }
 
@@ -217,6 +269,16 @@ public sealed partial class CloudViewModel : ObservableObject
 
         var query = new AssetQuery { Limit = 0, Offset = 0 };
 
+        // 文件格式筛选（含视频：MP4 / MOV 等）
+        if (FormatFilterIndex == 1)
+        {
+            query.IsRaw = true;
+        }
+        else if (FormatFilterIndex >= 2 && FormatFilterIndex - 2 < _formatKeys.Count)
+        {
+            query.Formats.Add(_formatKeys[FormatFilterIndex - 2]);
+        }
+
         // 分类筛选
         if (FilterDimensionIndex > 0 && FilterDimensionIndex <= FilterableDimensions.Length &&
             FilterValueIndex > 0 && FilterValueIndex <= _filterValues.Count)
@@ -261,7 +323,12 @@ public sealed partial class CloudViewModel : ObservableObject
         if (AppServices.Cloud is CloudSyncService svc)
             svc.AliasLookup = AppServices.Settings.Current.DeviceAliases;
 
+        CancelCurrent();
+        _cts = new CancellationTokenSource();
+        _pause = new PauseTokenSource();
+        IsPaused = false;
         FilterUploading = true;
+        OnPropertyChanged(nameof(BusyControlsVisibility));
         FilterUploadStatus = "正在统计素材…";
         try
         {
@@ -272,10 +339,14 @@ public sealed partial class CloudViewModel : ObservableObject
                     : p.Phase;
             });
             var report = await AppServices.Cloud.UploadFilteredAsync(
-                row.Target, query, progress, layout.Count > 0 ? layout : null);
+                row.Target, query, progress, layout.Count > 0 ? layout : null, _cts.Token, _pause);
             FilterUploadStatus = report.Summary +
                                  (report.Messages.Count > 0 ? $" · {string.Join("；", report.Messages.Take(3))}" : "");
             if (report.Uploaded > 0) AppEvents.SetStatus($"已按分类上传 {report.Uploaded} 个文件");
+        }
+        catch (OperationCanceledException)
+        {
+            FilterUploadStatus = "已取消";
         }
         catch (Exception ex)
         {
@@ -285,13 +356,20 @@ public sealed partial class CloudViewModel : ObservableObject
         finally
         {
             FilterUploading = false;
+            _pause = null;
+            IsPaused = false;
+            OnPropertyChanged(nameof(BusyControlsVisibility));
         }
     }
 
     /// <summary>XAML 里给按钮绑 IsEnabled 用（IsBusy 的反相）。</summary>
     public bool IsNotBusy => !IsBusy;
 
-    partial void OnIsBusyChanged(bool value) => OnPropertyChanged(nameof(IsNotBusy));
+    partial void OnIsBusyChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsNotBusy));
+        OnPropertyChanged(nameof(BusyControlsVisibility));
+    }
 
     [ObservableProperty]
     private string _statusText = "就绪";
@@ -411,6 +489,37 @@ public sealed partial class CloudViewModel : ObservableObject
     private Visibility _reportIssuesVisibility = Visibility.Collapsed;
 
     private CancellationTokenSource? _cts;
+
+    /// <summary>当前同步的暂停开关（暂停时在文件之间原地等待，继续后从断点接着走）。</summary>
+    private PauseTokenSource? _pause;
+
+    [ObservableProperty] private bool _isPaused;
+    [ObservableProperty] private string _pauseButtonText = "暂停";
+
+    partial void OnIsPausedChanged(bool value) => PauseButtonText = value ? "继续" : "暂停";
+
+    /// <summary>同步进行中（顶部进度条或按分类上传）时显示"暂停/取消"按钮。</summary>
+    public Microsoft.UI.Xaml.Visibility BusyControlsVisibility =>
+        IsBusy || FilterUploading ? Microsoft.UI.Xaml.Visibility.Visible : Microsoft.UI.Xaml.Visibility.Collapsed;
+
+    /// <summary>暂停 / 继续当前同步。</summary>
+    [RelayCommand]
+    private void PauseOrResume()
+    {
+        if (_pause is null) return;
+        if (_pause.IsPaused)
+        {
+            _pause.Resume();
+            IsPaused = false;
+            StatusText = "已继续";
+        }
+        else
+        {
+            _pause.Pause();
+            IsPaused = true;
+            StatusText = "已暂停（当前文件传完后停住，点「继续」接着传）";
+        }
+    }
     private CloudSyncPlan? _lastPlan;
 
     // ==================================================================================
@@ -826,6 +935,9 @@ public sealed partial class CloudViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+            _pause = null;
+            IsPaused = false;
+            OnPropertyChanged(nameof(BusyControlsVisibility));
             ProgressVisibility = Visibility.Collapsed;
         }
     }
@@ -850,7 +962,10 @@ public sealed partial class CloudViewModel : ObservableObject
         SelectedTarget = row;
         CancelCurrent();
         _cts = new CancellationTokenSource();
+        _pause = new PauseTokenSource();
+        IsPaused = false;
         IsBusy = true;
+        OnPropertyChanged(nameof(BusyControlsVisibility));
         ReportVisibility = Visibility.Collapsed;
         ProgressVisibility = Visibility.Visible;
         ProgressPercent = 0;
@@ -868,7 +983,7 @@ public sealed partial class CloudViewModel : ObservableObject
                     ProgressPercent = p.Percent;
                     ProgressFile = p.CurrentFile ?? "";
                     ProgressCounts = p.FilesTotal > 0 ? $"文件 {p.FilesProcessed}/{p.FilesTotal}" : "";
-                }), _cts.Token);
+                }), _cts.Token, _pause);
 
             ReportSummary = report.Summary;
             ReportDetail = report.Messages.Count == 0
@@ -986,6 +1101,11 @@ public sealed partial class CloudViewModel : ObservableObject
         try { _cts?.Cancel(); } catch { }
         _cts?.Dispose();
         _cts = null;
+
+        // 暂停中取消：先放行等待者，才能走到取消检查
+        try { _pause?.Resume(); } catch { }
+        _pause = null;
+        IsPaused = false;
     }
 
     public void ClearPlan()

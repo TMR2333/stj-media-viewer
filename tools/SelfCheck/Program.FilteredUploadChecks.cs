@@ -42,6 +42,12 @@ public static partial class Program
                 FileModified = DateTimeOffset.Now,
                 FileCreated = DateTimeOffset.Now,
             };
+            if (id == "fu-jpg-hi")
+            {
+                var side = path + ".xmp";
+                await File.WriteAllTextAsync(side, "<x:xmpmeta/>");
+                asset.Sidecars.Add(side);
+            }
             assets.Add(asset);
         }
         await s.Store.UpsertManyAsync(assets);
@@ -59,7 +65,7 @@ public static partial class Program
         var report = await svc.UploadFilteredAsync(target, new AssetQuery { MinRating = 4, Limit = 0 });
         var uploaded = report.Uploaded;
         Check("按筛选上传：评分筛选生效",
-              uploaded == 2 &&
+              uploaded >= 2 &&
               File.Exists(Path.Combine(remote, "hi.jpg")) &&
               File.Exists(Path.Combine(remote, "hi.raw")) &&
               !File.Exists(Path.Combine(remote, "lo.jpg")) &&
@@ -87,12 +93,49 @@ public static partial class Program
             ? Directory.GetFiles(layoutRemote, "*", SearchOption.AllDirectories).Select(Path.GetFileName).ToList()
             : new List<string?>();
         Check("按筛选上传：云端按三级目录存放",
-              layoutReport.Uploaded == 2 && layoutFiles.Contains("hi.jpg") &&
+              layoutReport.Uploaded >= 2 && layoutFiles.Contains("hi.jpg") &&
               Directory.Exists(Path.Combine(layoutRemote, "JPG")),
               $"{layoutReport.Summary}（{string.Join(",", Directory.GetDirectories(layoutRemote).Select(Path.GetFileName))}）");
+        Check("按筛选上传：边车跟随三级目录",
+              File.Exists(Path.Combine(layoutRemote, "JPG", "hi.jpg.xmp")) &&
+              !File.Exists(Path.Combine(layoutRemote, "hi.jpg.xmp")),
+              "XMP 应在 JPG/ 下与主文件同目录");
 
         Check("按筛选上传：RAW 筛选生效",
               reportRaw.Uploaded == 2 && raws.Contains("hi.raw") && raws.Contains("lo.raw"),
               $"{reportRaw.Summary}（云端 {raws.Count} 个文件）");
+        // 暂停：暂停中不继续上传，继续后能完成
+        var pauseRemote = Path.Combine(tempData, "filtered-remote-pause");
+        Directory.CreateDirectory(pauseRemote);
+        var pauseTarget = new CloudTarget
+        {
+            Kind = CloudProviderKind.LocalFolder,
+            Name = "暂停测试",
+            LocalFolderPath = local,
+            RemoteFolderPath = pauseRemote,
+            Direction = CloudSyncDirection.UploadOnly,
+        };
+        var pause = new PauseTokenSource();
+        pause.Pause();
+        var task = svc.UploadFilteredAsync(pauseTarget, new AssetQuery { MinRating = 4, Limit = 0 },
+            progress: null, remoteLayout: null, ct: default, pause: pause);
+        await Task.Delay(400);
+        var blocked = !task.IsCompleted;
+        pause.Resume();
+        var pausedReport = await task;
+        Check("按筛选上传：支持暂停/继续", blocked && pausedReport.Uploaded >= 2,
+              $"暂停时未完成={blocked}，继续后上传 {pausedReport.Uploaded}");
+
+        // 取消：预先取消的令牌应抛 OperationCanceledException
+        using var canceled = new CancellationTokenSource();
+        canceled.Cancel();
+        var canceledOk = false;
+        try
+        {
+            await svc.UploadFilteredAsync(pauseTarget, new AssetQuery { MinRating = 4, Limit = 0 },
+                progress: null, remoteLayout: null, ct: canceled.Token);
+        }
+        catch (OperationCanceledException) { canceledOk = true; }
+        Check("按筛选上传：支持取消", canceledOk, canceledOk ? "已按取消退出" : "未响应取消");
     }
 }
