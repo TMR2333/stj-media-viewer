@@ -104,6 +104,39 @@ public static partial class Program
         Check("按筛选上传：RAW 筛选生效",
               reportRaw.Uploaded == 2 && raws.Contains("hi.raw") && raws.Contains("lo.raw"),
               $"{reportRaw.Summary}（云端 {raws.Count} 个文件）");
+        // 来自云同步：下载后素材应被标记 origin（素材库可按来源筛选）
+        var originLocal = Path.Combine(tempData, "origin-local");
+        var originRemote = Path.Combine(tempData, "origin-remote");
+        Directory.CreateDirectory(originLocal);
+        Directory.CreateDirectory(originRemote);
+        await File.WriteAllTextAsync(Path.Combine(originRemote, "cloud.jpg"), "xyz");
+        var originLib = await s.Library.AddLibraryAsync(originLocal);
+        await s.Store.UpsertManyAsync(new[]
+        {
+            new MediaAsset
+            {
+                Id = "origin-asset", LibraryId = originLib.Id,
+                FullPath = Path.Combine(originLocal, "cloud.jpg"),
+                RelativePath = "cloud.jpg", FileName = "cloud.jpg",
+                Kind = MediaKind.Image, FormatCode = "JPG",
+                SizeBytes = 3, FileModified = DateTimeOffset.Now, FileCreated = DateTimeOffset.Now,
+            },
+        });
+        var originTarget = new CloudTarget
+        {
+            Kind = CloudProviderKind.LocalFolder,
+            Name = "我的云盘",
+            LocalFolderPath = originLocal,
+            RemoteFolderPath = originRemote,
+            Direction = CloudSyncDirection.Bidirectional,
+        };
+        var originReport = await svc.SyncAsync(originTarget);
+        var originAsset = await s.Store.GetByPathAsync(Path.Combine(originLocal, "cloud.jpg"));
+        var originHits = await s.Store.QueryAsync(new AssetQuery { Origins = { "我的云盘" }, Limit = 0 });
+        Check("素材库：下载的素材标记为「来自云同步」",
+              originHits.Any(a => a.Id == "origin-asset"),
+              $"{originReport.Summary} · 文件存在={File.Exists(Path.Combine(originLocal, "cloud.jpg"))} · origin={originAsset?.Origin ?? "(null)"} · 命中 {originHits.Count}");
+
         // 暂停：暂停中不继续上传，继续后能完成
         var pauseRemote = Path.Combine(tempData, "filtered-remote-pause");
         Directory.CreateDirectory(pauseRemote);

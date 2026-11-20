@@ -223,6 +223,17 @@ public static class AppServices
         Warmup = new ThumbnailWarmup(Store, Thumbnails, Luts);
         VideoProxy = new VideoProxyService(Ffmpeg, CacheRootDirectory);
         Cloud = new CloudSyncService(store: Store, xmp: Xmp);
+        // 下载成功 → 记住"这个文件来自哪个云同步目标"，素材库可据此筛选「来自云同步」
+        CloudSyncService.FileDownloaded += (path, origin) =>
+        {
+            try
+            {
+                var settings = Settings.Current;
+                settings.CloudOrigins[PathUtil.Normalize(path)] = origin;
+                _ = Settings.SaveAsync();
+            }
+            catch (Exception ex) { Log.Warn($"[cloud] 记录来源失败：{ex.Message}"); }
+        };
         // 别把 App 自己的缓存/数据目录当素材同步（缩略图缓存被用户放进库里时也安全）
         CloudSyncService.ExcludeDirectory(Path.Combine(Settings.AppDataDirectory, "Cache"));
         CloudSyncService.ExcludeDirectory(ThumbnailCacheDirectory);

@@ -87,6 +87,9 @@ public sealed class CloudSyncService : ICloudSyncService
         return false;
     }
 
+    /// <summary>每成功下载一个文件触发一次（完整路径, 同步目标名）。App 用它记录"来自云同步"。</summary>
+    public static event Action<string, string>? FileDownloaded;
+
     private readonly Func<CloudTarget, ICloudStorage>? _storageFactory;
 
     /// <summary>三级目录里"设备"维度用的别名表（按需注入，缺失就用原名）。</summary>
@@ -408,6 +411,7 @@ public sealed class CloudSyncService : ICloudSyncService
 
                     case CloudActionKind.Download:
                         await DoDownloadAsync(storage, target, localRoot, action.RelativePath, dryRun, ct).ConfigureAwait(false);
+                        if (!dryRun) await MarkOriginAsync(target, localRoot, action.RelativePath, ct).ConfigureAwait(false);
                         item.Direction = "Download";
                         break;
 
@@ -1099,6 +1103,41 @@ public sealed class CloudSyncService : ICloudSyncService
             var b = FileHasher.FullHash(uploaded, ct);
             if (!string.Equals(a, b, StringComparison.OrdinalIgnoreCase))
                 throw new IOException("上传后哈希不一致（文件可能损坏）");
+        }
+    }
+
+    /// <summary>下载成功后给素材打「来自云同步」标记：已入库的直接更新，未入库的交给 App 记录、扫描时补上。</summary>
+    private async Task MarkOriginAsync(CloudTarget target, string localRoot, string relativePath, CancellationToken ct)
+    {
+        try
+        {
+            var full = Path.Combine(localRoot, relativePath.Replace('\\', '/').Replace('/', Path.DirectorySeparatorChar));
+            FileDownloaded?.Invoke(full, target.Name);
+
+            if (_store is null) return;
+
+            // 索引里的 full_path 可能来自扫描/不同分隔符（用户手填的库路径可能带正斜杠），
+            // 先精确查，再按"分隔符无关"的宽松方式兜底。
+            var normalized = PathUtil.Normalize(full);
+            var asset = await _store.GetByPathAsync(normalized, ct).ConfigureAwait(false)
+                        ?? await _store.GetByPathAsync(full, ct).ConfigureAwait(false);
+
+            if (asset is null)
+            {
+                var name = Path.GetFileName(normalized);
+                var candidates = await _store.QueryAsync(new AssetQuery { Text = name, Limit = 20 }, ct).ConfigureAwait(false);
+                static string Loose(string p) => PathUtil.Normalize(p).Replace('/', '\\').ToLowerInvariant();
+                asset = candidates.FirstOrDefault(a => Loose(a.FullPath) == Loose(normalized));
+            }
+
+            if (asset is null || string.Equals(asset.Origin, target.Name, StringComparison.Ordinal)) return;
+            asset.Origin = target.Name;
+            await _store.UpsertAsync(asset, ct).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            Log.Warn($"[cloud] 标记云同步来源失败：{relativePath}（{ex.Message}）");
         }
     }
 

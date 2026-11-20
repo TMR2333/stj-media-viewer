@@ -1047,7 +1047,8 @@ public sealed partial class LibraryViewModel : ObservableObject
                 unsetCount: facets.ToneUnsetCount);
 
             // 只有库里真有"来自云同步"的素材时才显示这个筛选组（避免给纯本地用户塞一个空维度）
-            if (facets.ByOrigin.Count > 0 || OriginGroup.Options.Count > 0)
+            if (facets.ByOrigin.Count > 0 || OriginGroup.Options.Count > 0 ||
+                AppServices.Settings.Current.CloudTargets.Count > 0)
                 SyncOptions(OriginGroup, facets.ByOrigin, static key => key,
                     unsetCount: facets.OriginUnsetCount, unsetDisplay: "本地文件");
 

@@ -268,6 +268,27 @@ public sealed class LibraryService : ILibraryService
             }
             if (merged > 0) Log.Info($"[library] preserved classification for {merged} assets");
 
+            // 扫描入库时补「来自云同步」标记：路径 → 目标名 由 App 在下载成功后记录
+            try
+            {
+                var origins = SafeSettings().CloudOrigins;
+                if (origins.Count > 0)
+                {
+                    int stamped = 0;
+                    foreach (var a in assets)
+                    {
+                        if (!string.IsNullOrEmpty(a.Origin)) continue;
+                        if (origins.TryGetValue(PathUtil.Normalize(a.FullPath), out var origin) && !string.IsNullOrWhiteSpace(origin))
+                        {
+                            a.Origin = origin;
+                            stamped++;
+                        }
+                    }
+                    if (stamped > 0) Log.Info($"[library] stamped cloud origin for {stamped} assets");
+                }
+            }
+            catch (Exception ex) { Log.Warn($"[library] cloud origin stamp failed: {ex.Message}"); }
+
             int added = 0, updated = 0, failed = 0;
             int total = assets.Count;
             int processed = 0;

@@ -64,6 +64,12 @@ public sealed class AppSettings
     public string ThemeMode { get; set; } = "system";  // system | light | dark
     public string Locale { get; set; } = "zh-CN";
     public List<LibraryRoot> Libraries { get; set; } = new();
+
+    /// <summary>
+    /// 从云同步下载下来的文件 → 来源目标名（完整路径为键）。
+    /// 扫描入库时用它给素材打上「来自云同步」标记，素材库就能按来源筛选。
+    /// </summary>
+    public Dictionary<string, string> CloudOrigins { get; set; } = new();
     public string? LastLibraryId { get; set; }
     public AiSettings Ai { get; set; } = new();
     public GridSettings Grid { get; set; } = new();
