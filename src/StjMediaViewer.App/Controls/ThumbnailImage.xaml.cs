@@ -44,7 +44,19 @@ public sealed partial class ThumbnailImage : UserControl
 
     public ThumbnailImage()
     {
-        InitializeComponent();
+        // 防御：XAML LoadComponent 在控件首次实例化时可能因为环境压力（COM 包装锁竞争等）
+        // 抛出托管异常；让它逃到 XAML 顶层就是 0xc000027b（整进程被终止）。
+        // 控件构造失败只影响这一个格子，绝不能让整个界面挂掉。
+        try
+        {
+            InitializeComponent();
+        }
+        catch (Exception ex)
+        {
+            Core.Util.Log.Error("ThumbnailImage 初始化失败", ex);
+            return;
+        }
+
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
         ActualThemeChanged += OnActualThemeChanged;

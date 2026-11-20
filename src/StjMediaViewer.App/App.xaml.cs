@@ -10,7 +10,8 @@ public partial class App : Application
 
     /// <summary>FirstChanceException 的递归保护（写日志失败时不能再次进入）。</summary>
     [ThreadStatic] private static bool _firstChanceHandling;
-    private static int _firstChanceCount;
+    private static int _firstChanceSeen;
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, int> FirstChanceCounts = new();
 
     /// <summary>日志/IO 类异常：常见且无害（文件被占用），绝不能在其处理器里再写日志。</summary>
     private static bool IsLoggingOrIoNoise(Exception ex)
@@ -41,13 +42,20 @@ public partial class App : Application
             // 就会无限递归 FirstChance → 栈溢出（0xC00000FD），表现为"双击打不开"。
             if (IsLoggingOrIoNoise(e.Exception)) return;
             if (_firstChanceHandling) return;
-            if (Interlocked.Increment(ref _firstChanceCount) > 200) return;
+
+            // 同一种异常（尤其 COMException）一次刷新里会成百上千次：
+            // 每次都在 UI 线程同步写日志会放大卡顿，这里按 (类型+HRESULT) 限流。
+            var key = e.Exception.GetType().FullName + "|" + e.Exception.HResult.ToString("X8");
+            var seen = Interlocked.Increment(ref _firstChanceSeen);
+            var count = FirstChanceCounts.AddOrUpdate(key, 1, (_, n) => n + 1);
+            if (seen > 2000 || (count > 20 && count % 200 != 0)) return;
 
             _firstChanceHandling = true;
             try
             {
-                Core.Util.Log.Warn("[first-chance] " + e.Exception.GetType().Name + ": " +
-                                   e.Exception.Message + "\n" + (e.Exception.StackTrace ?? ""));
+                Core.Util.Log.Warn($"[first-chance] {e.Exception.GetType().Name} hr=0x{e.Exception.HResult:X8} " +
+                                   $"thread={Environment.CurrentManagedThreadId} msg={e.Exception.Message} " +
+                                   $"occurrence={count}\n{e.Exception.StackTrace}");
             }
             finally
             {

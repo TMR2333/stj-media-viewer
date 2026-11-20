@@ -23,10 +23,24 @@ public sealed class ThumbnailLoader : IThumbnailLoader
     private readonly Dictionary<string, ImageSource> _cache = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Task<ImageSource?>> _inflight = new(StringComparer.Ordinal);
     private readonly Queue<string> _order = new();
-    // 解码是 CPU/IO 混合任务：并发太低会排队（一屏 12 张要等好几轮），
-    // 太高又会和 UI 线程抢核。按核心数取 1.5 倍，夹在 6–16。
-    private static readonly int ThumbConcurrency =
-        Math.Clamp(Environment.ProcessorCount * 3 / 2, 6, 16);
+    // 解码并发：以前按核心数取到 6–16，一次性导入几百张时会把 WIC 的 COM 包装锁打成热点，
+    // UI 线程创建控件（首次 XAML LoadComponent）会被这把全局锁挡住 → 0xc000027b。
+    // 现在默认 4（可用 STJ_THUMB_CONCURRENCY 覆盖），宁可慢一点也不能让 UI 线程卡死。
+    private static readonly int ThumbConcurrency = ReadConcurrency();
+
+    private static int ReadConcurrency()
+    {
+        var raw = Environment.GetEnvironmentVariable("STJ_THUMB_CONCURRENCY");
+        if (int.TryParse(raw, out var v) && v > 0) return Math.Clamp(v, 1, 16);
+        return Math.Clamp(Environment.ProcessorCount / 2, 2, 4);
+    }
+
+    /// <summary>
+    /// BitmapImage 是 UI 线程亲和对象，而且创建后的解码也会占 UI/渲染线程。
+    /// 一次刷新回来几十个请求时，如果全部同时在 UI 线程 new BitmapImage，
+    /// 会形成第二波 RCW/渲染压力；这里再限一道流（默认 3）。
+    /// </summary>
+    private static readonly SemaphoreSlim UiCreateGate = new(3, 3);
 
     private readonly SemaphoreSlim _gate;
 
@@ -109,14 +123,30 @@ public sealed class ThumbnailLoader : IThumbnailLoader
             var path = await _service.GetThumbnailPathAsync(asset, size, lut, lutEntry?.Id, CancellationToken.None).ConfigureAwait(true);
             if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return null;
 
-            var image = new BitmapImage
+            // 只在 UI 线程创建 BitmapImage；非 UI 线程直接抛（调用方会记录，不再静默产生 COMException 风暴）
+            var dispatcher = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+            if (dispatcher is null || !dispatcher.HasThreadAccess)
             {
-                DecodePixelType = DecodePixelType.Logical,
-                DecodePixelWidth = Math.Max(64, size),
-                UriSource = new Uri(path),
-            };
-            Remember(key, image);
-            return image;
+                Log.Warn($"[thumb] 非 UI 线程创建 BitmapImage，已跳过：{asset.FileName}");
+                return null;
+            }
+
+            await UiCreateGate.WaitAsync().ConfigureAwait(true);
+            try
+            {
+                var image = new BitmapImage
+                {
+                    DecodePixelType = DecodePixelType.Logical,
+                    DecodePixelWidth = Math.Max(64, size),
+                    UriSource = new Uri(path),
+                };
+                Remember(key, image);
+                return image;
+            }
+            finally
+            {
+                UiCreateGate.Release();
+            }
         }
         catch (Exception ex)
         {
@@ -152,15 +182,18 @@ public sealed class ThumbnailLoader : IThumbnailLoader
         }
         _ = Task.Run(async () =>
         {
+            // 注意：不能 using 释放 gate —— 子任务是 fire-and-forget，释放后后台还在 Release
+            // 会抛 ObjectDisposedException（旧版本日志里的"未观察的任务异常"就是它）。
             try
             {
-                using var gate = new SemaphoreSlim(2, 2);
+                var gate = new SemaphoreSlim(2, 2);
+                var tasks = new List<Task>();
                 int n = 0;
                 foreach (var asset in assets)
                 {
                     if (n++ >= maxCount) break;
                     await gate.WaitAsync().ConfigureAwait(false);
-                    _ = Task.Run(async () =>
+                    tasks.Add(Task.Run(async () =>
                     {
                         try
                         {
@@ -171,9 +204,10 @@ public sealed class ThumbnailLoader : IThumbnailLoader
                         }
                         catch { /* 预取失败无所谓 */ }
                         finally { gate.Release(); }
-                    });
+                    }));
                 }
-                await Task.Delay(50).ConfigureAwait(false);
+                // 等这一批都结束再退出（这样也不需要释放 gate，交给 GC 即可）
+                await Task.WhenAll(tasks).ConfigureAwait(false);
             }
             finally
             {

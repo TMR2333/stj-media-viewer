@@ -193,6 +193,31 @@ public sealed partial class LibraryPage : Page
             });
         }
 
+        // 验收用：STJ_DEMO_SCROLL_STRESS=1 快速滚动网格，压测缩略图（复现一次性渲染几百张的崩溃场景）
+        if (Environment.GetEnvironmentVariable("STJ_DEMO_SCROLL_STRESS") == "1")
+        {
+            _ = Task.Run(async () =>
+            {
+                await Task.Delay(3500);
+                DispatcherQueue.TryEnqueue(async () =>
+                {
+                    for (int i = 0; i < 40 && ViewModel.IsLoading; i++) await Task.Delay(250);
+                    var scroller = FindDescendant<ScrollViewer>(AssetList);
+                    if (scroller is null) { Core.Util.Log.Warn("[stress] 找不到滚动容器"); return; }
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    for (int i = 0; i < 60; i++)
+                    {
+                        var offset = i % 2 == 0 ? i * 900 : Math.Max(0, (59 - i) * 900);
+                        scroller.ChangeView(null, offset, null, true);
+                        await Task.Delay(90);
+                    }
+                    Core.Util.Log.Info($"[stress] scroll done elapsed={sw.ElapsedMilliseconds}ms items={ViewModel.Items.Count} " +
+                                       $"thumbCache={AppServices.Thumbs.GetType().Name}");
+                    EndMarquee();
+                });
+            });
+        }
+
         // 验收用：STJ_DEMO_SELECTALL=1 点「全选」：全部页加载 + 全选，检查有没有漏
         if (Environment.GetEnvironmentVariable("STJ_DEMO_SELECTALL") == "1")
         {

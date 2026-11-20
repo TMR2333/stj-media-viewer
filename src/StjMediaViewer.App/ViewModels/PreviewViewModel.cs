@@ -367,6 +367,39 @@ public sealed partial class PreviewViewModel : ObservableObject
     }
 
     /// <summary>
+    /// 后台线程写 UI 绑定属性会抛 RPC_E_WRONG_THREAD（0x8001010E）；
+    /// 这个项目里大量 await 的续体可能落在 IO 线程上，写 UI 属性前统一走这里。
+    /// </summary>
+    private static Task RunOnUiAsync(Action action)
+    {
+        var dispatcher = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+        if (dispatcher is not null && dispatcher.HasThreadAccess)
+        {
+            action();
+            return Task.CompletedTask;
+        }
+
+        var queue = App.MainWindow?.DispatcherQueue;
+        if (queue is null)
+        {
+            try { action(); } catch { }
+            return Task.CompletedTask;
+        }
+
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (!queue.TryEnqueue(() =>
+            {
+                try { action(); }
+                catch (Exception ex) { Log.Warn("切回 UI 线程执行失败", ex); }
+                finally { tcs.TrySetResult(); }
+            }))
+        {
+            tcs.TrySetResult();
+        }
+        return tcs.Task;
+    }
+
+    /// <summary>
     /// 系统解码器不支持该视频（4:2:2 / 10-bit H.264、HEVC、ProRes…）时：
     /// 用 ffmpeg 生成一份 720p H.264 8-bit 代理再播放；没有 ffmpeg 就给出明确的设置指引。
     /// </summary>
@@ -393,24 +426,30 @@ public sealed partial class PreviewViewModel : ObservableObject
 
             var fallbackLut = ResolveBoundLut(asset);
             var proxyPath = await proxy.EnsureProxyAsync(asset.FullPath, fallbackLut?.FilePath, CancellationToken.None);
-            if (string.IsNullOrEmpty(proxyPath))
+            await RunOnUiAsync(() =>
             {
-                VideoStatusText = "生成预览代理失败：可以在「设置 → 工具链」确认 ffmpeg 可用，或用外部播放器打开。";
-                VideoErrorVisibility = Visibility.Visible;
-                return;
-            }
+                if (string.IsNullOrEmpty(proxyPath))
+                {
+                    VideoStatusText = "生成预览代理失败：可以在「设置 → 工具链」确认 ffmpeg 可用，或用外部播放器打开。";
+                    VideoErrorVisibility = Visibility.Visible;
+                    return;
+                }
 
-            VideoSource = MediaSource.CreateFromUri(new Uri(proxyPath));
-            VideoStatusText = "已用 ffmpeg 预览代理播放（H.264 8-bit · 720p，代理已缓存）";
-            VideoErrorVisibility = Visibility.Collapsed;
-            LoadingVisibility = Visibility.Collapsed;
+                VideoSource = MediaSource.CreateFromUri(new Uri(proxyPath));
+                VideoStatusText = "已用 ffmpeg 预览代理播放（H.264 8-bit · 720p，代理已缓存）";
+                VideoErrorVisibility = Visibility.Collapsed;
+                LoadingVisibility = Visibility.Collapsed;
+            });
             Log.Info($"[preview] 切换预览代理：{asset.FileName} → {proxyPath}");
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
-            VideoStatusText = $"生成预览代理失败：{ex.Message}";
-            VideoErrorVisibility = Visibility.Visible;
+            await RunOnUiAsync(() =>
+            {
+                VideoStatusText = $"生成预览代理失败：{ex.Message}";
+                VideoErrorVisibility = Visibility.Visible;
+            });
             Log.Warn("切换视频预览代理失败", ex);
         }
     }
@@ -452,25 +491,32 @@ public sealed partial class PreviewViewModel : ObservableObject
 
             var proxyPath = await proxy.EnsureProxyAsync(asset.FullPath, lut.FilePath, ct);
             if (token != _lutProxyVersion) return;
-            if (string.IsNullOrEmpty(proxyPath))
+            await RunOnUiAsync(() =>
             {
-                VideoStatusText = $"「{lut.Name}」监视代理生成失败，当前播放原始画面（可检查 ffmpeg 设置）。";
-                VideoErrorVisibility = Visibility.Visible;
-                return;
-            }
+                if (token != _lutProxyVersion) return;
+                if (string.IsNullOrEmpty(proxyPath))
+                {
+                    VideoStatusText = $"「{lut.Name}」监视代理生成失败，当前播放原始画面（可检查 ffmpeg 设置）。";
+                    VideoErrorVisibility = Visibility.Visible;
+                    return;
+                }
 
-            VideoSource = MediaSource.CreateFromUri(new Uri(proxyPath));
-            VideoVisibility = Visibility.Visible;
-            VideoStatusText = $"已按设备绑定自动套用监视 LUT「{lut.Name}」（{asset.DisplayDevice} · Log），代理已缓存";
-            VideoErrorVisibility = Visibility.Collapsed;
-            LoadingVisibility = Visibility.Collapsed;
+                VideoSource = MediaSource.CreateFromUri(new Uri(proxyPath));
+                VideoVisibility = Visibility.Visible;
+                VideoStatusText = $"已按设备绑定自动套用监视 LUT「{lut.Name}」（{asset.DisplayDevice} · Log），代理已缓存";
+                VideoErrorVisibility = Visibility.Collapsed;
+                LoadingVisibility = Visibility.Collapsed;
+            });
             Log.Info($"[preview] Log 监视 LUT：「{lut.Name}」→ {asset.FileName}（{asset.DeviceKey}）");
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
-            VideoStatusText = $"套用监视 LUT 失败：{ex.Message}（当前播放原始画面）";
-            VideoErrorVisibility = Visibility.Visible;
+            await RunOnUiAsync(() =>
+            {
+                VideoStatusText = $"套用监视 LUT 失败：{ex.Message}（当前播放原始画面）";
+                VideoErrorVisibility = Visibility.Visible;
+            });
             Log.Warn("套用视频监视 LUT 失败", ex);
         }
     }
