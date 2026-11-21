@@ -12,5 +12,3 @@ dist/
 tools/Installer/payload.zip
 tools/Installer/bin/
 tools/Installer/obj/
-macos/.build/
-macos/dist/

@@ -310,7 +310,7 @@ UI 只通过 ViewModel 访问服务；所有长任务都吃 `CancellationToken`�
 | --- | --- | --- |
 | 便携版双击无窗口 | 启动器用 ShellExecute 在部分环境子进程启动即崩 | 先直接 `CreateProcess`，失败再退回 Shell |
 | 安装到自定义目录后文件散落 | 安装脚本直接用用户选的目录 | 先创建 `<所选目录>\STJ Media Viewer` 子目录；已是自身目录则不重复 |
-| 版本号不一致 | 多处硬编码 | 5 处同时改：App csproj、Installer csproj、Installer Program、build-installer.ps1、macOS Info.plist |
+| 版本号不一致 | 多处硬编码 | 4 处同时改：App csproj、Installer csproj、Installer Program、build-installer.ps1 |
 | GitCode 上传失败 | 服务端偶发 203 / ConnectionAborted | 上传脚本带重试（3–5 次），大文件用原始 PUT + Content-Length |
 
 ---
@@ -347,7 +347,7 @@ UI 只通过 ViewModel 访问服务；所有长任务都吃 `CancellationToken`�
 
 ## 10. 已知限制
 
-- Windows 独占 UI（WinUI 3）；macOS 版需要原生重写表现层（见 `docs/macOS-PROMPT.md`）。
+- Windows 独占 UI（WinUI 3）；macOS 版为独立仓库（原 `docs/macOS-PROMPT.md` 已随迁，见 <https://gitcode.com/TMR2333/stj-media-viewer-macos>）。
 - 视频编辑能力仅限转码/压缩/预览代理，不做时间线剪辑。
 - AI 只支持 OpenAI 兼容 Chat Completions，不做本地模型推理（可接 Ollama）。
 - 离线城市库是 GeoNames cities15000，乡镇级精度有限；更细位置用 GPS 聚类。
@@ -355,14 +355,17 @@ UI 只通过 ViewModel 访问服务；所有长任务都吃 `CancellationToken`�
 
 ---
 
-## 11. 给 macOS 版的提示
+## 11. 给 macOS 版的提示（历史；macOS 版已迁至独立仓库）
+
+> macOS 版现已独立为 <https://gitcode.com/TMR2333/stj-media-viewer-macos>，
+> 提示词文档随之迁到该仓库 `docs/MACOS-PROMPT.md`。以下条目保留作跨平台经验参考。
 
 1. **不要逐行翻译 XAML**：用 SwiftUI/AppKit 的原生组织方式（NavigationSplitView + Inspector + Toolbar + 菜单），交互按 macOS HIG。
 2. **复用数据契约**：SQLite schema、分类语义（`is_pick` 三态、`__unset__`、多主题 `themes_json`、origin）直接照搬，才能读同一份 catalog.db。
 3. **Core 可移植 ≈90%**：算法（解析/分类/LUT/整理路径/云同步比对）用 Swift 重写时照本文的规则与边界条件，别重新发明。
 4. **平台坑的同类项**：跨线程写 UI（macOS 是 `@MainActor`）、异步取消、文件协调（`NSFileCoordinator`）、沙盒与安全作用域书签、Keychain 存 Key、WebDAV 同样要处理 Expect/限流/重试。
 5. **自检等价物**：Swift 版也做 `stjcheck` 命令行 + XCTest，覆盖同样的业务断言；UI 用 XCUITest/截图比对。
-6. 详细的 macOS 提示词见 **[docs/MACOS-PROMPT.md](MACOS-PROMPT.md)**。
+6. 详细的 macOS 提示词见 **[stj-media-viewer-macos/docs/MACOS-PROMPT.md](https://gitcode.com/TMR2333/stj-media-viewer-macos/blob/main/docs/MACOS-PROMPT.md)**。
 
 ---
 

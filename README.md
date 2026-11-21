@@ -3,7 +3,8 @@
 > **Stjarna PERSPECTIVE 出品 · co-worked with DeepSeek Harness**
 >
 > 文档：[项目手册（功能 + 踩坑 + 经验）](docs/PROJECT-HANDBOOK.md) ·
-> [macOS 原生版提示词](docs/MACOS-PROMPT.md) · [架构](docs/ARCHITECTURE.md) · [设计令牌](docs/THEME-TOKENS.md) · [更新日志](CHANGELOG.md)
+> [架构](docs/ARCHITECTURE.md) · [设计令牌](docs/THEME-TOKENS.md) · [更新日志](CHANGELOG.md) ·
+> [macOS 独立仓库](https://gitcode.com/TMR2333/stj-media-viewer-macos)
 
 面向专业创作者的 **Windows 原生素材整理软件**。选一个媒体库文件夹，它递归扫描、排除非媒体、解析元数据、自动分类，并给你一个能按 9 个维度检索的素材库。界面遵循**微软 Fluent 设计语言**（WinUI 3 原生、Mica 背板、Segoe UI Variable 字阶），支持跟随系统 / 浅色 / 深色。
 
@@ -643,26 +644,18 @@ STJMediaViewer-1.25.0-portable.exe /D=D:\STJ 便携版解压到指定目录
 - 快捷方式 / 卸载项写入失败不影响安装完成，只记日志（安装包同目录 `stj-setup.log`）；
 - 发布只保留 `zh-Hans` / `en` 框架资源，日期选择器等系统控件保持中文。
 
-## 3.3 macOS 版（SwiftUI 原生）
+## 3.3 macOS 版（已迁至独立仓库）
 
-Windows 主版本用 WinUI 3；macOS 版是独立的 SwiftUI 原生应用，见 [`macos/README.md`](macos/README.md)。
+macOS 版是独立的 SwiftUI 原生应用（NavigationSplitView 三栏、Liquid Glass、SwiftPM 多 target），
+已于 2026-11 从本仓库迁出、单独维护：
 
-- **给 macOS 端 DSH 的完整提示词**：[`docs/MACOS-PROMPT.md`](docs/MACOS-PROMPT.md)
-  （原生 SwiftUI/AppKit、Apple HIG、数据契约、分阶段功能清单、验收与已知坑，可直接复制使用）；
-- **项目手册（全部功能 + 踩过的坑 + 工程经验）**：[`docs/PROJECT-HANDBOOK.md`](docs/PROJECT-HANDBOOK.md)。
+- 仓库：<https://gitcode.com/TMR2333/stj-media-viewer-macos>
+- 最新发行版（`.dmg`，Universal）：<https://gitcode.com/TMR2333/stj-media-viewer-macos/releases>
+- 数据兼容：两端共用同一份 `catalog.db`（同 schema、同筛选语义：`is_pick` 三态、`__unset__` 空值并集、多主题），
+  素材库目录可以共用（同一时刻只让一端写库）。
 
-- **当前阶段 P1 = 只读素材库浏览器**：读同一份 `catalog.db` + 缩略图缓存，原生三栏界面、
-  筛选/搜索/排序、检视面板、拖出到其他软件；不做写库与导入（P2–P5 见路线图）。
-- **产物是 `.dmg`**，但**必须在 macOS 上构建**（Windows 无法编译出 Mach-O / 无法签名）：
-  ```bash
-  bash macos/scripts/build-dmg.sh          # 产出 macos/dist/STJMediaViewer-1.0.0-macos-arm64-x86_64.dmg
-  ```
-  没有 Mac 就走 GitHub Actions：`.github/workflows/macos-dmg.yml`（`macos-14` runner），
-  push 后到 Actions 下载 `STJMediaViewer-macos-dmg` 构件。
-- 签名/公证：设置 `CODESIGN_IDENTITY` + `NOTARY_PROFILE` 后脚本自动 codesign + notarytool + staple；
-  不设置则 ad-hoc 签名（用户首次打开需右键 → 打开）。
-- 可行性盘点与取舍（Core 可复用 ~90%、三条路线对比）见 [`docs/macos-port.md`](docs/macos-port.md)。
-
+本仓库（Windows / WinUI 3 主版本）不再包含 macOS 源码、构建脚本与相关文档；
+历史上发布过的 macOS 版本（`v1.25.0-macos` … `v1.35.0-macos`）仍可从原发行版页面下载。
 
 ## 4. 工程与验证
 
@@ -755,7 +748,7 @@ dotnet build tools/SelfCheck/StjMediaViewer.SelfCheck.csproj
 
 当前版本 **v1.25.0**，历史见 [CHANGELOG.md](CHANGELOG.md)。
 
-- 规则：每次对外更新都 **+1 版本号**（`1.24.1` → `1.25.0` → `1.25.1` → …），同步改应用/安装器/便携版/macOS Info.plist；
+- 规则：每次对外更新都 **+1 版本号**（`1.24.1` → `1.25.0` → `1.25.1` → …），同步改应用/安装器/便携版；
 - 每次发版：`git tag v<版本>` + 推送到 GitCode + 创建发行版（Release）；
 - 一键脚本（版本、构建、提交、打标签、推送、创建发行版）：
 

@@ -3,6 +3,10 @@
 版本号规则：`主版本.次版本.修订号`。**每次对外更新都要 +1 修订号**（功能/修复都算），
 然后同步 GitCode 仓库并打 `v<版本>` 标签、创建发行版。
 
+> **说明（2026-11-21）**：macOS 原生版已迁至独立仓库
+> <https://gitcode.com/TMR2333/stj-media-viewer-macos>。
+> 本文件中涉及 macOS 的条目均为历史记录，不再随本仓库更新。
+
 ## v1.25.0 — 2026-11-21
 
 ### 文档：项目手册 + macOS 原生版提示词
@@ -12,7 +16,7 @@
   地图/时间线/整理/云同步/AI/水印/设置/引导）、设计系统、**按主题整理的问题与根因**
   （WinUI 崩溃、索引路径、扫描性能、WebDAV、UI 交互、打包发布）、可复用工程经验 Checklist、
   验证与发布流程、已知限制。
-- 新增 **[docs/MACOS-PROMPT.md](docs/MACOS-PROMPT.md)**：可直接复制给 macOS 端 DSH 的提示词，
+- 新增 **[docs/MACOS-PROMPT.md](https://gitcode.com/TMR2333/stj-media-viewer-macos/blob/main/docs/MACOS-PROMPT.md)**（该文档已随 macOS 版迁出）：可直接复制给 macOS 端 DSH 的提示词，
   要求原生 SwiftUI + AppKit、Apple HIG（NavigationSplitView / Inspector / Toolbar / 菜单与快捷键 /
   Settings 场景 / SF Symbols / 深浅色与 Vibrancy），包含数据契约、分阶段功能清单（P0–P4）、
   `stjcheck` + XCTest 验收项、性能目标、已知坑与工作方式。
@@ -820,7 +824,7 @@
 
 ### 其它
 
-- 版本号统一为 1.0.1（应用 / 安装器 / 便携版 / macOS Info.plist）。
+- 版本号统一为 1.0.1（应用 / 安装器 / 便携版）。
 - 新增本 CHANGELOG 与发布脚本 `tools/release.ps1`。
 
 ## v1.0.0 — 2026-11-16
