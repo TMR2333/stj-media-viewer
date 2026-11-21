@@ -1,0 +1,19 @@
+# macOS
+.DS_Store
+
+# SwiftPM
+.build/
+.swiftpm/
+*.xcodeproj
+Package.resolved
+
+# 构建产物
+dist/
+*.dmg
+
+# 样例素材库（2.6MB 媒体 + catalog.db，跑 `swift test` 前用脚本生成）
+.testdata/
+
+# 日志
+*.log
+__pycache__/

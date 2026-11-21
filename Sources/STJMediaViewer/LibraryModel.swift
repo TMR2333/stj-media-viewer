@@ -1,0 +1,1330 @@
+import AppKit
+import Combine
+import STJCore
+import SwiftUI
+
+enum SidebarSelection: Hashable {
+    case section(SidebarSection)
+    case collection(String)
+    case mergeGroup(String)
+}
+
+@MainActor
+final class LibraryModel: ObservableObject {
+    // MARK: 状态
+
+    @Published private(set) var catalog: Catalog?
+    @Published private(set) var dataDirectory: URL?
+    @Published private(set) var assets: [Asset] = []
+    @Published private(set) var totalCount = 0
+    @Published private(set) var facets = Facets()
+    @Published private(set) var collections: [AssetCollection] = []
+    @Published private(set) var mergeGroups: [MergeGroup] = []
+    @Published private(set) var libraries: [LibraryRoot] = []
+    @Published var filter = AssetFilter() {
+        didSet {
+            if filter != oldValue {
+                scheduleReload(reason: "筛选变化")
+            }
+        }
+    }
+    @Published var sort = SortDescriptor() {
+        didSet {
+            if sort != oldValue {
+                scheduleReload(reason: "排序变化")
+            }
+        }
+    }
+    @Published var selection: Set<String> = []
+    @Published var sidebarSelection: SidebarSelection = .section(.all) {
+        didSet {
+            guard sidebarSelection != oldValue else { return }
+            applySidebarSelection()
+        }
+    }
+    @Published var expandedGroup: MergeGroup? {
+        didSet {
+            AppLog.breadcrumb(expandedGroup.map { "展开合并组：\($0.name)（\($0.count) 项）" } ?? "收起合并组")
+            scheduleReload(reason: "合并组")
+        }
+    }
+    @Published var isLoading = false
+    @Published var cachedThumbnailCount = 0
+    @Published var quickLookFallbackCount = 0
+    @Published var columnVisibility: NavigationSplitViewVisibility = .all
+    @Published var statusMessage: String?
+    @Published var presentedError: String?
+    @Published var isBatchEditorPresented = false
+    @Published var searchFocused = false
+    @Published var listDensityOverride: LibraryDensity?
+    @Published var showsTimeline = false
+    @Published var showsMap = false
+    /// 画廊里当前预览的 LUT 名称；nil 表示原图。
+    @Published var galleryLUTName: String?
+
+    /// 数据目录 `LUTs/` 下的 .cube 预设。
+    var availableLUTs: [CubeLUT] {
+        LUTDirectory.loadAll(in: dataDirectory)
+    }
+
+    /// 对所选素材跑 AI 分类（OpenAI 兼容接口），把结果写回素材库。
+    func aiTagSelection() {
+        guard let catalog, !selectedAssets.isEmpty, !isAITagging else { return }
+        #if DEBUG
+        let apiKey = UserDefaults.standard.string(forKey: "aiAPIKey") ?? settings.apiKey ?? ""
+        #else
+        let apiKey = settings.apiKey ?? ""
+        #endif
+        guard !apiKey.isEmpty else {
+            showStatus("请先在设置 → AI 里填写 API Key")
+            return
+        }
+        let configuration = AITagger.Configuration(endpoint: settings.aiEndpoint,
+                                                  model: settings.aiModel,
+                                                  apiKey: apiKey)
+        let tagger = AITagger(configuration: configuration)
+        let assets = selectedAssets
+        isAITagging = true
+        aiTagProgress = (0, assets.count)
+        AppLog.breadcrumb("AI 打标开始：\(assets.count) 个素材 → \(settings.aiEndpoint)")
+        Task {
+            var applied = 0
+            var failed = 0
+            var firstError: String?
+            for (index, asset) in assets.enumerated() {
+                if Task.isCancelled { break }
+                if let data = await AIProgress.previewJPEGData(for: asset) {
+                    do {
+                        let suggestion = try await tagger.suggest(imageData: data)
+                        if suggestion.error == nil {
+                            let patch = AITagger.patch(for: asset, suggestion: suggestion)
+                            if !patch.isEmpty {
+                                try catalog.update(patch: patch, ids: [asset.id])
+                                applied += 1
+                            }
+                        } else {
+                            failed += 1
+                            firstError = firstError ?? suggestion.error
+                        }
+                    } catch {
+                        failed += 1
+                        firstError = firstError ?? error.localizedDescription
+                    }
+                } else {
+                    failed += 1
+                }
+                aiTagProgress = (index + 1, assets.count)
+            }
+            aiTagProgress = nil
+            isAITagging = false
+            aiTagSummary = "AI 打标：成功 \(applied) · 失败 \(failed)"
+            showStatus(aiTagSummary ?? "")
+            AppLog.breadcrumb("AI 打标完成：成功 \(applied) · 失败 \(failed)")
+            if let firstError, applied == 0 {
+                presentedError = firstError
+            }
+            await reloadNow(reason: "AI 打标", debounced: false)
+        }
+    }
+
+    func toggleTimeline() {
+        showsTimeline.toggle()
+        if showsTimeline { showsMap = false }
+    }
+
+    func toggleMap() {
+        showsMap.toggle()
+        if showsMap { showsTimeline = false }
+    }
+
+    // 重复项检测
+    @Published var isDuplicateScanning = false
+    @Published var duplicateGroups: [DuplicateGroup] = []
+    @Published var isDuplicateSheetPresented = false
+
+    // 整理动作
+    @Published var isOrganizing = false
+    // MARK: 云同步
+    @Published var isAITagging = false
+    @Published var aiTagProgress: (done: Int, total: Int)?
+    @Published var aiTagSummary: String?
+    @Published var isCloudSyncing = false
+    @Published var cloudSyncProgress: CloudSyncProgress?
+    @Published var cloudSyncSummary: String?
+    @Published var cloudDiagnostics: [DiagnosticStep]?
+    @Published var isRemoteBrowserPresented = false
+    @Published var remoteEntries: [RemoteEntry] = []
+    @Published var remotePath = ""
+    @Published var remoteSelection: Set<String> = []
+    @Published var isRemoteLoading = false
+    @Published var remoteStatus: String?
+    @Published var isRemoteDownloading = false
+    @Published var remoteDownloadProgress: (done: Int, total: Int)?
+    private var remoteTask: Task<Void, Never>?
+    private var cloudSyncTask: Task<Void, Never>?
+    @Published var organizeSummary: String?
+    /// 画廊模式当前查看的素材 ID；非 nil 时弹出画廊窗口。
+    @Published var galleryAssetID: String?
+
+    private var reloadTask: Task<Void, Never>?
+    private var statusTask: Task<Void, Never>?
+    private var started = false
+    private var currentReloadReason = ""
+
+    var settings: SettingsStore { SettingsStore.shared }
+
+    // MARK: 派生属性
+
+    var density: LibraryDensity {
+        get { listDensityOverride ?? settings.density }
+        set {
+            listDensityOverride = newValue
+            settings.density = newValue
+            AppLog.breadcrumb("切换视图密度：\(newValue.title)")
+        }
+    }
+
+    var selectedAssets: [Asset] {
+        assets.filter { selection.contains($0.id) }
+    }
+
+    var primarySelection: Asset? {
+        selectedAssets.first
+    }
+
+    var galleryAsset: Asset? {
+        guard let galleryAssetID else { return nil }
+        return assets.first { $0.id == galleryAssetID }
+    }
+
+    /// 画廊里当前素材在可见列表中的序号（从 1 开始），用于「3 / 25」提示。
+    var galleryPosition: (index: Int, total: Int)? {
+        guard let galleryAssetID, let index = assets.firstIndex(where: { $0.id == galleryAssetID }) else {
+            return nil
+        }
+        return (index + 1, assets.count)
+    }
+
+    var canDeleteSelection: Bool { !selection.isEmpty }
+
+    var breadcrumb: String {
+        var pieces: [String] = ["素材库"]
+        switch sidebarSelection {
+        case .section(let section):
+            pieces.append(section.title)
+        case .collection(let id):
+            pieces.append(collections.first { $0.id == id }?.name ?? "合集")
+        case .mergeGroup(let id):
+            pieces.append(mergeGroups.first { $0.id == id }?.name ?? "合并组")
+        }
+        if !filter.ratings.isEmpty { pieces.append("评分 \(filter.ratings.sorted().map(String.init).joined(separator: "/"))") }
+        if !filter.years.isEmpty { pieces.append("年份 \(filter.years.sorted().joined(separator: "/"))") }
+        if !filter.cities.isEmpty { pieces.append("城市 \(filter.cities.sorted().joined(separator: "/"))") }
+        if !filter.themes.isEmpty { pieces.append("主题 \(filter.themes.sorted().joined(separator: "/"))") }
+        if !filter.searchText.trimmingCharacters(in: .whitespaces).isEmpty { pieces.append("搜索“\(filter.searchText)”") }
+        if let expandedGroup { pieces.append("合并组 \(expandedGroup.name)") }
+        return pieces.joined(separator: " / ")
+    }
+
+    var statusLine: String {
+        var pieces: [String] = []
+        pieces.append("共 \(totalCount) 张")
+        if assets.count != totalCount { pieces.append("当前显示 \(assets.count) 张") }
+        if !selection.isEmpty { pieces.append("已选 \(selection.count) 项") }
+        if settings.foldRawPairs { pieces.append("已折叠 RAW+JPG 配对") }
+        pieces.append("缩略图缓存命中 \(cachedThumbnailCount) 张")
+        if quickLookFallbackCount > 0 { pieces.append("QuickLook 兜底 \(quickLookFallbackCount) 张") }
+        if let dataDirectory { pieces.append("数据目录 \(dataDirectory.lastPathComponent)") }
+        return pieces.joined(separator: " · ")
+    }
+
+    // MARK: 启动与打开
+
+    func startIfNeeded() async {
+        guard !started else { return }
+        started = true
+        let defaults = UserDefaults.standard
+        if let path = defaults.string(forKey: "dataDirectory"), !path.isEmpty {
+            await open(directory: URL(fileURLWithPath: (path as NSString).expandingTildeInPath), quiet: true)
+        } else if let last = LastLibraryStore.lastDirectoryPath {
+            await open(directory: URL(fileURLWithPath: last), quiet: true)
+        } else {
+            AppLog.breadcrumb("启动：未指定素材库，等待用户选择")
+        }
+        if let preselect = defaults.string(forKey: "preselectAssetID"), !preselect.isEmpty {
+            selection = [preselect]
+            AppLog.breadcrumb("启动参数预置选中项：\(preselect)")
+        }
+        if let gallery = defaults.string(forKey: "galleryAssetID"), !gallery.isEmpty {
+            selection = [gallery]
+            galleryAssetID = gallery
+            AppLog.breadcrumb("启动参数打开画廊：\(gallery)")
+        }
+        #if DEBUG
+        if defaults.bool(forKey: "showsTimeline") {
+            showsTimeline = true
+            AppLog.breadcrumb("启动参数切换时间线视图")
+        }
+        if defaults.bool(forKey: "showsMap") {
+            showsMap = true
+            AppLog.breadcrumb("启动参数切换地图视图")
+        }
+        if let lutName = defaults.string(forKey: "galleryLUT"), !lutName.isEmpty {
+            galleryLUTName = lutName
+            AppLog.breadcrumb("启动参数画廊 LUT：\(lutName)")
+        }
+        // 仅 Debug 构建：验收截图用，强制显示首次引导。
+        if defaults.bool(forKey: "showOnboardingOnLaunch") {
+            settings.hasCompletedOnboarding = false
+            AppLog.breadcrumb("启动参数显示首次引导")
+        }
+        // 仅 Debug 构建：验收用，直接跑一次素材库备份（跳过面板）。
+        if let backupPath = defaults.string(forKey: "backupOnLaunch"), !backupPath.isEmpty, let library = dataDirectory {
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 800_000_000)
+                do {
+                    let summary = try await Task.detached(priority: .userInitiated) {
+                        try LibraryBackup.create(from: library, destination: URL(fileURLWithPath: backupPath), appVersion: "debug")
+                    }.value
+                    showStatus("备份完成：\(summary.descriptionText)")
+                    AppLog.breadcrumb("启动参数备份：\(summary.descriptionText) → \(summary.destination.path)")
+                } catch {
+                    AppLog.error("启动参数备份失败：\(error.localizedDescription)")
+                }
+            }
+        }
+        // 仅 Debug 构建：验收用，直接从备份恢复（跳过面板与确认框）。
+        if let restorePath = defaults.string(forKey: "restoreOnLaunch"), !restorePath.isEmpty, let library = dataDirectory {
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 800_000_000)
+                do {
+                    let summary = try await Task.detached(priority: .userInitiated) {
+                        try LibraryBackup.restore(from: URL(fileURLWithPath: restorePath), to: library)
+                    }.value
+                    showStatus("恢复完成：\(summary.descriptionText)")
+                    AppLog.breadcrumb("启动参数恢复：\(summary.descriptionText)")
+                    await open(directory: library)
+                } catch {
+                    AppLog.error("启动参数恢复失败：\(error.localizedDescription)")
+                }
+            }
+        }
+        // 仅 Debug 构建：验收截图用，把当前素材全部导出为带水印 JPEG。
+        if let exportPath = defaults.string(forKey: "watermarkExportDirectory"), !exportPath.isEmpty {
+            let style = settings.watermarkStyle
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 1_200_000_000)
+                let list = assets
+                let summary = await Task.detached(priority: .userInitiated) {
+                    try? Watermarker.export(assets: list, to: URL(fileURLWithPath: exportPath), style: style)
+                }.value
+                if let summary {
+                    showStatus("水印导出：\(summary.descriptionText)")
+                    AppLog.breadcrumb("启动参数水印导出：\(summary.descriptionText) → \(exportPath)")
+                } else {
+                    AppLog.error("启动参数水印导出失败")
+                }
+            }
+        }
+        // 仅 Debug 构建：本机无辅助功能授权，无法合成菜单点击，用启动参数直接打开重复项面板以便验收截图。
+        #if DEBUG
+        if defaults.bool(forKey: "remoteBrowserOnLaunch") {
+            let initialPath = defaults.string(forKey: "remotePathOnLaunch") ?? ""
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 900_000_000)
+                self.openRemoteBrowser()
+                if !initialPath.isEmpty {
+                    try? await Task.sleep(nanoseconds: 600_000_000)
+                    await self.loadRemoteEntries(initialPath)
+                }
+                if defaults.bool(forKey: "remoteSelectAllOnLaunch") {
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    self.remoteSelection = Set(self.remoteEntries.filter { !$0.isDirectory }.map(\.path))
+                }
+                if defaults.bool(forKey: "remoteDownloadAllOnLaunch") {
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    self.remoteSelection = Set(self.remoteEntries.filter { !$0.isDirectory }.map(\.path))
+                    self.downloadRemoteSelection()
+                }
+            }
+        }
+        if let text = defaults.string(forKey: "searchTextOnLaunch"), !text.isEmpty {
+            var next = filter
+            next.searchText = text
+            filter = next
+        }
+        #endif
+        if defaults.bool(forKey: "showDuplicatesOnLaunch") {
+            findDuplicates()
+        }
+        // 仅 Debug 构建：验收截图用，全选素材并直接开始 AI 打标（无需点菜单）。
+        if defaults.bool(forKey: "aiTagAllOnLaunch") {
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 600_000_000)
+                selectAll()
+                aiTagSelection()
+                AppLog.breadcrumb("启动参数触发 AI 打标：\(selection.count) 项")
+            }
+        }
+        // 仅 Debug 构建：验收截图用，全选素材并直接开始 WebDAV 上传（无需点菜单）。
+        if defaults.bool(forKey: "uploadAllOnLaunch") {
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 500_000_000)
+                selectAll()
+                uploadSelectionToWebDAV()
+                AppLog.breadcrumb("启动参数触发全量 WebDAV 上传：\(selection.count) 项")
+            }
+        }
+        #endif
+    }
+
+    func open(directory: URL, quiet: Bool = false) async {
+        do {
+            let catalog = try Catalog(directory: directory)
+            self.catalog = catalog
+            self.dataDirectory = directory
+            ThumbnailStore.shared.configure(cacheDirectory: directory.appendingPathComponent("Cache/thumbs"))
+            LastLibraryStore.lastDirectoryPath = directory.path
+            cachedThumbnailCount = ThumbnailStore.shared.cachedThumbnailCount()
+            let libraryCount = (try? catalog.loadFacets().total) ?? 0
+            if !quiet {
+                AppLog.breadcrumb("打开素材库：\(directory.path)（\(libraryCount) 张）")
+                showStatus("已打开 \(directory.lastPathComponent)")
+            }
+            selection = []
+            await reloadNow(reason: "打开素材库")
+        } catch {
+            AppLog.error("打开素材库失败：\(directory.path) — \(error.localizedDescription)")
+            presentedError = error.localizedDescription
+        }
+    }
+
+    func openFromPanel() async {
+        let panel = NSOpenPanel()
+        panel.title = "选择素材库目录"
+        panel.message = "请选择包含 catalog.db 的素材库目录"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "打开"
+        if let dataDirectory {
+            panel.directoryURL = dataDirectory
+        }
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        await open(directory: url)
+    }
+
+    // MARK: 导入 / 扫描（P2）
+
+    /// 扫描导入进度（nil 表示当前没有导入任务）。
+    @Published var importProgress: ImportProgress?
+    @Published var isImporting = false
+
+    func importLibraryFolder() {
+        let panel = NSOpenPanel()
+        panel.title = "导入 / 扫描素材目录"
+        panel.message = "选择素材目录：没有 catalog.db 时会按 Windows 兼容 schema 新建素材库；已有库则增量扫描"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "扫描并导入"
+        if let dataDirectory {
+            panel.directoryURL = dataDirectory.deletingLastPathComponent()
+        }
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        importFrom(url)
+    }
+
+    func importFrom(_ folder: URL) {
+        guard !isImporting else { return }
+        isImporting = true
+        importProgress = ImportProgress(processed: 0, total: 0, currentFileName: "")
+        showStatus("正在扫描：\(folder.lastPathComponent)")
+        let name = folder.lastPathComponent
+        let progressHandler: @Sendable (ImportProgress) -> Void = { progress in
+            Task { @MainActor [weak self] in
+                self?.importProgress = progress
+            }
+        }
+        Task {
+            do {
+                let summary = try await Task.detached(priority: .userInitiated) {
+                    try Importer.importFolder(folder, libraryName: name, progress: progressHandler)
+                }.value
+                isImporting = false
+                importProgress = nil
+                showStatus("导入完成：\(summary.descriptionText)")
+                AppLog.breadcrumb("导入素材库：\(folder.path) → \(summary.descriptionText)（\(String(format: "%.1f", summary.duration)) 秒）")
+                if let databaseURL = summary.databaseURL {
+                    await open(directory: databaseURL.deletingLastPathComponent(), quiet: true)
+                }
+            } catch {
+                isImporting = false
+                importProgress = nil
+                presentedError = error.localizedDescription
+                AppLog.error("导入失败：\(folder.path) — \(error.localizedDescription)")
+            }
+        }
+    }
+
+    // MARK: 刷新
+
+    func scheduleReload(reason: String) {
+        currentReloadReason = reason
+        reloadTask?.cancel()
+        reloadTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 120_000_000)
+            guard !Task.isCancelled else { return }
+            await self?.reloadNow(reason: reason, debounced: true)
+        }
+    }
+
+    func reloadNow(reason: String = "手动刷新", debounced: Bool = false) async {
+        guard let catalog else { return }
+        isLoading = true
+        defer { isLoading = false }
+        var filter = self.filter
+        filter.foldRawPairs = settings.foldRawPairs
+        let sort = self.sort
+        let groupID = expandedGroup?.id
+        do {
+            let snapshot = try await Task.detached(priority: .userInitiated) {
+                let assets = try catalog.loadAssets(filter: filter, sort: sort, expandedGroupID: groupID)
+                let total = try catalog.count(filter: filter, expandedGroupID: groupID)
+                let facets = try catalog.loadFacets()
+                let collections = try catalog.collections()
+                let groups = try catalog.mergeGroups()
+                let libraries = try catalog.libraries()
+                return Snapshot(assets: assets, total: total, facets: facets,
+                                collections: collections, mergeGroups: groups, libraries: libraries)
+            }.value
+            guard !Task.isCancelled else { return }
+            assets = snapshot.assets
+            totalCount = snapshot.total
+            facets = snapshot.facets
+            collections = snapshot.collections
+            mergeGroups = snapshot.mergeGroups
+            libraries = snapshot.libraries
+            let visibleIDs = Set(snapshot.assets.map(\.id))
+            selection = selection.filter { visibleIDs.contains($0) }
+            cachedThumbnailCount = ThumbnailStore.shared.cachedThumbnailCount()
+            quickLookFallbackCount = countQuickLookFallbacks(in: snapshot.assets)
+            AppLog.breadcrumb("\(reason)：显示 \(snapshot.assets.count)/\(snapshot.total) 张 · \(breadcrumb)")
+        } catch {
+            AppLog.error("刷新失败：\(error.localizedDescription)")
+            presentedError = error.localizedDescription
+        }
+    }
+
+    private func countQuickLookFallbacks(in assets: [Asset]) -> Int {
+        let hits = ThumbnailStore.shared.cachedHitCount(for: assets)
+        return max(assets.count - hits, 0)
+    }
+
+    // MARK: 侧栏
+
+    private func applySidebarSelection() {
+        var next = AssetFilter()
+        next.searchText = filter.searchText
+        switch sidebarSelection {
+        case .section(.all):
+            break
+        case .section(.pick):
+            next.pick = 1
+        case .section(.rejected):
+            next.pick = 0
+        case .section(.uncategorized):
+            next.unsetDimensions.insert(.collection)
+        case .collection(let id):
+            next.collectionIDs = [id]
+        case .mergeGroup(let id):
+            next.mergeGroupIDs = [id]
+        }
+        expandedGroup = nil
+        selection = []
+        filter = next
+        AppLog.breadcrumb("切换侧栏：\(breadcrumb)")
+    }
+
+    func clearFilters() {
+        filter = AssetFilter()
+        selection = []
+        showStatus("已清除筛选条件")
+    }
+
+    func removeFilterChip(_ apply: (inout AssetFilter) -> Void) {
+        var next = filter
+        apply(&next)
+        filter = next
+    }
+
+    // MARK: 选择
+
+    func handleTap(asset: Asset, modifiers: NSEvent.ModifierFlags) {
+        if modifiers.contains(.command) {
+            if selection.contains(asset.id) {
+                selection.remove(asset.id)
+            } else {
+                selection.insert(asset.id)
+            }
+        } else if modifiers.contains(.shift), let anchor = primarySelection,
+                  let anchorIndex = assets.firstIndex(where: { $0.id == anchor.id }),
+                  let targetIndex = assets.firstIndex(where: { $0.id == asset.id }) {
+            let range = anchorIndex < targetIndex ? anchorIndex...targetIndex : targetIndex...anchorIndex
+            selection = Set(assets[range].map(\.id))
+        } else {
+            selection = [asset.id]
+        }
+        AppLog.breadcrumb("选中 \(selection.count) 项：\(asset.fileName)")
+    }
+
+    func selectAll() {
+        selection = Set(assets.map(\.id))
+        AppLog.breadcrumb("全选 \(selection.count) 项")
+    }
+
+    func clearSelection() {
+        selection = []
+    }
+
+    func moveSelection(offset: Int) {
+        guard !assets.isEmpty else { return }
+        let currentIndex: Int
+        if let first = selectedAssets.first, let index = assets.firstIndex(of: first) {
+            currentIndex = index
+        } else {
+            currentIndex = offset > 0 ? -1 : assets.count
+        }
+        let nextIndex = min(max(currentIndex + offset, 0), assets.count - 1)
+        selection = [assets[nextIndex].id]
+    }
+
+    // MARK: 交互动作
+
+    func toggleQuickLook() {
+        let urls = selectedAssets.map(\.fileURL)
+        guard !urls.isEmpty else {
+            AppLog.breadcrumb("空格快速查看：当前没有选中素材")
+            return
+        }
+        AppLog.breadcrumb("空格快速查看 \(urls.count) 项")
+        QuickLookController.shared.toggle(items: urls)
+    }
+
+    func openSelectionInDefaultApp() {
+        let urls = selectedAssets.map(\.fileURL)
+        guard !urls.isEmpty else { return }
+        for url in urls {
+            NSWorkspace.shared.open(url)
+        }
+        AppLog.breadcrumb("用默认应用打开 \(urls.count) 项")
+        showStatus("已交给默认应用打开 \(urls.count) 个文件")
+    }
+
+    func revealSelection() {
+        let urls = selectedAssets.map(\.fileURL)
+        guard !urls.isEmpty else { return }
+        NSWorkspace.shared.activateFileViewerSelecting(urls)
+        AppLog.breadcrumb("在 Finder 中显示 \(urls.count) 项")
+    }
+
+    func deleteSelection() {
+        guard let catalog else { return }
+        let ids = selectedAssets.map(\.id)
+        guard !ids.isEmpty else { return }
+        let alert = NSAlert()
+        alert.messageText = "把 \(ids.count) 个素材移到废纸篓？"
+        alert.informativeText = "原文件会进入废纸篓，并从 catalog.db 中移除记录。"
+        alert.addButton(withTitle: "移到废纸篓")
+        alert.addButton(withTitle: "取消")
+        alert.alertStyle = .warning
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        Task {
+            do {
+                let expanded = try catalog.expandedIDs(for: ids)
+                let urls = selectedAssets.map(\.fileURL)
+                try await Self.recycleFiles(urls)
+                try catalog.delete(ids: expanded)
+                AppLog.breadcrumb("移到废纸篓：\(ids.count) 项（含合并组成员 \(expanded.count) 条记录）")
+                showStatus("已移到废纸篓 \(ids.count) 项")
+                selection = []
+                await reloadNow(reason: "删除素材")
+            } catch {
+                AppLog.error("删除失败：\(error.localizedDescription)")
+                presentedError = error.localizedDescription
+            }
+        }
+    }
+
+    private static func recycleFiles(_ urls: [URL]) async throws {
+        guard !urls.isEmpty else { return }
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            NSWorkspace.shared.recycle(urls) { _, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume()
+                }
+            }
+        }
+    }
+
+    // MARK: 编辑
+
+    func update(_ patch: AssetPatch, ids: [String]) {
+        guard let catalog, !ids.isEmpty else { return }
+        Task {
+            do {
+                let expanded = try catalog.expandedIDs(for: ids)
+                try catalog.update(patch: patch, ids: expanded)
+                AppLog.breadcrumb("修改 \(ids.count) 项（含合并组成员共 \(expanded.count) 条记录）")
+                showStatus("已更新 \(ids.count) 项")
+                await reloadNow(reason: "编辑素材")
+            } catch {
+                AppLog.error("修改失败：\(error.localizedDescription)")
+                presentedError = error.localizedDescription
+            }
+        }
+    }
+
+    func submitBatchEdit(_ patch: AssetPatch) {
+        let ids = selectedAssets.map(\.id)
+        update(patch, ids: ids)
+        isBatchEditorPresented = false
+    }
+
+    func setRating(_ rating: Int) {
+        var patch = AssetPatch()
+        patch.rating = rating
+        update(patch, ids: selectedAssets.map(\.id))
+    }
+
+    func setPick(_ value: Int?) {
+        var patch = AssetPatch()
+        patch.isPick = value.map { .set($0) } ?? .clear
+        update(patch, ids: selectedAssets.map(\.id))
+    }
+
+    func writeXMP() {
+        let targets = selectedAssets
+        guard !targets.isEmpty else { return }
+        Task {
+            do {
+                let written = try XMPWriter.write(for: targets)
+                AppLog.breadcrumb("写入 XMP 侧车 \(written.count) 个")
+                showStatus("已写入 \(written.count) 个 XMP 侧车文件")
+            } catch {
+                AppLog.error("写入 XMP 失败：\(error.localizedDescription)")
+                presentedError = error.localizedDescription
+            }
+        }
+    }
+
+    // MARK: 配对导出
+
+    /// 把当前选中的素材（含配对的 RAW/JPG 伴生文件）复制到用户选择的文件夹。
+    /// 备份当前素材库（catalog.db + 缩略图）到用户选择的目录。
+    func backupLibrary() {
+        guard let dataDirectory, catalog != nil else {
+            showStatus("先打开一个素材库")
+            return
+        }
+        let panel = NSOpenPanel()
+        panel.title = "选择备份保存位置"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "备份到此"
+        guard panel.runModal() == .OK, let destination = panel.url else { return }
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+        showStatus("正在备份素材库…")
+        Task {
+            do {
+                let summary = try await Task.detached(priority: .userInitiated) {
+                    try LibraryBackup.create(from: dataDirectory, destination: destination, appVersion: version)
+                }.value
+                showStatus("备份完成：\(summary.descriptionText)")
+                AppLog.breadcrumb("备份素材库：\(summary.descriptionText) → \(summary.destination.path)")
+                NSWorkspace.shared.activateFileViewerSelecting([summary.destination])
+            } catch {
+                presentedError = error.localizedDescription
+                AppLog.error("备份素材库失败：\(error.localizedDescription)")
+            }
+        }
+    }
+
+    /// 从备份目录恢复素材库（替换 catalog.db + 缩略图）。
+    func restoreLibrary() {
+        guard let dataDirectory else {
+            showStatus("先打开一个素材库")
+            return
+        }
+        let panel = NSOpenPanel()
+        panel.title = "选择 STJMediaViewer-Backup-* 备份目录"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "恢复"
+        guard panel.runModal() == .OK, let backup = panel.url else { return }
+        let alert = NSAlert()
+        alert.messageText = "用备份替换当前素材库？"
+        alert.informativeText = "当前 catalog.db 会改名保留（catalog.db.restore-时间戳），缩略图缓存会被备份覆盖。"
+        alert.addButton(withTitle: "恢复")
+        alert.addButton(withTitle: "取消")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        showStatus("正在恢复素材库…")
+        Task {
+            do {
+                let summary = try await Task.detached(priority: .userInitiated) {
+                    try LibraryBackup.restore(from: backup, to: dataDirectory)
+                }.value
+                showStatus("恢复完成：\(summary.descriptionText)")
+                AppLog.breadcrumb("恢复素材库：\(summary.descriptionText)")
+                await open(directory: dataDirectory)
+            } catch {
+                presentedError = error.localizedDescription
+                AppLog.error("恢复素材库失败：\(error.localizedDescription)")
+            }
+        }
+    }
+
+    /// 导出选中素材的带水印 JPEG（导出到用户选择目录）。
+    func exportWatermarkedSelection() {
+        guard !selectedAssets.isEmpty else {
+            showStatus("先选择要导出的素材")
+            return
+        }
+        let style = settings.watermarkStyle
+        guard style.isEnabled else {
+            showStatus("请先在设置 → 媒体库中填写水印文字")
+            return
+        }
+        let panel = NSOpenPanel()
+        panel.title = "选择水印导出目录"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "导出"
+        guard panel.runModal() == .OK, let directory = panel.url else { return }
+        let assets = selectedAssets
+        AppLog.breadcrumb("导出带水印：\(assets.count) 个素材 → \(directory.path)")
+        Task {
+            do {
+                let summary = try await Task.detached(priority: .userInitiated) {
+                    try Watermarker.export(assets: assets, to: directory, style: style)
+                }.value
+                showStatus("水印导出：\(summary.descriptionText)")
+                AppLog.breadcrumb("水印导出完成：\(summary.descriptionText) → \(summary.directory.path)")
+                if !summary.failures.isEmpty {
+                    presentedError = summary.failures.joined(separator: "\n")
+                }
+                NSWorkspace.shared.open(directory)
+            } catch {
+                presentedError = error.localizedDescription
+                AppLog.error("水印导出失败：\(error.localizedDescription)")
+            }
+        }
+    }
+
+    func exportPairs() {
+        let targets = selectedAssets
+        guard !targets.isEmpty else { return }
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.canCreateDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "导出到此处"
+        panel.message = "选择导出目标文件夹（会一并复制配对的 JPG / RAW 文件）"
+        guard panel.runModal() == .OK, let directory = panel.url else { return }
+
+        var pairs: [ExportPair] = []
+        for asset in targets {
+            let pair = PairExporter.plan(for: asset)
+            if !pair.isEmpty { pairs.append(pair) }
+        }
+        guard !pairs.isEmpty else {
+            showStatus("选中的素材没有可导出的文件")
+            return
+        }
+        Task {
+            do {
+                let written = try PairExporter.copy(pairs, to: directory)
+                AppLog.breadcrumb("导出配对：\(written.count) 个文件 → \(directory.path)")
+                showStatus("已导出 \(written.count) 个文件到 \(directory.lastPathComponent)")
+            } catch {
+                AppLog.error("导出配对失败：\(error.localizedDescription)")
+                presentedError = error.localizedDescription
+            }
+        }
+    }
+
+    // MARK: 合集
+
+    func createCollection() {
+        guard let catalog else { return }
+        let alert = NSAlert()
+        alert.messageText = "新建合集"
+        alert.informativeText = "合集用于把跨目录的素材组织在一起。"
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        field.placeholderString = "合集名称"
+        alert.accessoryView = field
+        alert.addButton(withTitle: "创建")
+        alert.addButton(withTitle: "取消")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let name = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        do {
+            let id = try catalog.createCollection(name: name)
+            AppLog.breadcrumb("新建合集：\(name)")
+            sidebarSelection = .collection(id)
+            showStatus("已创建合集“\(name)”")
+        } catch {
+            AppLog.error("新建合集失败：\(error.localizedDescription)")
+            presentedError = error.localizedDescription
+        }
+    }
+
+    func addSelectionToCollection(_ collectionID: String) {
+        guard let catalog else { return }
+        let ids = selectedAssets.map(\.id)
+        guard !ids.isEmpty else { return }
+        Task {
+            do {
+                let expanded = try catalog.expandedIDs(for: ids)
+                try catalog.addToCollection(collectionID: collectionID, assetIDs: expanded)
+                AppLog.breadcrumb("加入合集 \(collectionID)：\(ids.count) 项（含组成员 \(expanded.count) 条）")
+                showStatus("已把 \(ids.count) 项加入合集")
+                await reloadNow(reason: "加入合集")
+            } catch {
+                AppLog.error("加入合集失败：\(error.localizedDescription)")
+                presentedError = error.localizedDescription
+            }
+        }
+    }
+
+    func removeSelectionFromCollection() {
+        guard let catalog, case .collection(let collectionID) = sidebarSelection else { return }
+        let ids = selectedAssets.map(\.id)
+        Task {
+            do {
+                try catalog.removeFromCollection(collectionID: collectionID, assetIDs: ids)
+                AppLog.breadcrumb("移出合集 \(collectionID)：\(ids.count) 项")
+                showStatus("已移出合集 \(ids.count) 项")
+                await reloadNow(reason: "移出合集")
+            } catch {
+                AppLog.error("移出合集失败：\(error.localizedDescription)")
+                presentedError = error.localizedDescription
+            }
+        }
+    }
+
+    func renameCollection(_ collection: AssetCollection) {
+        guard let catalog else { return }
+        let alert = NSAlert()
+        alert.messageText = "重命名合集"
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 260, height: 24))
+        field.stringValue = collection.name
+        alert.accessoryView = field
+        alert.addButton(withTitle: "保存")
+        alert.addButton(withTitle: "取消")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        do {
+            try catalog.renameCollection(id: collection.id, name: field.stringValue)
+            showStatus("合集已重命名")
+            Task { await reloadNow(reason: "重命名合集") }
+        } catch {
+            presentedError = error.localizedDescription
+        }
+    }
+
+    func deleteCollection(_ collection: AssetCollection) {
+        guard let catalog else { return }
+        let alert = NSAlert()
+        alert.messageText = "删除合集“\(collection.name)”？"
+        alert.informativeText = "只删除合集及其成员关系，不会删除素材文件。"
+        alert.addButton(withTitle: "删除")
+        alert.addButton(withTitle: "取消")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        do {
+            try catalog.deleteCollection(id: collection.id)
+            if case .collection(let id) = sidebarSelection, id == collection.id {
+                sidebarSelection = .section(.all)
+            }
+            Task { await reloadNow(reason: "删除合集") }
+        } catch {
+            presentedError = error.localizedDescription
+        }
+    }
+
+    // MARK: 合并组
+
+    func toggleGroupExpansion(_ group: MergeGroup) {
+        if expandedGroup?.id == group.id {
+            expandedGroup = nil
+        } else {
+            expandedGroup = group
+        }
+    }
+
+    // MARK: 拖拽
+
+    // MARK: 画廊
+
+    func openGallery(_ asset: Asset? = nil) {
+        guard let target = asset ?? primarySelection else {
+            showStatus("请先选择一条素材再打开画廊")
+            return
+        }
+        selection = [target.id]
+        galleryAssetID = target.id
+        AppLog.breadcrumb("打开画廊：\(target.fileName)")
+    }
+
+    func closeGallery() {
+        guard galleryAssetID != nil else { return }
+        galleryAssetID = nil
+        AppLog.breadcrumb("关闭画廊")
+    }
+
+    /// 在画廊中向前后翻页（delta = ±1），到头即停。
+    func stepGallery(by delta: Int) {
+        guard let current = galleryAssetID,
+              let index = assets.firstIndex(where: { $0.id == current }) else { return }
+        let next = min(max(index + delta, 0), max(assets.count - 1, 0))
+        let asset = assets[next]
+        galleryAssetID = asset.id
+        selection = [asset.id]
+    }
+
+    /// 显示偏好（例如 RAW+JPG 折叠）变化后重新加载列表。
+    func reloadForPreferenceChange() {
+        scheduleReload(reason: "显示偏好变化")
+    }
+
+    func dragProvider(for asset: Asset) -> NSItemProvider {
+        AppLog.breadcrumb("开始拖拽：\(asset.fileName)")
+        return NSItemProvider(contentsOf: asset.fileURL) ?? NSItemProvider()
+    }
+
+    // MARK: 提示
+
+    // MARK: 云同步（WebDAV）
+
+    /// 上传所选素材（含同目录 XMP 边车）到 WebDAV；未配置时提示去设置。
+    func uploadSelectionToWebDAV() {
+        guard !selectedAssets.isEmpty else {
+            showStatus("先在网格里选择要上传的素材")
+            return
+        }
+        guard !isCloudSyncing else { return }
+        guard let credentials = SettingsStore.shared.webdavCredentials() else {
+            showStatus("请先在「设置 → 云同步」填写 WebDAV 地址、用户名与密码")
+            AppLog.error("云同步未配置：缺少 WebDAV 地址或口令")
+            return
+        }
+        let layout = SettingsStore.shared.cloudLayout
+        let (items, skipped) = CloudSync.plan(assets: selectedAssets, layout: layout)
+        guard !items.isEmpty else {
+            showStatus("所选素材的文件都不存在")
+            return
+        }
+
+        isCloudSyncing = true
+        cloudSyncProgress = CloudSyncProgress(completed: 0, total: items.count,
+                                              currentItem: "", bytesUploaded: 0, failed: 0)
+        AppLog.network(method: "PUT", url: credentials.endpoint.absoluteString,
+                       status: nil, bytes: 0, milliseconds: 0,
+                       note: "开始上传 \(items.count) 个文件（布局：\(layout.title)）")
+        cloudSyncTask = Task { [weak self] in
+            var throttle: Duration = .zero
+            #if DEBUG
+            let ms = UserDefaults.standard.integer(forKey: "cloudSyncThrottleMS")
+            if ms > 0 { throttle = .milliseconds(ms) }
+            #endif
+            let result = await CloudSync.upload(items: items, credentials: credentials,
+                                                progress: { progress in
+                Task { @MainActor [weak self] in
+                    self?.cloudSyncProgress = progress
+                }
+            }, interItemDelay: throttle)
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                self.isCloudSyncing = false
+                self.cloudSyncProgress = nil
+                self.cloudSyncSummary = result.summaryText
+                if !result.failed.isEmpty, let first = result.failed.first {
+                    self.presentedError = "部分素材上传失败：\(first.name) — \(first.message)"
+                }
+                if !skipped.isEmpty {
+                    AppLog.error("云同步跳过 \(skipped.count) 个不存在的文件：\(skipped.prefix(3).joined(separator: ", "))")
+                }
+                self.logSyncResult(result, layout: layout)
+                self.showStatus(result.summaryText)
+            }
+        }
+    }
+
+    private func logSyncResult(_ result: CloudSyncResult, layout: CloudLayout) {
+        AppLog.breadcrumb("云同步：\(result.summaryText)（布局 \(layout.title)，耗时 \(String(format: "%.1f", result.duration))s）")
+        AppLog.network(method: "PUT", url: SettingsStore.shared.webdavEndpoint,
+                       status: result.failed.isEmpty ? 200 : 500,
+                       bytes: Int(result.bytesUploaded), milliseconds: Int(result.duration * 1000),
+                       note: "上传 \(result.uploaded.count) 项，失败 \(result.failed.count) 项")
+    }
+
+    func cancelCloudSync() {
+        cloudSyncTask?.cancel()
+        cloudSyncTask = nil
+        isCloudSyncing = false
+        cloudSyncProgress = nil
+        showStatus("已取消云同步（已完成的部分保留在云端）")
+        AppLog.breadcrumb("云同步：用户取消")
+    }
+
+
+    // MARK: - 云端浏览与下载（WebDAV 反向同步）
+
+    func openRemoteBrowser() {
+        guard let credentials = SettingsStore.shared.webdavCredentials() else {
+            presentedError = "请先在设置 → 云同步里填写 WebDAV 地址与口令"
+            return
+        }
+        isRemoteBrowserPresented = true
+        remotePath = ""
+        remoteSelection = []
+        remoteStatus = nil
+        Task { await loadRemoteEntries("", credentials: credentials) }
+    }
+
+    func loadRemoteEntries(_ path: String, credentials: WebDAVCredentials? = nil) async {
+        guard let credentials = credentials ?? SettingsStore.shared.webdavCredentials() else { return }
+        isRemoteLoading = true
+        defer { isRemoteLoading = false }
+        do {
+            let client = WebDAVClient(credentials: credentials)
+            let entries = try await client.listEntries(path)
+            remoteEntries = entries
+            remotePath = path
+            remoteSelection = []
+            remoteStatus = "\(entries.filter { !$0.isDirectory }.count) 个文件 · \(entries.filter(\.isDirectory).count) 个目录"
+            AppLog.breadcrumb("云端浏览：\(path.isEmpty ? "/" : path) — \(entries.count) 项")
+        } catch {
+            remoteStatus = "读取失败：\(error.localizedDescription)"
+            AppLog.error("云端浏览失败：\(path) — \(error.localizedDescription)")
+        }
+    }
+
+    func remoteGoUp() {
+        guard !remotePath.isEmpty else { return }
+        var comps = remotePath.split(separator: "/").map(String.init)
+        _ = comps.popLast()
+        Task { await loadRemoteEntries(comps.joined(separator: "/")) }
+    }
+
+    func enterRemoteDirectory(_ entry: RemoteEntry) {
+        guard entry.isDirectory else { return }
+        Task { await loadRemoteEntries(entry.path) }
+    }
+
+    /// 下载选中的远端文件：落到「数据目录/云同步下载/远端路径」，然后增量导入当前素材库。
+    func downloadRemoteSelection() {
+        guard let credentials = SettingsStore.shared.webdavCredentials(),
+              let dataDir = dataDirectory else { return }
+        let selected = remoteEntries.filter { remoteSelection.contains($0.path) && !$0.isDirectory }
+        guard !selected.isEmpty else {
+            showStatus("请先在云端列表里勾选要下载的文件")
+            return
+        }
+        if isRemoteDownloading { return }
+        isRemoteDownloading = true
+        remoteDownloadProgress = (0, selected.count)
+        let destinationRoot = dataDir.appendingPathComponent("云同步下载", isDirectory: true)
+        let targetPath = remotePath
+        remoteTask?.cancel()
+        remoteTask = Task { [weak self] in
+            guard let self else { return }
+            let client = WebDAVClient(credentials: credentials)
+            var failed = 0
+            for (index, entry) in selected.enumerated() {
+                if Task.isCancelled { break }
+                let destination = destinationRoot.appendingPathComponent(entry.path)
+                do {
+                    try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(),
+                                                            withIntermediateDirectories: true)
+                    _ = try await client.download(relativePath: entry.path, to: destination)
+                } catch {
+                    failed += 1
+                    AppLog.error("云端下载失败：\(entry.path) — \(error.localizedDescription)")
+                }
+                let done = index + 1
+                await MainActor.run { self.remoteDownloadProgress = (done, selected.count) }
+            }
+            let written = selected.count - failed
+            await MainActor.run {
+                self.isRemoteDownloading = false
+                self.remoteDownloadProgress = nil
+                self.showStatus("云端下载 \(written) 个文件" + (failed > 0 ? " · 失败 \(failed)" : ""))
+                AppLog.breadcrumb("云端下载：\(written) 个文件 → \(destinationRoot.path)（失败 \(failed)）")
+            }
+            if written > 0 {
+                await self.importFrom(dataDir)
+            }
+            _ = targetPath
+        }
+    }
+
+    func cancelRemoteDownload() {
+        remoteTask?.cancel()
+        remoteTask = nil
+        isRemoteDownloading = false
+        remoteDownloadProgress = nil
+        showStatus("已取消云端下载")
+    }
+
+    /// 设置页「测试连接」：跑连接→鉴权→列目录→上传探针→核验→清理。
+    func runWebDAVDiagnostics() async -> [DiagnosticStep] {
+        guard let credentials = SettingsStore.shared.webdavCredentials() else {
+            let step = DiagnosticStep(id: 0, title: "配置", detail: "请先填写 WebDAV 地址与口令", succeeded: false)
+            cloudDiagnostics = [step]
+            return [step]
+        }
+        let steps = await WebDAVDiagnostics.run(credentials: credentials)
+        cloudDiagnostics = steps
+        for step in steps {
+            AppLog.breadcrumb("WebDAV 诊断：\(step.title) — \(step.succeeded ? "OK" : "失败") \(step.detail)")
+        }
+        return steps
+    }
+
+    func showStatus(_ message: String) {
+        statusMessage = message
+        statusTask?.cancel()
+        statusTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            guard !Task.isCancelled else { return }
+            self?.statusMessage = nil
+        }
+    }
+
+    // MARK: 重复项检测
+
+    /// 扫描当前素材库里的疑似重复（先按大小/尺寸/时长聚类，再按文件头哈希确认）。
+    func findDuplicates() {
+        guard let catalog, !isDuplicateScanning else { return }
+        isDuplicateScanning = true
+        AppLog.breadcrumb("查找重复项：开始扫描")
+        Task {
+            do {
+                let all = try catalog.loadAssets(limit: 200_000)
+                let groups = await Task.detached(priority: .userInitiated) {
+                    DuplicateFinder.find(in: all, verifyContent: true)
+                }.value
+                duplicateGroups = groups
+                isDuplicateSheetPresented = true
+                let wasted = groups.reduce(Int64(0)) { $0 + $1.wastedBytes }
+                AppLog.breadcrumb("查找重复项：\(groups.count) 组，可回收 \(ByteCountFormatter.string(fromByteCount: wasted, countStyle: .file))")
+                showStatus(groups.isEmpty
+                    ? "没有发现重复素材"
+                    : "发现 \(groups.count) 组重复，可回收 \(ByteCountFormatter.string(fromByteCount: wasted, countStyle: .file))")
+            } catch {
+                AppLog.error("查找重复项失败：\(error.localizedDescription)")
+                presentedError = error.localizedDescription
+            }
+            isDuplicateScanning = false
+        }
+    }
+
+    func selectDuplicateGroup(_ group: DuplicateGroup) {
+        selection = Set(group.assets.map(\.id))
+        isDuplicateSheetPresented = false
+    }
+
+    // MARK: 整理动作
+
+    /// 选择目标目录并填写重命名模板后执行复制/移动。
+    func organizeSelection(mode: OrganizeMode) {
+        guard catalog != nil, !selectedAssets.isEmpty, !isOrganizing else { return }
+        let targets = selectedAssets
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.canCreateDirectories = true
+        panel.prompt = "选择目标目录"
+        panel.message = "\(mode.title) \(targets.count) 个素材到："
+        guard panel.runModal() == .OK, let destination = panel.url else { return }
+
+        let field = NSTextField(string: "{date}/{original}")
+        field.frame = NSRect(x: 0, y: 0, width: 320, height: 24)
+        let alert = NSAlert()
+        alert.messageText = "重命名模板（\(mode.title)）"
+        alert.informativeText = "可用占位符：{original} {name} {ext} {date} {year} {month} {day} {city} {country} {device} {rating} {theme}；用 / 分目录。重名自动加序号。"
+        alert.accessoryView = field
+        alert.addButton(withTitle: "开始")
+        alert.addButton(withTitle: "取消")
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+
+        let template = field.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        runOrganize(assets: targets, mode: mode, destination: destination,
+                    template: template.isEmpty ? "{original}" : template)
+    }
+
+    func runOrganize(assets targets: [Asset], mode: OrganizeMode, destination: URL, template: String) {
+        guard let catalog, !targets.isEmpty, !isOrganizing else { return }
+        isOrganizing = true
+        let rules = OrganizeRules(template: template, conflictPolicy: .autoRename)
+        let root = dataDirectory
+        Task {
+            let summary = await Task.detached(priority: .userInitiated) {
+                Organizer.perform(assets: targets, to: destination, mode: mode, rules: rules)
+            }.value
+            if mode == .move, !summary.relocated.isEmpty {
+                do {
+                    try catalog.updateLocations(summary.relocated, relativeTo: root)
+                } catch {
+                    AppLog.error("整理后回写数据库失败：\(error.localizedDescription)")
+                    presentedError = error.localizedDescription
+                }
+            }
+            organizeSummary = summary.descriptionText
+            AppLog.breadcrumb("整理：\(summary.descriptionText) → \(destination.path)")
+            if let first = summary.failures.first {
+                presentedError = "部分文件整理失败：\(first.message)"
+            }
+            showStatus(summary.descriptionText)
+            isOrganizing = false
+            if mode == .move {
+                await reloadNow(reason: "整理素材")
+            }
+        }
+    }
+}
+
+// MARK: - 快照
+
+private struct Snapshot: Sendable {
+    let assets: [Asset]
+    let total: Int
+    let facets: Facets
+    let collections: [AssetCollection]
+    let mergeGroups: [MergeGroup]
+    let libraries: [LibraryRoot]
+}
+
+// MARK: - 记住上次素材库
+
+enum LastLibraryStore {
+    private static let key = "lastLibraryDirectory"
+
+    static var lastDirectoryPath: String? {
+        get {
+            let path = UserDefaults.standard.string(forKey: key)
+            guard let path, FileManager.default.fileExists(atPath: path + "/catalog.db") else { return nil }
+            return path
+        }
+        set {
+            UserDefaults.standard.set(newValue, forKey: key)
+        }
+    }
+}

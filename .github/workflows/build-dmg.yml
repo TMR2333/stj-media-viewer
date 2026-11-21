@@ -1,0 +1,35 @@
+name: Build dmg
+
+# 在 GitHub Actions 的 macOS runner 上构建 .app + .dmg（Windows/Linux 无法产出 Mach-O）。
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'Sources/**'
+      - 'Resources/**'
+      - 'scripts/**'
+      - 'Package.swift'
+      - '.github/workflows/build-dmg.yml'
+
+jobs:
+  build-dmg:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain info
+        run: |
+          swift --version
+          xcodebuild -version || true
+
+      - name: Build app + dmg
+        run: bash scripts/build-dmg.sh
+
+      - name: Upload dmg
+        uses: actions/upload-artifact@v4
+        with:
+          name: STJMediaViewer-macos-dmg
+          path: dist/*.dmg
+          if-no-files-found: error
