@@ -148,6 +148,8 @@ final class LibraryModel: ObservableObject {
 
     // 整理动作
     @Published var isOrganizing = false
+    // 设置与图片数据导入导出
+    @Published var isExchangeRunning = false
     // MARK: 云同步
     @Published var isAITagging = false
     @Published var aiTagProgress: (done: Int, total: Int)?
@@ -758,6 +760,90 @@ final class LibraryModel: ObservableObject {
     // MARK: 配对导出
 
     /// 把当前选中的素材（含配对的 RAW/JPG 伴生文件）复制到用户选择的文件夹。
+    // MARK: - 设置与图片数据导入导出（跨平台，macOS 与 Windows 通用格式）
+
+    /// 导出当前应用设置 + 图片数据设置（评分/色标/选用/地点/主题/影调/关键词/标题/调色状态）
+    /// 与合集归属，写成与 Windows 版通用的 JSON 文件。
+    func exportSettingsExchange() {
+        guard let catalog else { showStatus("先打开一个素材库"); return }
+        let panel = NSSavePanel()
+        panel.title = "导出设置与图片数据"
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = "\(ExchangeFormat.defaultFileNamePrefix)-\(Self.exchangeTimestamp()).json"
+        panel.prompt = "导出"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let document = try makeExchangeDocument(catalog: catalog)
+            let data = try SettingsExchange.encode(document)
+            try data.write(to: url, options: .atomic)
+            let message = "已导出：设置 + \(document.assets.count) 条图片数据 + \(document.collections.count) 个合集"
+            showStatus(message)
+            AppLog.breadcrumb("导出设置与图片数据：\(message) → \(url.path)")
+        } catch {
+            presentedError = error.localizedDescription
+            AppLog.error("导出设置与图片数据失败：\(error.localizedDescription)")
+        }
+    }
+
+    private func makeExchangeDocument(catalog: Catalog) throws -> ExchangeDocument {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
+        return try SettingsExchange.exportDocument(catalog: catalog,
+                                                   appVersion: version,
+                                                   settings: SettingsExchange.snapshot(from: settings))
+    }
+
+    /// 从跨平台 JSON 文件导入设置与图片数据（可选择只填空字段或覆盖已有值）。
+    func importSettingsExchange() {
+        guard let catalog else { showStatus("先打开一个素材库"); return }
+        let panel = NSOpenPanel()
+        panel.title = "导入设置与图片数据"
+        panel.allowedContentTypes = [.json]
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = "导入"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+
+        do {
+            let data = try Data(contentsOf: url)
+            let document = try SettingsExchange.decode(data)
+            let plan = SettingsExchange.plan(document: document, assets: try catalog.loadAssets(limit: 200_000))
+
+            let alert = NSAlert()
+            alert.messageText = "导入设置与图片数据？"
+            var lines: [String] = []
+            lines.append("来源：\(document.app.name) \(document.app.version)（\(document.app.platform)） · \(document.app.exportedAt)")
+            lines.append("可匹配素材 \(plan.matchedCount) 条，未匹配 \(plan.unmatchedCount) 条，合集 \(plan.collections.count) 个。")
+            lines.append(plan.settings.isEmpty ? "文件中不含应用设置。" : "文件包含应用设置（外观/密度/排序/面板/RAW 折叠）。")
+            lines.append("只导入图片数据与设置，不移动任何图片文件；密钥类设置不会包含在交换文件中。")
+            alert.informativeText = lines.joined(separator: "\n")
+            alert.addButton(withTitle: "导入（只填空字段）")
+            alert.addButton(withTitle: "导入（覆盖已有值）")
+            alert.addButton(withTitle: "取消")
+            let response = alert.runModal()
+            guard response == .alertFirstButtonReturn || response == .alertSecondButtonReturn else { return }
+            let mode: ExchangeMergeMode = response == .alertFirstButtonReturn ? .fillEmpty : .overwrite
+
+            isExchangeRunning = true
+            defer { isExchangeRunning = false }
+            var summary = try SettingsExchange.apply(plan: plan, mode: mode, catalog: catalog)
+            summary.settingsApplied = SettingsExchange.apply(settings: plan.settings, to: settings)
+            Task { await reloadNow(reason: "导入设置与图片数据") }
+            showStatus("导入完成：\(summary.descriptionText)")
+            AppLog.breadcrumb("导入设置与图片数据：\(summary.descriptionText) ← \(url.lastPathComponent)")
+        } catch {
+            presentedError = error.localizedDescription
+            AppLog.error("导入设置与图片数据失败：\(error.localizedDescription)")
+        }
+    }
+
+    private static func exchangeTimestamp() -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        return formatter.string(from: Date())
+    }
+
     /// 备份当前素材库（catalog.db + 缩略图）到用户选择的目录。
     func backupLibrary() {
         guard let dataDirectory, catalog != nil else {

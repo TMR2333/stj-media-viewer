@@ -92,8 +92,17 @@ swift test
 | 整理动作 / 重复项 | 已完成（1.27.0）：模板复制/移动、冲突改名、移动后回写数据库；重复项按哈希确认 |
 | XMP 读取回填 | 已完成（1.28.0）：Lightroom/Bridge/ExifTool 常见字段；仅空字段回填，用户编辑优先 |
 | 时间线 / 视频 | 已完成（1.35.0）：时间线视图、画廊视频播放；视频抽帧缩略图仍用 QuickLook |
-| AI | 已完成打标（1.35.0）：OpenAI 兼容接口 + Keychain Key；批处理队列与失败重试待做 |
-| WebDAV | 已完成单向上传与连接诊断（1.29.0）；远端浏览、双向同步、断点续传待做 |
+| AI | 已完成打标（1.32.0）：OpenAI 兼容接口 + Keychain Key；批处理队列与失败重试待做 |
+| WebDAV | 已完成上传与连接诊断（1.29.0）、远端浏览与下载（1.35.0）；断点续传/冲突合并待做 |
 | 水印、引导页 | P4 里程碑 |
 | 签名 | 本机无 Developer ID，发行版为 ad-hoc；首次打开需右键 → 打开。有证书时 `CODESIGN_IDENTITY`/`NOTARY_PROFILE` 自动签名+公证 |
 | 辅助功能 | 未授予"辅助功能"权限的机器无法被脚本模拟点击；截图验收用 `-preselectAssetID` 启动参数 |
+
+## 设置与图片数据导入导出（1.38.0）
+
+- 目标：把「界面偏好 + 素材编辑成果」在不同机器 / 不同平台之间搬运，而不是复制整个素材库。
+- 导出：`SettingsExchange.exportDocument(catalog:appVersion:settings:)` 收集所有素材（含合并组隐藏成员）中「非默认」的编辑字段 + 设置的子集 + 合集成员，编码为 `stj-media-viewer/exchange` v1 JSON。
+- 导入：`plan(document:assets:)` 先按 `fileName + sizeBytes` 匹配，产出 `ExchangeImportPlan`；`apply(plan:mode:catalog:)` 按 `fillEmpty` / `overwrite` 写库并还原合集，返回 `ExchangeImportSummary`。
+- 安全：不导出 AI Key / WebDAV 口令（Keychain 内），不导出水印样式（Windows 是品牌图形模型）、缓存目录、窗口状态。
+- 命令行：`stjcheck --export-exchange <file>`、`--import-exchange <file> --merge fill|overwrite`。
+- Windows 端实现指引见 `docs/windows-exchange-prompt.md`。

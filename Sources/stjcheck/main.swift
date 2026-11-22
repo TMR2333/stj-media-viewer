@@ -60,12 +60,19 @@ func printUsage() {
       --import    扫描导入目录：没有 catalog.db 时按 Windows 兼容 schema 新建，然后打印导入结果
       --dav-endpoint/--dav-user/--dav-password/--dav-root/--dav-layout/--dav-limit
                   用 WebDAV 上传 --data-dir 里的前 N 个素材（真实 HTTP 往返，供本机 MockWebDav 校验）
+      --export-exchange <file.json>
+                  导出「设置与图片数据」交换文件（与 Windows 版通用格式）
+      --import-exchange <file.json> [--merge fill|overwrite]
+                  导入交换文件并写库（默认只填空白字段）
       -h, --help  显示帮助
     """.replacingOccurrences(of: "\u{200B}", with: ""))
 }
 
 var dataDirArgument: String?
 var importDirectoryArgument: String?
+var exportExchangeArgument: String?
+var importExchangeArgument: String?
+var mergeArgument: String = "fillEmpty"
 var davEndpointArgument: String?
 var davUserArgument: String = ""
 var davPasswordArgument: String = ""
@@ -89,6 +96,27 @@ while argIndex < arguments.count {
             exit(2)
         }
         importDirectoryArgument = arguments[argIndex + 1]
+        argIndex += 2
+    case "--export-exchange":
+        guard argIndex + 1 < arguments.count else {
+            print("[FAIL] 参数错误 — --export-exchange 需要一个文件路径")
+            exit(2)
+        }
+        exportExchangeArgument = arguments[argIndex + 1]
+        argIndex += 2
+    case "--import-exchange":
+        guard argIndex + 1 < arguments.count else {
+            print("[FAIL] 参数错误 — --import-exchange 需要一个文件路径")
+            exit(2)
+        }
+        importExchangeArgument = arguments[argIndex + 1]
+        argIndex += 2
+    case "--merge":
+        guard argIndex + 1 < arguments.count else {
+            print("[FAIL] 参数错误 — --merge 需要 fill 或 overwrite")
+            exit(2)
+        }
+        mergeArgument = arguments[argIndex + 1]
         argIndex += 2
     case "--dav-endpoint":
         guard argIndex + 1 < arguments.count else {
@@ -151,6 +179,55 @@ if let importDirectoryArgument {
         exit(0)
     } catch {
         print("[FAIL] 扫描导入 — \(error.localizedDescription)")
+        print("checks: 1, failures: 1")
+        exit(1)
+    }
+}
+
+// --export-exchange / --import-exchange：设置与图片数据交换文件（跨平台 JSON）
+if let exportExchangeArgument {
+    guard let dataDirectory = normalizeDataDir(dataDirArgument) else {
+        print("[FAIL] 导出交换文件 — 需要 --data-dir 指向素材库")
+        exit(2)
+    }
+    do {
+        let catalog = try Catalog(directory: dataDirectory)
+        let document = try SettingsExchange.exportDocument(catalog: catalog, appVersion: "dev")
+        let data = try SettingsExchange.encode(document)
+        let outURL = URL(fileURLWithPath: (exportExchangeArgument as NSString).expandingTildeInPath,
+                         relativeTo: currentDirectory).standardizedFileURL
+        try data.write(to: outURL, options: .atomic)
+        print("[OK] 导出交换文件 — 设置 + \(document.assets.count) 条图片数据 + \(document.collections.count) 个合集 → \(outURL.path)")
+        print("checks: 1, failures: 0")
+        exit(0)
+    } catch {
+        print("[FAIL] 导出交换文件 — \(error.localizedDescription)")
+        print("checks: 1, failures: 1")
+        exit(1)
+    }
+}
+
+if let importExchangeArgument {
+    guard let dataDirectory = normalizeDataDir(dataDirArgument) else {
+        print("[FAIL] 导入交换文件 — 需要 --data-dir 指向素材库")
+        exit(2)
+    }
+    do {
+        let catalog = try Catalog(directory: dataDirectory)
+        let inURL = URL(fileURLWithPath: (importExchangeArgument as NSString).expandingTildeInPath,
+                        relativeTo: currentDirectory).standardizedFileURL
+        let plan = try SettingsExchange.plan(fromFile: inURL, catalog: catalog)
+        let mode: ExchangeMergeMode = mergeArgument.lowercased().hasPrefix("over") ? .overwrite : .fillEmpty
+        let summary = try SettingsExchange.apply(plan: plan, mode: mode, catalog: catalog)
+        print("[OK] 导入交换文件 — 匹配 \(plan.matchedCount) 条、未匹配 \(plan.unmatchedCount) 条；\(summary.descriptionText)")
+        let reloaded = try catalog.loadAssets(limit: 200_000)
+        let rated = reloaded.filter { $0.rating > 0 }.count
+        let keyworded = reloaded.filter { !$0.keywords.isEmpty }.count
+        print("[OK] 导入结果复核 — 素材 \(reloaded.count) 条、评分 >0 \(rated) 条、有关键词 \(keyworded) 条、合集 \(try catalog.collections().count) 个")
+        print("checks: 2, failures: 0")
+        exit(0)
+    } catch {
+        print("[FAIL] 导入交换文件 — \(error.localizedDescription)")
         print("checks: 1, failures: 1")
         exit(1)
     }

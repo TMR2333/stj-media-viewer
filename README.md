@@ -6,15 +6,15 @@
 - **独立仓库**：本仓库只包含 macOS 端（原 Windows/WinUI 版在 [stj-media-viewer](https://gitcode.com/TMR2333/stj-media-viewer)）
 - 语言/UI：Swift 6 + SwiftUI，少量 AppKit（打开面板、Finder、QuickLook 面板、键盘事件）
 - 最低系统：**macOS 14 Sonoma**；macOS 26 起自动启用 Liquid Glass 材质
-- 版本：**1.37.1**（Liquid Glass 界面 · 对齐 Windows 交互）
-- 发行版：[releases](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases) — 最新 `v1.37.1-macos`
+- 版本：**1.38.0**（Liquid Glass 界面 · 跨平台设置与图片数据迁移）
+- 发行版：[releases](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases) — 最新 `v1.38.0-macos`
 - 文档：[实施说明](docs/macos-port.md) · [开发计划](PLAN.md) · [更新日志](CHANGELOG.md) · [原始提示词存档](docs/MACOS-PROMPT.md)
 
 ## 下载
 
 | 平台 | 版本 | 文件 |
 | --- | --- | --- |
-| macOS 原生（Universal，Apple Silicon + Intel） | `v1.37.1-macos` | `STJMediaViewer-1.37.1-macos-arm64-x86_64.dmg` |
+| macOS 原生（Universal，Apple Silicon + Intel） | `v1.38.0-macos` | `STJMediaViewer-1.38.0-macos-arm64-x86_64.dmg` |
 | Windows（WinUI 3） | `v1.25.0` | [stj-media-viewer releases](https://gitcode.com/TMR2333/stj-media-viewer/releases) |
 
 首次打开（ad-hoc 签名，无 Apple Developer ID / 公证）：右键 App →「打开」→ 再点「打开」。
@@ -43,7 +43,11 @@
 | --- | --- |
 | ![引导](shots/onboarding-light.png) | ![云同步设置](shots/cloud-settings-light.png) |
 
-> 截图来自 1.37.1 发布包实机运行（2640×1680，Retina 2x）。Liquid Glass 只在 macOS 26 上呈现，旧系统自动回退半透明材质。
+| 设置与图片数据迁移（跨平台） |
+| --- |
+| ![设置与图片数据迁移](shots/settings-exchange.png) |
+
+> 截图来自 1.38.0 发布包实机运行（主窗口 2640×1680，设置窗口 1120×1576，Retina 2x）。Liquid Glass 只在 macOS 26 上呈现，旧系统自动回退半透明材质。
 
 ## 快捷键
 
@@ -55,6 +59,7 @@
 | | `⌘1`–`⌘4` | 小 / 中 / 大网格 / 列表 |
 | | `⌘⌥S` / `⌘⌥I` | 侧栏 / 检视面板开关 |
 | | `⌘,` | 设置 |
+| | `⇧⌘X` / `⇧⌘I` | 导出 / 导入设置与图片数据（跨平台 JSON） |
 | 网格 | `空格` | QuickLook 快速预览（系统面板） |
 | | `↩` 或双击 | 内置画廊预览（与 Windows 一致） |
 | | `⌘↩` / `⌥⌘R` | 用默认应用打开 / 在 Finder 中显示 |
@@ -126,9 +131,21 @@
 | 视频播放 | 画廊中视频直接用 `AVPlayerView` 播放（播放/进度/音量/全屏），不再只显示静态封面 |
 | 云同步 | WebDAV 上传（设置 → 云同步）：按 平铺/年月/地点/年月+设备 分类，XMP 边车同目录上传，上传后核验远端大小；`⌥⌘U` 上传所选，可取消；设置页「测试连接」跑连接→鉴权→列目录→探针→核验→清理 |
 | 侧栏工具区 | 侧栏底部「工具」分区：扫描导入、快速批量填写、AI 打标、导出带水印、查找重复项、上传/浏览云端、备份/恢复，按选中状态自动启用 |
+| 设置与图片数据迁移 | `⇧⌘X` 导出 / `⇧⌘I` 导入：把界面设置 + 评分/色标/选用/地点/主题/影调/关键词/标题/调色状态打包成跨平台 JSON（`stj-media-viewer/exchange` v1），与 Windows 版互通；可选「只填空字段」或「覆盖已有值」 |
 | 外观 | 跟随系统 / 浅色 / 深色；中文界面；语义字号 |
 | 日志 | `~/Library/Logs/STJMediaViewer/app.log`（导航面包屑 `[nav]`、网络一行摘要 `[net]`、5MB 轮转） |
 | API Key | 存 macOS 钥匙串（`com.stjarnaperspective.stjmediaviewer`），不写数据库 |
+
+## 跨平台迁移：设置与图片数据导入导出
+
+macOS 与 Windows 共用同一套 `catalog.db` schema，因此编辑数据理论上互通；这个功能解决的是「把编辑成果与界面偏好快速带到另一台机器/另一个平台」。
+
+- **入口**：文件菜单 `⇧⌘X` 导出、`⇧⌘I` 导入；或 设置 → 通用 → 「设置与图片数据迁移」。命令行：`stjcheck --export-exchange 文件.json` / `--import-exchange 文件.json --merge fill|overwrite`。
+- **导出内容**：界面设置（外观、密度、排序、面板开关、RAW+JPG 折叠）+ 每条素材的用户编辑（评分、色标、选用三态、国家/省份/城市、主题、影调、关键词、标题、调色状态）+ 合集与成员。
+- **不导出**：任何密钥（AI Key、WebDAV 口令）、缓存路径、水印样式（两端水印模型不同）、窗口/日志等本机状态。**不移动/不删除任何媒体文件**。
+- **匹配规则**：素材以 `fileName`（小写）+ `sizeBytes` 为主键，`relativePath` 仅用于消歧；匹配不到的条目只在导入预览里统计，不会凭空创建素材行。
+- **合并策略**：`fillEmpty`（默认，只填空字段，保留本机已有编辑）/ `overwrite`（用文件里的值覆盖已有值）。
+- 格式契约与 Windows 侧实现指引见 [docs/windows-exchange-prompt.md](docs/windows-exchange-prompt.md)。
 
 ## 构建
 

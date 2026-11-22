@@ -1,3 +1,25 @@
+## v1.38.0 — 2026-11-22
+
+跨平台「设置与图片数据」导入导出。
+
+### 新增
+- **设置与图片数据迁移**（文件菜单 `⇧⌘X` / `⇧⌘I`，或 设置 → 通用）：把界面设置与素材编辑成果打包成 `stj-media-viewer/exchange` v1 JSON，可在 Windows / macOS 之间互通。
+  - 导出：外观、密度、排序、面板开关、RAW+JPG 折叠；每条素材的评分、色标、选用三态、国家/省份/城市、主题、影调、关键词、标题、调色状态；合集与成员。
+  - 导入：先预览（来源设备、匹配数、未匹配数、是否含设置、不含密钥），再选择「只填空字段」或「覆盖已有值」。
+  - 匹配键 = 文件名（小写）+ 字节数，`relativePath` 仅消歧；不创建、不移动、不删除任何素材文件。
+  - 导出文件**不含**任何密钥、口令、缓存路径与水印样式（两端水印模型不同）。
+- 命令行等价入口：`stjcheck --export-exchange out.json`、`stjcheck --import-exchange in.json --merge fill|overwrite`（便于 CI 与跨平台联调）。
+- 文档：`docs/windows-exchange-prompt.md`（给 Windows 端的实现提示词与验收用例）。
+
+### 内部
+- `SettingsExchange`（STJCore）统一编解码、匹配与合并逻辑；`Catalog.collectionMembers()` 读取合集成员。
+- 导出改为包含合并组隐藏成员（此前只导出封面），合集成员不再丢失。
+- 新增 7 项 XCTest（格式校验、默认值省略、无密钥、匹配规则、两种合并策略、合集还原、Windows 旧密度命名映射）。
+
+### 验证
+- `swift test`：71 项 0 失败；`stjcheck --data-dir .testdata`：20 项 0 失败。
+- 端到端：`.testdata` 导出 28 条素材 + 3 个合集 → 清空评分/地点/关键词后导入（fill）→ 28 条匹配、19 条合集成员恢复；`overwrite` 模式可覆盖已有值。
+
 ## v1.37.1 — 2026-11-22
 
 ### 界面

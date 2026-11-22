@@ -380,8 +380,10 @@ public final class Catalog: @unchecked Sendable {
                            sort: SortDescriptor = SortDescriptor(),
                            limit: Int = 20_000,
                            offset: Int = 0,
-                           expandedGroupID: String? = nil) throws -> [Asset] {
-        let (whereSql, binds) = try whereClause(filter, coverOnly: expandedGroupID == nil, expandedGroupID: expandedGroupID)
+                           expandedGroupID: String? = nil,
+                           includeGroupMembers: Bool = false) throws -> [Asset] {
+        let coverOnly = !includeGroupMembers && expandedGroupID == nil
+        let (whereSql, binds) = try whereClause(filter, coverOnly: coverOnly, expandedGroupID: expandedGroupID)
         let sql = """
         SELECT \(try selectClause())
         FROM assets\(whereSql)
@@ -524,6 +526,18 @@ public final class Catalog: @unchecked Sendable {
                             count: statement.int(4) ?? 0,
                             sortOrder: statement.int(3) ?? 0)
         }
+    }
+
+    /// 合集成员工件 ID 列表（按合集 id 分组），供设置交换导出使用。
+    public func collectionMembers() throws -> [String: [String]] {
+        guard try tables.contains("collections"), try tables.contains("collection_assets") else { return [:] }
+        let db = try Database(path: databaseURL.path, readOnly: true)
+        var members: [String: [String]] = [:]
+        try db.query("SELECT collection_id, asset_id FROM collection_assets ORDER BY collection_id, added_at;") { statement in
+            guard let collectionID = statement.string(0), let assetID = statement.string(1) else { return }
+            members[collectionID, default: []].append(assetID)
+        }
+        return members
     }
 
     public func mergeGroups() throws -> [MergeGroup] {

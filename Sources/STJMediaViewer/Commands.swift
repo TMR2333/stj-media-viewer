@@ -22,6 +22,13 @@ struct AppCommands: Commands {
                 Task { await model.reloadNow(reason: "菜单刷新") }
             }
             .keyboardShortcut("r", modifiers: .command)
+            Divider()
+            Button("导出设置与图片数据…") { model.exportSettingsExchange() }
+                .keyboardShortcut("x", modifiers: [.command, .shift])
+                .disabled(model.catalog == nil)
+            Button("导入设置与图片数据…") { model.importSettingsExchange() }
+                .keyboardShortcut("i", modifiers: [.command, .shift])
+                .disabled(model.catalog == nil || model.isExchangeRunning)
         }
 
         CommandGroup(replacing: .pasteboard) {

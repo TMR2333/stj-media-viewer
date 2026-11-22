@@ -77,6 +77,18 @@ struct SettingsView: View {
             Text("外观跟随系统时会随 macOS 深浅色自动切换。")
                 .font(.system(size: 10))
                 .foregroundStyle(.secondary)
+
+            Section("设置与图片数据迁移") {
+                HStack(spacing: 8) {
+                    Button("导出设置与图片数据…") { model.exportSettingsExchange() }
+                    Button("导入设置与图片数据…") { model.importSettingsExchange() }
+                    Spacer()
+                }
+                Text("导出的 JSON 与 Windows 版通用：包含应用设置（外观/密度/排序/面板/RAW 折叠）与图片数据（评分、色标、选用、地点、主题、影调、关键词、标题、调色状态）以及合集归属；不含 API Key、云端口令等密钥，也不会移动图片文件。")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .formStyle(.grouped)
         .padding()
