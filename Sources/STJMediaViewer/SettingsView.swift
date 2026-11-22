@@ -154,10 +154,17 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
             Section("素材读取") {
-                Toggle("折叠 RAW+JPG 配对（只显示 RAW）", isOn: $settings.foldRawPairs)
+                Toggle("RAW+JPG 合并显示（优先显示 RAW）", isOn: $settings.foldRawPairs)
                     .onChange(of: settings.foldRawPairs) { _, _ in
                         model.reloadForPreferenceChange()
                     }
+                Toggle("图片与视频分库显示", isOn: $settings.splitMediaKinds)
+                    .onChange(of: settings.splitMediaKinds) { _, _ in
+                        model.reloadForPreferenceChange()
+                    }
+                Text("合并显示时同一张照片的 RAW 与 JPG 只占一格，角标显示 RAW+JPG；分库显示时侧栏出现「图片素材 / 视频素材」两个入口，合并组与合集不受影响。")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
                 Text("支持 Windows 版生成的 catalog.db（assets / asset_custom / collections / merge_groups / libraries 表）。修改会直接写回数据库，缩略图缓存沿用素材库下的 Cache/thumbs。")
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)

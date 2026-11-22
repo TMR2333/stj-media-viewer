@@ -6,15 +6,15 @@
 - **独立仓库**：本仓库只包含 macOS 端（原 Windows/WinUI 版在 [stj-media-viewer](https://gitcode.com/TMR2333/stj-media-viewer)）
 - 语言/UI：Swift 6 + SwiftUI，少量 AppKit（打开面板、Finder、QuickLook 面板、键盘事件）
 - 最低系统：**macOS 14 Sonoma**；macOS 26 起自动启用 Liquid Glass 材质
-- 版本：**1.38.0**（Liquid Glass 界面 · 跨平台设置与图片数据迁移）
-- 发行版：[releases](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases) — 最新 `v1.38.0-macos`
+- 版本：**1.39.0**（Liquid Glass 界面 · RAW+JPG 合并显示 · 图片/视频分库）
+- 发行版：[releases](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases) — 最新 `v1.39.0-macos`
 - 文档：[实施说明](docs/macos-port.md) · [开发计划](PLAN.md) · [更新日志](CHANGELOG.md) · [原始提示词存档](docs/MACOS-PROMPT.md)
 
 ## 下载
 
 | 平台 | 版本 | 文件 |
 | --- | --- | --- |
-| macOS 原生（Universal，Apple Silicon + Intel） | `v1.38.0-macos` | `STJMediaViewer-1.38.0-macos-arm64-x86_64.dmg` |
+| macOS 原生（Universal，Apple Silicon + Intel） | `v1.39.0-macos` | `STJMediaViewer-1.39.0-macos-arm64-x86_64.dmg` |
 | Windows（WinUI 3） | `v1.25.0` | [stj-media-viewer releases](https://gitcode.com/TMR2333/stj-media-viewer/releases) |
 
 首次打开（ad-hoc 签名，无 Apple Developer ID / 公证）：右键 App →「打开」→ 再点「打开」。
@@ -43,11 +43,15 @@
 | --- | --- |
 | ![引导](shots/onboarding-light.png) | ![云同步设置](shots/cloud-settings-light.png) |
 
+| RAW+JPG 合并显示 | 媒体库设置（配对与分库开关） |
+| --- | --- |
+| ![RAW+JPG 合并](shots/raw-jpg-merge.png) | ![媒体库设置](shots/settings-media.png) |
+
 | 设置与图片数据迁移（跨平台） |
 | --- |
 | ![设置与图片数据迁移](shots/settings-exchange.png) |
 
-> 截图来自 1.38.0 发布包实机运行（主窗口 2640×1680，设置窗口 1120×1576，Retina 2x）。Liquid Glass 只在 macOS 26 上呈现，旧系统自动回退半透明材质。
+> 截图来自 1.39.0 发布包实机运行（主窗口 1800×1053，设置窗口 1120×1576，Retina 2x 缩小）。Liquid Glass 只在 macOS 26 上呈现，旧系统自动回退半透明材质。
 
 ## 快捷键
 
@@ -101,14 +105,14 @@
 
 | 能力 | 说明 |
 | --- | --- |
-| 三栏骨架 | `NavigationSplitView`：侧栏（素材库/合并组/合集）+ 网格/列表 + `.inspector` 检视面板 |
+| 三栏骨架 | `NavigationSplitView`：侧栏（全部素材 / 图片素材 / 视频素材 / 智能分类 / 合并组 / 合集 / 工具）+ 网格/列表 + `.inspector` 检视面板 |
 | 打开素材库 | `⌘O` 选择含 `catalog.db` 的目录；记住上次打开的素材库 |
 | 扫描导入 | `⌘I` 选目录：没有 `catalog.db` 时按 Windows 兼容 schema 建库；已有库则增量扫描（按路径/大小/修改时间跳过未变文件）；自动生成 `Cache/thumbs` 缩略图并写 `thumb_key`；重复导入保留用户评分/主题等编辑 |
 | 网格 / 列表 | 密度小 / 中 / 大 / 列表；`⌘1`–`⌘4` 切换 |
 | 选择 | 单击、⌘ 点、⇧ 点范围选择、`⌘A` 全选、方向键移动、Esc 取消 |
 | 预览 | `空格` QuickLook（QLPreviewPanel），`↩` 用默认应用打开，右键「在 Finder 中显示」 |
 | 画廊 | `⇧⌘G` 全屏画廊：大图 + `←/→` 翻页（在当前筛选结果内循环到头即停）、Esc 关闭 |
-| RAW+JPG 折叠 | 设置 → 媒体库开关（或「查看」菜单）：同目录同基名存在 RAW 时只显示 RAW 封面，隐藏 JPG 伴生行 |
+| RAW+JPG 合并显示 | 默认开启：同目录同基名的 RAW+JPG 只占一格（优先 RAW，角标写「RAW+JPG」），隐藏 JPG 伴生行；设置 → 媒体库或「查看」菜单可关闭 |
 | 筛选 | 类型 / 格式 / 年份 / 城市 / 相机 / 主题 / 影调 / 评分 / 色标 / 选用 / 调色 / Log / 未填写 |
 | 快捷筛选 | 精选、废片、评分 ≥4、已调色、Log、城市未填写、主题未填写 |
 | 搜索排序 | 文件名/关键词/城市多关键词搜索；拍摄时间/文件名/修改时间/大小/评分/入库时间排序 |
@@ -155,7 +159,7 @@ bash scripts/verify.sh            # 加 --dmg 顺带产出 universal dmg
 
 swift build -c release            # 只构建本机架构
 bash scripts/build-dmg.sh         # universal (arm64 + x86_64) .app + .dmg
-# 产物：dist/STJMediaViewer-1.38.0-macos-arm64-x86_64.dmg
+# 产物：dist/STJMediaViewer-1.39.0-macos-arm64-x86_64.dmg
 ```
 
 > 云端 CI：`.cnb.yml` 在 GitCode 的 Linux Runner 上做清单/结构一致性校验；
@@ -237,7 +241,7 @@ swift run -q stjcheck --data-dir /path/to/media-folder
 ## 截图
 
 `shots/` 下为浅色与深色调的验收截图（真实 app 以 `screencapture -l <windowid>` 截取，非设计稿）。
-1.36.0 的截图已体现 **Liquid Glass**：顶部筛选 chip 为玻璃胶囊、底部状态条为悬浮玻璃条、
+1.36.0 起截图体现 **Liquid Glass**：顶部筛选 chip 为玻璃胶囊、底部状态条为悬浮玻璃条、
 画廊上下工具栏为深色玻璃浮层（见 `gallery-dark.png` / `main-dark.png`）。
 主界面 `main-light.png` / `main-dark.png`，检视面板 `inspector-light.png` / `inspector-dark.png`，
 画廊 `gallery-light.png` / `gallery-dark.png`，重复项面板 `duplicates-light.png`，

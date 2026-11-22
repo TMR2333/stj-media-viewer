@@ -273,7 +273,11 @@ struct AssetCardView: View {
             .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
             .overlay(alignment: .topLeading) {
                 HStack(spacing: 4) {
-                    if asset.isRaw { CapsuleBadge(text: "RAW", tint: .orange) }
+                    if asset.hasJpegSibling {
+                        CapsuleBadge(text: "RAW+JPG", tint: .orange)
+                    } else if asset.isRaw {
+                        CapsuleBadge(text: "RAW", tint: .orange)
+                    }
                     if asset.isVideo { CapsuleBadge(text: "视频", systemImage: "play.fill", tint: .pink) }
                     if asset.isLog { CapsuleBadge(text: asset.logProfile ?? "LOG", tint: .purple) }
                     if let count = groupCount {

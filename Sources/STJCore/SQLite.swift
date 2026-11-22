@@ -196,6 +196,12 @@ public final class Statement {
         sqlite3_clear_bindings(handle)
     }
 
+    /// 查询结果第 `index` 列的列名（用于计算列）。
+    public func name(at index: Int32) -> String? {
+        guard let cString = sqlite3_column_name(handle, index) else { return nil }
+        return String(cString: cString)
+    }
+
     public func columnCount() -> Int32 { sqlite3_column_count(handle) }
 
     public func isNull(_ index: Int32) -> Bool {

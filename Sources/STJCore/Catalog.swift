@@ -2,6 +2,9 @@ import Foundation
 
 /// catalog.db 的只读查询 + 受控写入层。
 /// 所有字段按 Windows 版 schema 命名；老库缺少某些列时自动降级为 NULL，不会崩溃。
+/// RAW 扩展名集合（用于「RAW+JPG 配对」判定）。
+let RAW_EXTENSIONS_SQL = "('cr3','cr2','crw','nef','nrw','arw','srf','sr2','raf','rw2','orf','dng','pef','srw','x3f','rwl','mos','mrw','3fr','erf','mef','iiq','k25','kdc','dcr','raw')"
+
 public final class Catalog: @unchecked Sendable {
     public let directory: URL
     public let databaseURL: URL
@@ -71,9 +74,26 @@ public final class Catalog: @unchecked Sendable {
 
     private func selectClause() throws -> String {
         let existing = try columns
-        return Catalog.readColumns.map { column in
+        var clauses = Catalog.readColumns.map { column in
             existing.contains(column) ? column : "NULL AS \(column)"
-        }.joined(separator: ", ")
+        }
+        // 「RAW+JPG 配对」标记：RAW 素材在同目录存在同基名 JPG 时为 1。
+        if existing.contains("format_code") && existing.contains("file_name") {
+            let raw = "lower(COALESCE(assets.format_code,'')) IN " + RAW_EXTENSIONS_SQL
+            let dir = "substr(lower(assets.full_path),1,length(assets.full_path)-length(assets.file_name))"
+            let base = "substr(lower(assets.file_name),1,length(assets.file_name)-length(assets.format_code)-1)"
+            clauses.append("""
+            EXISTS (SELECT 1 FROM assets sibling
+                    WHERE sibling.full_path <> assets.full_path
+                      AND \(raw)
+                      AND lower(COALESCE(sibling.format_code,'')) IN ('jpg','jpeg')
+                      AND substr(lower(sibling.full_path),1,length(sibling.full_path)-length(sibling.file_name))
+                          = \(dir)
+                      AND substr(lower(sibling.file_name),1,length(sibling.file_name)-length(sibling.format_code)-1)
+                          = \(base)) AS has_jpeg_sibling
+            """)
+        }
+        return clauses.joined(separator: ", ")
     }
 
     private func makeAsset(_ statement: Statement, index: [String: Int32]) -> Asset? {
@@ -90,6 +110,10 @@ public final class Catalog: @unchecked Sendable {
             return statement.double(position)
         }
         guard let id = text("id"), let path = text("full_path") else { return nil }
+        let hasJpegSibling: Bool = {
+            guard let position = index["has_jpeg_sibling"] else { return false }
+            return statement.int(position) == 1
+        }()
         let keywords: [String]
         if let raw = text("keywords_json"), let list = Catalog.decodeStringArray(raw) {
             keywords = list
@@ -159,7 +183,8 @@ public final class Catalog: @unchecked Sendable {
             lastError: text("last_error"),
             aiSubject: text("ai_subject"),
             aiMood: text("ai_mood"),
-            qualityScore: doubleValue("quality_score")
+            qualityScore: doubleValue("quality_score"),
+            hasJpegSibling: hasJpegSibling
         )
     }
 
@@ -169,8 +194,8 @@ public final class Catalog: @unchecked Sendable {
         try statement.bindAll(binds)
         var index: [String: Int32] = [:]
         for i in 0..<statement.columnCount() {
-            // 列顺序与我们显式拼接的 SELECT 一致
-            index[Catalog.readColumns[Int(i)]] = i
+            // 优先用 SQL 实际列名（含 has_jpeg_sibling 这类计算列），回退到声明的列顺序。
+            index[statement.name(at: i) ?? Catalog.readColumns[Int(i)]] = i
         }
         var assets: [Asset] = []
         while try statement.step() {
@@ -402,11 +427,12 @@ public final class Catalog: @unchecked Sendable {
         return try db.scalarInt("SELECT count(*) FROM assets\(whereSql);", binds: binds)
     }
 
-    public func loadFacets() throws -> Facets {
+    public func loadFacets(filter: AssetFilter = AssetFilter(), expandedGroupID: String? = nil) throws -> Facets {
         var facets = Facets()
         let db = try Database(path: databaseURL.path, readOnly: true)
         let hasGroup = try has("group_id")
-        let whereSql = hasGroup ? " WHERE (is_group_cover = 1 OR group_id IS NULL OR group_id = '')" : ""
+        let coverOnly = expandedGroupID == nil
+        let (whereSql, facetBinds) = try whereClause(filter, coverOnly: coverOnly, expandedGroupID: expandedGroupID)
         // 老库缺列时降级为 NULL，保持列顺序不变。
         let existing = try columns
         let needed = ["kind", "format_code", "city", "country", "device_key", "captured_day",
@@ -431,6 +457,7 @@ public final class Catalog: @unchecked Sendable {
         var unset: [FilterDimension: Int] = [:]
 
         let statement = try db.prepare(sql)
+        try statement.bindAll(facetBinds.map { $0 as Any? })
         while try statement.step() {
             facets.total += 1
             if let kind = statement.int(0) {

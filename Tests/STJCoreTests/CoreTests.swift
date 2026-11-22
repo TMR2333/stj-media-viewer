@@ -668,6 +668,43 @@ final class CoreTests: XCTestCase {
                       "除 JPG 伴生行外，样例库原有可见素材不应被折叠")
     }
 
+    /// RAW+JPG 配对：RAW 行应带 hasJpegSibling 标记（用于「RAW+JPG」角标），JPG 行不带。
+    func testCatalogDetectsRawJpegSibling() throws {
+        let fixture = try makeFixture()
+        defer { fixture.cleanup() }
+        let (temporary, directory) = try fixture.temporaryCatalog()
+        let database = try Database(path: directory.appendingPathComponent("catalog.db").path, readOnly: false)
+
+        let insert = try database.prepare("""
+        INSERT INTO assets (id, full_path, file_name, format_code, group_id, is_group_cover)
+        VALUES ('sib-jpg', ?, 'SIB_0001.jpg', 'jpg', NULL, 1);
+        """)
+        try insert.bindAll(["\\(directory.path)/media/sib/SIB_0001.jpg"])
+        _ = try insert.step()
+
+        let insertRaw = try database.prepare("""
+        INSERT INTO assets (id, full_path, file_name, format_code, group_id, is_group_cover)
+        VALUES ('sib-raw', ?, 'SIB_0001.CR3', 'CR3', NULL, 1);
+        """)
+        try insertRaw.bindAll(["\\(directory.path)/media/sib/SIB_0001.CR3"])
+        _ = try insertRaw.step()
+
+        let assets = try temporary.loadAssets(limit: 5_000)
+        let raw = try XCTUnwrap(assets.first { $0.id == "sib-raw" })
+        let jpg = try XCTUnwrap(assets.first { $0.id == "sib-jpg" })
+        XCTAssertTrue(raw.hasJpegSibling, "RAW 存在同基名 JPG 时应带配对标记")
+        XCTAssertFalse(jpg.hasJpegSibling, "JPG 行不应被标记为 RAW+JPG")
+        XCTAssertFalse(try XCTUnwrap(assets.first { $0.id != "sib-raw" && !$0.isRaw }).hasJpegSibling,
+                       "普通图片不应误标")
+
+        // 合并显示：只保留 RAW 一行。
+        var folded = AssetFilter()
+        folded.foldRawPairs = true
+        let foldedIDs = Set(try temporary.loadAssets(filter: folded, limit: 5_000).map(\.id))
+        XCTAssertTrue(foldedIDs.contains("sib-raw"))
+        XCTAssertFalse(foldedIDs.contains("sib-jpg"))
+    }
+
     /// 画廊用 ImageLoader 直接读原图（ImageIO 降采样），视频等无解码器文件返回 nil。
     func testImageLoaderLoadsJPEGPreview() throws {
         let fixture = try makeFixture()

@@ -140,9 +140,13 @@ public final class SettingsStore: ObservableObject {
     @Published public var excludesScreenshotsInGallery: Bool {
         didSet { defaults.set(excludesScreenshotsInGallery, forKey: Keys.galleryExcludesScreenshots) }
     }
-    /// 折叠 RAW+JPG 配对：网格里只显示 RAW 封面，隐藏同名 JPG 伴生文件。
+    /// 合并 RAW+JPG 配对：网格里只显示 RAW 封面（角标标注 RAW+JPG），隐藏同名 JPG 伴生文件。
     @Published public var foldRawPairs: Bool {
         didSet { defaults.set(foldRawPairs, forKey: Keys.foldRawPairs) }
+    }
+    /// 图片与视频分库显示：侧栏拆成「图片素材 / 视频素材」两个入口。
+    @Published public var splitMediaKinds: Bool {
+        didSet { defaults.set(splitMediaKinds, forKey: Keys.splitMediaKinds) }
     }
     @Published public var aiEndpoint: String {
         didSet { defaults.set(aiEndpoint, forKey: Keys.aiEndpoint) }
@@ -194,6 +198,7 @@ public final class SettingsStore: ObservableObject {
         static let sortAscending = "sortAscending"
         static let galleryExcludesScreenshots = "galleryExcludesScreenshots"
         static let foldRawPairs = "foldRawPairs"
+        static let splitMediaKinds = "splitMediaKinds"
         static let aiEndpoint = "aiEndpoint"
         static let aiModel = "aiModel"
         static let webdavEndpoint = "webdavEndpoint"
@@ -218,7 +223,8 @@ public final class SettingsStore: ObservableObject {
         self.sortKey = SortKey(rawValue: defaults.string(forKey: Keys.sortKey) ?? "captured") ?? .captured
         self.sortAscending = defaults.object(forKey: Keys.sortAscending) as? Bool ?? false
         self.excludesScreenshotsInGallery = defaults.object(forKey: Keys.galleryExcludesScreenshots) as? Bool ?? true
-        self.foldRawPairs = defaults.object(forKey: Keys.foldRawPairs) as? Bool ?? false
+        self.foldRawPairs = defaults.object(forKey: Keys.foldRawPairs) as? Bool ?? true
+        self.splitMediaKinds = defaults.object(forKey: Keys.splitMediaKinds) as? Bool ?? true
         self.aiEndpoint = defaults.string(forKey: Keys.aiEndpoint) ?? "https://api.openai.com/v1"
         self.aiModel = defaults.string(forKey: Keys.aiModel) ?? "gpt-4o-mini"
         self.webdavEndpoint = defaults.string(forKey: Keys.webdavEndpoint) ?? ""

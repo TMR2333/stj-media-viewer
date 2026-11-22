@@ -401,7 +401,7 @@ final class LibraryModel: ObservableObject {
             ThumbnailStore.shared.configure(cacheDirectory: directory.appendingPathComponent("Cache/thumbs"))
             LastLibraryStore.lastDirectoryPath = directory.path
             cachedThumbnailCount = ThumbnailStore.shared.cachedThumbnailCount()
-            let libraryCount = (try? catalog.loadFacets().total) ?? 0
+            let libraryCount = (try? catalog.loadFacets(filter: AssetFilter()).total) ?? 0
             if !quiet {
                 AppLog.breadcrumb("打开素材库：\(directory.path)（\(libraryCount) 张）")
                 showStatus("已打开 \(directory.lastPathComponent)")
@@ -506,7 +506,7 @@ final class LibraryModel: ObservableObject {
             let snapshot = try await Task.detached(priority: .userInitiated) {
                 let assets = try catalog.loadAssets(filter: filter, sort: sort, expandedGroupID: groupID)
                 let total = try catalog.count(filter: filter, expandedGroupID: groupID)
-                let facets = try catalog.loadFacets()
+                let facets = try catalog.loadFacets(filter: filter, expandedGroupID: groupID)
                 let collections = try catalog.collections()
                 let groups = try catalog.mergeGroups()
                 let libraries = try catalog.libraries()
@@ -544,6 +544,10 @@ final class LibraryModel: ObservableObject {
         switch sidebarSelection {
         case .section(.all):
             break
+        case .section(.images):
+            next.kinds = [1]
+        case .section(.videos):
+            next.kinds = [2]
         case .section(.pick):
             next.pick = 1
         case .section(.rejected):

@@ -56,6 +56,8 @@ public struct Asset: Identifiable, Hashable, Sendable {
     public var aiMood: String?
     /// AI 质量分 0~1（Windows `quality_score`）。
     public var qualityScore: Double?
+    /// 同目录同基名的 JPG 伴生文件是否存在（仅对 RAW 素材有意义，用于「RAW+JPG」角标）。
+    public var hasJpegSibling: Bool = false
 
     public init(id: String = UUID().uuidString,
                 libraryID: String = "default",
@@ -104,7 +106,8 @@ public struct Asset: Identifiable, Hashable, Sendable {
                 lastError: String? = nil,
                 aiSubject: String? = nil,
                 aiMood: String? = nil,
-                qualityScore: Double? = nil) {
+                qualityScore: Double? = nil,
+                hasJpegSibling: Bool = false) {
         self.id = id
         self.libraryID = libraryID
         self.path = path
@@ -153,6 +156,7 @@ public struct Asset: Identifiable, Hashable, Sendable {
         self.aiSubject = aiSubject
         self.aiMood = aiMood
         self.qualityScore = qualityScore
+        self.hasJpegSibling = hasJpegSibling
     }
 
     // MARK: 展示辅助
@@ -482,11 +486,13 @@ public enum AppearanceMode: String, CaseIterable, Identifiable, Sendable {
 }
 
 public enum SidebarSection: String, CaseIterable, Identifiable, Sendable {
-    case all, pick, rejected, uncategorized
+    case all, images, videos, pick, rejected, uncategorized
     public var id: String { rawValue }
     public var title: String {
         switch self {
         case .all: return "全部素材"
+        case .images: return "图片素材"
+        case .videos: return "视频素材"
         case .pick: return "精选"
         case .rejected: return "废片"
         case .uncategorized: return "未归类"
@@ -495,6 +501,8 @@ public enum SidebarSection: String, CaseIterable, Identifiable, Sendable {
     public var symbol: String {
         switch self {
         case .all: return "square.grid.2x2"
+        case .images: return "photo.on.rectangle"
+        case .videos: return "film"
         case .pick: return "star.fill"
         case .rejected: return "trash"
         case .uncategorized: return "questionmark.folder"

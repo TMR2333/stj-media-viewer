@@ -3,6 +3,7 @@ import SwiftUI
 
 struct SidebarView: View {
     @EnvironmentObject private var model: LibraryModel
+    @ObservedObject private var settings = SettingsStore.shared
 
     private var selectionBinding: Binding<SidebarSelection?> {
         Binding(
@@ -18,7 +19,24 @@ struct SidebarView: View {
     var body: some View {
         List(selection: selectionBinding) {
             Section("素材库") {
-                ForEach(SidebarSection.allCases) { section in
+                row(title: SidebarSection.all.title,
+                    symbol: SidebarSection.all.symbol,
+                    count: count(for: .all))
+                    .tag(SidebarSelection.section(.all))
+                if settings.splitMediaKinds {
+                    row(title: SidebarSection.images.title,
+                        symbol: SidebarSection.images.symbol,
+                        count: count(for: .images))
+                        .tag(SidebarSelection.section(.images))
+                    row(title: SidebarSection.videos.title,
+                        symbol: SidebarSection.videos.symbol,
+                        count: count(for: .videos))
+                        .tag(SidebarSelection.section(.videos))
+                }
+            }
+
+            Section("智能分类") {
+                ForEach([SidebarSection.pick, .rejected, .uncategorized]) { section in
                     row(title: section.title,
                         symbol: section.symbol,
                         count: count(for: section))
@@ -155,10 +173,16 @@ struct SidebarView: View {
     private func count(for section: SidebarSection) -> Int {
         switch section {
         case .all: return model.facets.total
+        case .images: return kindCount("1")
+        case .videos: return kindCount("2")
         case .pick: return model.facets.picked
         case .rejected: return model.facets.rejected
         case .uncategorized: return model.facets.unsetCounts[.collection] ?? 0
         }
+    }
+
+    private func kindCount(_ value: String) -> Int {
+        model.facets.kinds.first { $0.value == value }?.count ?? 0
     }
 
     /// 侧栏「工具」区的一行：图标 + 标题 + 快捷键提示，禁用时整体变淡。
