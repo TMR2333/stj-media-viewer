@@ -60,6 +60,44 @@ struct SidebarView: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(.secondary)
             }
+
+            Section("工具") {
+                toolRow("扫描导入…", symbol: "folder.badge.plus", shortcut: "⌘I") {
+                    model.importLibraryFolder()
+                }
+                toolRow("快速批量填写…", symbol: "rectangle.and.pencil.and.ellipsis", shortcut: "⇧⌘E",
+                        enabled: !model.selection.isEmpty) {
+                    model.isBatchEditorPresented = true
+                }
+                toolRow("AI 打标所选", symbol: "sparkles", shortcut: "⌥⌘A",
+                        enabled: !model.selection.isEmpty && !model.isAITagging) {
+                    model.aiTagSelection()
+                }
+                toolRow("导出带水印…", symbol: "seal", shortcut: "⌥⌘W",
+                        enabled: !model.selection.isEmpty) {
+                    model.exportWatermarkedSelection()
+                }
+                toolRow("查找重复项…", symbol: "square.on.square", shortcut: "⌥⌘D",
+                        enabled: model.dataDirectory != nil && !model.isDuplicateScanning) {
+                    model.findDuplicates()
+                }
+                toolRow("上传所选到云端", symbol: "icloud.and.arrow.up", shortcut: "⌥⌘U",
+                        enabled: !model.selection.isEmpty && !model.isCloudSyncing) {
+                    model.uploadSelectionToWebDAV()
+                }
+                toolRow("浏览云端…", symbol: "icloud", shortcut: "⌥⌘L",
+                        enabled: model.dataDirectory != nil && !model.isRemoteLoading) {
+                    model.openRemoteBrowser()
+                }
+                toolRow("备份素材库…", symbol: "externaldrive.badge.timemachine", shortcut: "⇧⌘B",
+                        enabled: model.dataDirectory != nil) {
+                    model.backupLibrary()
+                }
+                toolRow("从备份恢复…", symbol: "arrow.counterclockwise.circle", shortcut: "⌥⌘B",
+                        enabled: model.dataDirectory != nil) {
+                    model.restoreLibrary()
+                }
+            }
         }
         .listStyle(.sidebar)
         .navigationSplitViewColumnWidth(min: 208, ideal: 236, max: 300)
@@ -121,5 +159,28 @@ struct SidebarView: View {
         case .rejected: return model.facets.rejected
         case .uncategorized: return model.facets.unsetCounts[.collection] ?? 0
         }
+    }
+
+    /// 侧栏「工具」区的一行：图标 + 标题 + 快捷键提示，禁用时整体变淡。
+    private func toolRow(_ title: String, symbol: String, shortcut: String?, enabled: Bool = true,
+                         action: @escaping () -> Void = {}) -> some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Image(systemName: symbol)
+                    .font(.system(size: 11))
+                    .frame(width: 16)
+                    .foregroundStyle(.secondary)
+                Text(title)
+                    .font(.system(size: 12))
+                    .lineLimit(1)
+                Spacer(minLength: 4)
+
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.45)
+        .help(shortcut.map { "\(title.replacingOccurrences(of: "…", with: ""))（\($0)）" } ?? title)
     }
 }

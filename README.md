@@ -6,15 +6,15 @@
 - **独立仓库**：本仓库只包含 macOS 端（原 Windows/WinUI 版在 [stj-media-viewer](https://gitcode.com/TMR2333/stj-media-viewer)）
 - 语言/UI：Swift 6 + SwiftUI，少量 AppKit（打开面板、Finder、QuickLook 面板、键盘事件）
 - 最低系统：**macOS 14 Sonoma**；macOS 26 起自动启用 Liquid Glass 材质
-- 版本：**1.37.0**（Liquid Glass 界面 · 对齐 Windows 交互）
-- 发行版：[releases](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases) — 最新 `v1.37.0-macos`
+- 版本：**1.37.1**（Liquid Glass 界面 · 对齐 Windows 交互）
+- 发行版：[releases](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases) — 最新 `v1.37.1-macos`
 - 文档：[实施说明](docs/macos-port.md) · [开发计划](PLAN.md) · [更新日志](CHANGELOG.md) · [原始提示词存档](docs/MACOS-PROMPT.md)
 
 ## 下载
 
 | 平台 | 版本 | 文件 |
 | --- | --- | --- |
-| macOS 原生（Universal，Apple Silicon + Intel） | `v1.37.0-macos` | `STJMediaViewer-1.37.0-macos-arm64-x86_64.dmg` |
+| macOS 原生（Universal，Apple Silicon + Intel） | `v1.37.1-macos` | `STJMediaViewer-1.37.1-macos-arm64-x86_64.dmg` |
 | Windows（WinUI 3） | `v1.25.0` | [stj-media-viewer releases](https://gitcode.com/TMR2333/stj-media-viewer/releases) |
 
 首次打开（ad-hoc 签名，无 Apple Developer ID / 公证）：右键 App →「打开」→ 再点「打开」。
@@ -43,7 +43,7 @@
 | --- | --- |
 | ![引导](shots/onboarding-light.png) | ![云同步设置](shots/cloud-settings-light.png) |
 
-> 截图来自 1.37.0 发布包实机运行（2640×1680，Retina 2x）。Liquid Glass 只在 macOS 26 上呈现，旧系统自动回退半透明材质。
+> 截图来自 1.37.1 发布包实机运行（2640×1680，Retina 2x）。Liquid Glass 只在 macOS 26 上呈现，旧系统自动回退半透明材质。
 
 ## 快捷键
 
@@ -125,6 +125,7 @@
 | LUT 预览 | 数据目录 `LUTs/` 下放 `.cube` 文件，画廊标题栏「LUT」菜单即时预览（`CIColorCube`，r 最快序解析） |
 | 视频播放 | 画廊中视频直接用 `AVPlayerView` 播放（播放/进度/音量/全屏），不再只显示静态封面 |
 | 云同步 | WebDAV 上传（设置 → 云同步）：按 平铺/年月/地点/年月+设备 分类，XMP 边车同目录上传，上传后核验远端大小；`⌥⌘U` 上传所选，可取消；设置页「测试连接」跑连接→鉴权→列目录→探针→核验→清理 |
+| 侧栏工具区 | 侧栏底部「工具」分区：扫描导入、快速批量填写、AI 打标、导出带水印、查找重复项、上传/浏览云端、备份/恢复，按选中状态自动启用 |
 | 外观 | 跟随系统 / 浅色 / 深色；中文界面；语义字号 |
 | 日志 | `~/Library/Logs/STJMediaViewer/app.log`（导航面包屑 `[nav]`、网络一行摘要 `[net]`、5MB 轮转） |
 | API Key | 存 macOS 钥匙串（`com.stjarnaperspective.stjmediaviewer`），不写数据库 |
@@ -137,7 +138,7 @@ bash scripts/verify.sh            # 加 --dmg 顺带产出 universal dmg
 
 swift build -c release            # 只构建本机架构
 bash scripts/build-dmg.sh         # universal (arm64 + x86_64) .app + .dmg
-# 产物：dist/STJMediaViewer-1.37.0-macos-arm64-x86_64.dmg
+# 产物：dist/STJMediaViewer-1.37.1-macos-arm64-x86_64.dmg
 ```
 
 > 云端 CI：`.cnb.yml` 在 GitCode 的 Linux Runner 上做清单/结构一致性校验；
