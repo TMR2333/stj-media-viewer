@@ -106,3 +106,17 @@ swift test
 - 安全：不导出 AI Key / WebDAV 口令（Keychain 内），不导出水印样式（Windows 是品牌图形模型）、缓存目录、窗口状态。
 - 命令行：`stjcheck --export-exchange <file>`、`--import-exchange <file> --merge fill|overwrite`。
 - Windows 端实现指引见 `docs/windows-exchange-prompt.md`。
+
+## RAW+JPG 合并显示与图片/视频分库（1.39.0）
+
+- **RAW+JPG 合并**：同目录、同基名的 RAW 与 JPG 视为一条素材。做法是在 `SELECT` 里追加计算列
+  `EXISTS (… sibling.format_code IN ('jpg','jpeg') AND 同目录 AND 同基名)` 得到 `has_jpeg_sibling`，
+  再由 `Asset.hasJpegSibling` 驱动卡片角标（橙底「RAW+JPG」）；`AssetFilter.foldRawPairs`（默认开启）
+  让折叠条件只保留 RAW 行。与 Windows 的「RAW+JPG 折叠」语义一致，差异是 macOS 侧默认开启并显式角标。
+- **图片/视频分库**：`SettingsStore.splitMediaKinds`（默认开启）控制侧栏是否把「全部素材」拆成
+  「图片素材 / 视频素材」；`SidebarSection.images/.videos` 映射到 `AssetFilter.kinds = [1]/[2]`，
+  计数取自分面（facets），不额外查询。
+- 分面计数与折叠口径统一：`Catalog.loadFacets(filter:expandedGroupID:)` 复用 `whereClause`，
+  所以侧栏数字、状态栏「共 N 张 / 筛选 N」与实际网格一致。
+- 已知限制：配对只按「同目录 + 同基名 + 扩展名」判断（不做内容哈希）；只有 RAW 行会显示「RAW+JPG」角标，
+  JPG 行在折叠开启时被隐藏；关闭折叠后两者各自成条、角标分别显示 RAW / 无。
