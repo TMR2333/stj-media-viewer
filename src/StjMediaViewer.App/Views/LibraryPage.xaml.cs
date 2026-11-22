@@ -59,6 +59,8 @@ public sealed partial class LibraryPage : Page
             _ = DemoOriginAsync();
 
         AttachEvents();
+        _density = DensityFromSettings();
+        AppEvents.DensityChanged += OnDensityChangedExternal;
         ApplyDensity(_density);
         // 首次布局后按当前窗口尺寸决定三栏开合（之前用固定 true，会在窄窗口把检视面板顶出来）
         ApplyResponsiveLayout(WindowWidth);
@@ -578,6 +580,18 @@ public sealed partial class LibraryPage : Page
         ViewModel.DemoSelectOrigin();
     }
 
+    private void OnDensityChangedExternal(object? sender, EventArgs e) => ApplyDensity(DensityFromSettings());
+
+    /// <summary>设置里的密度 → 网格密度标签（兼容 macOS 交换文件里的 compact/comfortable/spacious）。</summary>
+    private static string DensityFromSettings() =>
+        AppServices.Settings.Current.Grid.Density?.Trim().ToLowerInvariant() switch
+        {
+            "compact" or "small" => "small",
+            "spacious" or "large" => "large",
+            "list" => "list",
+            _ => "medium",
+        };
+
     private void OnUnloaded(object sender, RoutedEventArgs e) => DetachEvents();
 
     private void AttachEvents()
@@ -802,6 +816,14 @@ public sealed partial class LibraryPage : Page
     private void ApplyDensity(string tag)
     {
         _density = tag;
+
+        // 密度也写回设置：跨平台交换文件导出/导入时保持"用户看到的密度"
+        var stored = AppServices.Settings.Current.Grid.Density;
+        if (!string.Equals(stored, tag, StringComparison.OrdinalIgnoreCase))
+        {
+            AppServices.Settings.Current.Grid.Density = tag;
+            _ = AppServices.Settings.SaveAsync();
+        }
         DensitySmall.IsChecked = tag == "small";
         DensityMedium.IsChecked = tag == "medium";
         DensityLarge.IsChecked = tag == "large";

@@ -758,6 +758,47 @@
             </uic:SectionCard>
 
             <!-- ==================================================================
+                 设置与图片数据迁移（跨平台交换文件 v1）
+                 ================================================================== -->
+            <uic:SectionCard Header="设置与图片数据迁移"
+                             Subtitle="在 Windows / macOS 之间搬运界面偏好、图片编辑成果与合集；不含任何密钥"
+                             Glyph="&#xE8B7;">
+                <StackPanel Spacing="10">
+                    <TextBlock Style="{ThemeResource AppMicroTextStyle}" TextWrapping="Wrap"
+                               Foreground="{ThemeResource TextSecondaryBrush}"
+                               Text="导出为 .json（stj-media-viewer/exchange v1）；导入时按「文件名 + 大小」匹配当前库里的素材，只更新匹配到的行，不新建素材、不移动文件。界面设置只包含明暗模式、网格密度与排序。" />
+
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="12,2,12,2" MinHeight="30"
+                                Click="ExportExchange_Click"
+                                IsEnabled="{x:Bind ViewModel.ExchangeIdle, Mode=OneWay}"
+                                ToolTipService.ToolTip="导出界面偏好 + 图片编辑成果 + 合集结构">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xEDE1;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                                <TextBlock Text="导出设置与图片数据…" Style="{ThemeResource AppCaptionTextStyle}" />
+                            </StackPanel>
+                        </Button>
+                        <Button Style="{ThemeResource AppSubtleButtonStyle}" Padding="12,2,12,2" MinHeight="30"
+                                Click="ImportExchange_Click"
+                                IsEnabled="{x:Bind ViewModel.ExchangeIdle, Mode=OneWay}"
+                                ToolTipService.ToolTip="从 macOS / Windows 导出的 .json 恢复编辑成果">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <FontIcon Glyph="&#xE8B5;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                                <TextBlock Text="导入设置与图片数据…" Style="{ThemeResource AppCaptionTextStyle}" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+
+                    <ProgressBar IsIndeterminate="True"
+                                 Visibility="{x:Bind ViewModel.ExchangeBusyVisibility, Mode=OneWay}" />
+                    <TextBlock Text="{x:Bind ViewModel.ExchangeStatus, Mode=OneWay}"
+                               Style="{ThemeResource AppMicroTextStyle}"
+                               Foreground="{ThemeResource TextSecondaryBrush}"
+                               TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                </StackPanel>
+            </uic:SectionCard>
+
+            <!-- ==================================================================
                  关于
                  ================================================================== -->
             <uic:SectionCard Header="关于" Subtitle="版本、路径与开源致谢" Glyph="&#xE946;">

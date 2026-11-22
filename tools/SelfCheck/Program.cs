@@ -87,6 +87,7 @@ public static partial class Program
             await Section("云同步：按筛选上传", async () => await CheckFilteredUpload(s, tempData));
             await Section("水印工作台", async () => await CheckWatermark(s, tempData));
             await Section("设置持久化", async () => await CheckSettings(s, tempData));
+            await Section("设置与图片数据导入导出", async () => await CheckExchange(s, tempData));
             await Section("AI 客户端(dry-run)", async () => await CheckAi(s));
             var aiUrl = ArgValue(args, "--ai-url");
             if (!string.IsNullOrEmpty(aiUrl))

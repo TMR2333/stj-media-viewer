@@ -35,6 +35,10 @@ public static class AppEvents
     public static event EventHandler<MediaAsset>? AssetUpdated;
     public static void RaiseAssetUpdated(MediaAsset asset) => AssetUpdated?.Invoke(null, asset);
 
+    /// <summary>网格密度被外部修改（例如导入跨平台交换文件），素材库需要重新应用布局。</summary>
+    public static event EventHandler? DensityChanged;
+    public static void RaiseDensityChanged() => DensityChanged?.Invoke(null, EventArgs.Empty);
+
     /// <summary>索引库内容发生结构性变化（首次扫描完成 / 重新扫描），列表需要整页重载。</summary>
     public static event EventHandler? LibraryContentChanged;
     public static void RaiseLibraryContentChanged() => LibraryContentChanged?.Invoke(null, EventArgs.Empty);

@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.UI.Dispatching;
 using Microsoft.UI.Xaml;
 using StjMediaViewer.App.Services;
+using StjMediaViewer.Core.Exchange;
 using StjMediaViewer.Core.Models;
 using StjMediaViewer.Core.Util;
 #pragma warning disable MVVMTK0045 // 本应用未启用 AOT；[ObservableProperty] 字段写法在 WinUI 3 下等价且更易读
@@ -495,6 +496,149 @@ public sealed partial class SettingsViewModel : ObservableObject
         if (_loading) return;
         _saveTimer?.Stop();
         _saveTimer?.Start();
+    }
+
+    // ==================================================================
+    //  设置与图片数据导入导出（跨平台交换文件 v1）
+    // ==================================================================
+
+    [ObservableProperty] private string _exchangeStatus =
+        "把界面偏好与图片编辑成果在 Windows / macOS 之间搬运；不含任何密钥、口令或缓存路径。";
+    [ObservableProperty] private bool _exchangeBusy;
+
+    public Visibility ExchangeBusyVisibility =>
+        ExchangeBusy ? Visibility.Visible : Visibility.Collapsed;
+
+    public bool ExchangeIdle => !ExchangeBusy;
+
+    partial void OnExchangeBusyChanged(bool value)
+    {
+        OnPropertyChanged(nameof(ExchangeBusyVisibility));
+        OnPropertyChanged(nameof(ExchangeIdle));
+    }
+
+    /// <summary>导入预览（解析 + 匹配，尚未写库）。</summary>
+    public sealed record ExchangePreview(string FilePath, ExchangeDocument Document, ExchangeImportPlan Plan)
+    {
+        public string Summary
+        {
+            get
+            {
+                var app = Document.App;
+                var when = app.ExportedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
+                var parts = new List<string>
+                {
+                    $"来自 {app.Version} · {app.Platform} · {when}",
+                    $"素材：匹配 {Plan.MatchedCount} 条，未匹配 {Plan.UnmatchedCount} 条",
+                };
+                if (Plan.Ambiguous.Count > 0) parts.Add($"其中 {Plan.Ambiguous.Count} 条同名同大小有歧义（按第一条处理）");
+                parts.Add(Plan.HasSettings ? "包含界面设置" : "不含界面设置");
+                parts.Add(Plan.HasCollections ? $"包含合集 {Plan.Collections.Count} 个" : "不含合集");
+                parts.Add("不含密钥");
+                if (Plan.UnmatchedCount > 0 && Plan.Unmatched.Count > 0)
+                    parts.Add("未匹配示例：" + string.Join("、", Plan.Unmatched.Take(3)));
+                return string.Join("\n", parts);
+            }
+        }
+    }
+
+    /// <summary>导出设置与图片数据到指定路径。</summary>
+    public async Task ExportExchangeAsync(string path)
+    {
+        if (ExchangeBusy) return;
+        ExchangeBusy = true;
+        ExchangeStatus = "正在导出…";
+        try
+        {
+            var service = new SettingsExchangeService(AppServices.Store);
+            var doc = await service.ExportAsync(
+                path, AppServices.Settings.Current, ResolveVersion(),
+                LibraryViewModel.Shared.SortKey, !LibraryViewModel.Shared.Descending);
+            ExchangeStatus = $"已导出 {doc.Assets.Count} 条素材编辑、{doc.Collections.Count} 个合集 → {path}";
+            AppEvents.SetStatus("设置与图片数据已导出");
+        }
+        catch (Exception ex)
+        {
+            ExchangeStatus = "导出失败：" + ex.Message;
+            Log.Warn("[exchange] 导出失败", ex);
+        }
+        finally
+        {
+            ExchangeBusy = false;
+        }
+    }
+
+    /// <summary>解析交换文件并生成导入预览；格式/版本不对直接返回 null 并把原因写进状态。</summary>
+    public async Task<ExchangePreview?> PrepareImportAsync(string path)
+    {
+        if (ExchangeBusy) return null;
+        ExchangeBusy = true;
+        ExchangeStatus = "正在读取交换文件…";
+        try
+        {
+            var doc = await SettingsExchangeService.LoadAsync(path);
+            var service = new SettingsExchangeService(AppServices.Store);
+            var plan = await service.BuildImportPlanAsync(doc);
+            ExchangeStatus = plan.MatchedCount == 0
+                ? "没有匹配的素材（检查文件是否来自同一批素材）"
+                : "请选择导入方式";
+            return new ExchangePreview(path, doc, plan);
+        }
+        catch (Exception ex)
+        {
+            ExchangeStatus = "导入失败：" + ex.Message;
+            Log.Warn("[exchange] 读取交换文件失败", ex);
+            return null;
+        }
+        finally
+        {
+            ExchangeBusy = false;
+        }
+    }
+
+    /// <summary>按合并策略写库，并应用可跨平台的界面设置。</summary>
+    public async Task<ExchangeImportSummary?> ApplyImportAsync(ExchangePreview preview, ExchangeMergeMode mode)
+    {
+        if (ExchangeBusy) return null;
+        ExchangeBusy = true;
+        ExchangeStatus = "正在导入…";
+        try
+        {
+            var service = new SettingsExchangeService(AppServices.Store);
+            var summary = await service.ApplyAsync(preview.Plan, mode);
+
+            var settingsResult = SettingsExchangeService.ApplySettings(preview.Document, AppServices.Settings.Current);
+            if (settingsResult.ThemeApplied && settingsResult.ThemeMode is { } theme)
+            {
+                try { await AppServices.Design.SetThemeModeAsync(theme); } catch { /* 主题切换失败不影响数据 */ }
+                ThemeMode = theme;
+            }
+            if (settingsResult.DensityApplied) AppEvents.RaiseDensityChanged();
+            if (settingsResult.SortKey is { } sortKey)
+                LibraryViewModel.Shared.SetSort(sortKey, descending: !settingsResult.SortAscending);
+
+            try { await AppServices.Settings.SaveAsync(); }
+            catch (Exception ex) { Log.Warn("[exchange] 设置已应用但写回失败", ex); }
+            AppEvents.RaiseLibraryContentChanged();
+
+            var notes = new List<string> { summary.Describe() };
+            if (settingsResult.Notes.Count > 0) notes.Add("设置：" + string.Join("、", settingsResult.Notes));
+            if (summary.Unmatched > 0) notes.Add($"未匹配 {summary.Unmatched} 条（不会新建素材）");
+            if (summary.Messages.Count > 0) notes.Add(string.Join("；", summary.Messages.Take(2)));
+            ExchangeStatus = string.Join("\n", notes);
+            AppEvents.SetStatus("设置与图片数据已导入");
+            return summary;
+        }
+        catch (Exception ex)
+        {
+            ExchangeStatus = "导入失败：" + ex.Message;
+            Log.Warn("[exchange] 导入失败", ex);
+            return null;
+        }
+        finally
+        {
+            ExchangeBusy = false;
+        }
     }
 
     public async Task SaveAsync()

@@ -205,6 +205,16 @@ UI 只通过 ViewModel 访问服务；所有长任务都吃 `CancellationToken`�
 - 5 个品牌字标（STJARNA/HASSELBLAD/Canon/Nikon/SONY）、6 种风格预设、大小/透明度/垂直位置/投影、Canon 红色原标、Nikon 黄底方块。
 - 导出 JPG/PNG/WEBP × 四档质量，保留原像素；批量导出选中素材；本地 SkiaSharp 渲染，不上传。
 
+### 5.14.1 设置与图片数据迁移（跨平台交换文件）
+
+- 导出 `.json`（`stj-media-viewer/exchange` v1）：界面偏好（明暗/密度/排序）+ 用户编辑成果
+  （评分/色标/选用三态/地点/主题/影调/关键词/标题/调色状态）+ 合集结构；**不含任何密钥**。
+- 导入：按「文件名小写 + 大小」匹配当前库（相对路径消歧），只更新匹配行，不新建/不移动/不重扫；
+  `fillEmpty`（只填空，默认）或 `overwrite`；关键词/主题并集，合集按名字重建。
+- 命令行：`tools/ExchangeCli --data <dir> --export/--import`，与 macOS `stjcheck` 对齐。
+- 经验：交换格式必须有 `format` + `formatVersion` 明确校验（不做"尽力而为"解析）；
+  三态字段（`is_pick`）必须保留 null 语义；按"文件名+大小"匹配足以跨平台，因为路径会变、文件不会变。
+
 ### 5.15 关于 / 设置
 
 - 关于：作者卡（TMR、一个货成、一只马子、大肥鱼），可点进 B 站/抖音，项目地址。

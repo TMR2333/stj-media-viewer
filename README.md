@@ -191,6 +191,26 @@
 - 语义：文本字段**留空 = 不改动**；要清空已有值就写上内容再删掉（提交空串），自检覆盖了"未勾选字段保持不变 / 空值清空 / 空 patch 不写库"三种情况。
 - 实现：`IAssetStore.ApplyBatchEditAsync(ids, BatchEditPatch)` 在**单个事务**里用一条动态 UPDATE 写完所有字段（含关键词 JSON 合并），并刷新 `captured_day` / `city_source` 等派生列；写完同时失效缩略图缓存并刷新图库。
 
+### 2.6.2 设置与图片数据迁移（跨平台交换文件）
+
+Windows 与 macOS 之间搬运**界面偏好 + 图片编辑成果 + 合集结构**，文件是 `.json`
+（`stj-media-viewer/exchange` v1，几百 KB 量级）：
+
+- **导出**：设置页 → 「设置与图片数据迁移」→ 导出；只写有用户编辑的素材（评分、色标、选用/废片、
+  国家/省/市、多主题、影调、关键词、标题、调色状态）+ 全部合集成员 + 设置子集
+  （明暗模式、网格密度、排序）。**绝不包含 API Key、WebDAV 口令等任何密钥**。
+- **导入**：按「文件名（小写）+ 文件大小」匹配当前库素材（同名同大小用相对路径消歧），
+  只更新匹配到的行，**不新建素材、不复制/移动文件、不触发重扫**；
+  两种合并策略：**只填空字段**（默认，保留本机成果）或 **覆盖已有值**；
+  关键词/主题按并集去重，主题第一个是主主题；合集按名字匹配，不存在则新建。
+- 界面设置在导入时即时生效：明暗模式、网格密度（macOS `large` → Windows `spacious`）、排序。
+- 命令行（CI / 两端联调，等价于 macOS 的 `stjcheck --export-exchange / --import-exchange`）：
+
+  ```powershell
+  dotnet run --project tools/ExchangeCli -- --data <数据目录> --export out.json
+  dotnet run --project tools/ExchangeCli -- --data <数据目录> --import out.json --merge fill
+  ```
+
 ### 2.7 云同步（坚果云 / Nextcloud / 群晖 NAS / 任意挂载目录）
 
 ![云同步页](shots/final-cloud.png)
@@ -595,7 +615,7 @@ ffmpeg 是可选的：把 `ffmpeg.exe` 放到 `tools/ffmpeg/bin/`（或 PATH）�
 | 产物 | 大小 | 说明 |
 | --- | --- | --- |
 | `STJMediaViewer-Setup.exe` | ≈143 MB | **安装包**，带图形界面：可**自定义安装目录**、可选创建桌面快捷方式；装到用户目录，不需要管理员权限 |
-| `STJMediaViewer-1.25.0-portable.exe` | ≈143 MB | **便携版**：单文件，双击后解压到 `%LOCALAPPDATA%\StjMediaViewerPortable` 并直接启动；不写注册表、不建快捷方式 |
+| `STJMediaViewer-1.26.0-portable.exe` | ≈143 MB | **便携版**：单文件，双击后解压到 `%LOCALAPPDATA%\StjMediaViewerPortable` 并直接启动；不写注册表、不建快捷方式 |
 
 > 旧的 `*-portable-win-x64.zip` 已废弃：压缩包里的 exe 直接双击容易踩「没解压就在压缩包里运行 / SmartScreen 拦截」，
 > 现在改成**单文件便携 exe**，双击即用。
@@ -626,8 +646,8 @@ STJMediaViewer-Setup.exe                      交互式安装（选目录）
 STJMediaViewer-Setup.exe /S                   静默安装到默认目录
 STJMediaViewer-Setup.exe /S /D=D:\Apps\STJ  静默安装到指定目录
 STJMediaViewer-Setup.exe /uninstall           卸载（/S 静默；/D= 指定安装目录）
-STJMediaViewer-1.25.0-portable.exe            便携版：解压 + 启动
-STJMediaViewer-1.25.0-portable.exe /D=D:\STJ 便携版解压到指定目录
+STJMediaViewer-1.26.0-portable.exe            便携版：解压 + 启动
+STJMediaViewer-1.26.0-portable.exe /D=D:\STJ 便携版解压到指定目录
 ```
 
 **卸载**：Windows 设置 → 应用 → 已安装的应用（或 `Setup.exe /uninstall`）。
@@ -666,6 +686,7 @@ tools/SelfCheck            # 端到端自检（扫描→元数据→分类→查
 tools/SampleLibrary        # 测试素材库生成器（Python，幂等）
 tools/MockAiServer         # 本地 OpenAI 兼容 mock 服务器（纯标准库）
 tools/Seed                 # 把素材库扫进索引（命令行）
+tools/ExchangeCli          # 交换文件导入导出（CLI，跨平台联调用）
 tools/MetaSmoke / MediaSmoke / dev
 ```
 
@@ -746,9 +767,9 @@ dotnet build tools/SelfCheck/StjMediaViewer.SelfCheck.csproj
 
 ### 3.5 版本号与发行流程
 
-当前版本 **v1.25.0**，历史见 [CHANGELOG.md](CHANGELOG.md)。
+当前版本 **v1.26.0**，历史见 [CHANGELOG.md](CHANGELOG.md)。
 
-- 规则：每次对外更新都 **+1 版本号**（`1.24.1` → `1.25.0` → `1.25.1` → …），同步改应用/安装器/便携版；
+- 规则：每次对外更新都 **+1 版本号**（`1.25.0` → `1.26.0` → `1.26.1` → …），同步改应用/安装器/便携版；
 - 每次发版：`git tag v<版本>` + 推送到 GitCode + 创建发行版（Release）；
 - 一键脚本（版本、构建、提交、打标签、推送、创建发行版）：
 
@@ -759,7 +780,7 @@ powershell -ExecutionPolicy Bypass -File tools/release.ps1 -Version 1.0.4 -Notes
 
 - 仓库：<https://gitcode.com/TMR2333/stj-media-viewer>
 - 发行版：<https://gitcode.com/TMR2333/stj-media-viewer/releases>
-  - v1.25.0：安装包 + 便携版（Release 附件直下）
+  - v1.26.0：安装包 + 便携版（Release 附件直下）
 
 **每次更新都会：**改版本号 → 构建 → 提交 → 打 tag → 推送 → 建发行版并上传安装包/便携版。
 
