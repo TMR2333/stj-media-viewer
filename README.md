@@ -155,7 +155,7 @@ bash scripts/verify.sh            # 加 --dmg 顺带产出 universal dmg
 
 swift build -c release            # 只构建本机架构
 bash scripts/build-dmg.sh         # universal (arm64 + x86_64) .app + .dmg
-# 产物：dist/STJMediaViewer-1.37.1-macos-arm64-x86_64.dmg
+# 产物：dist/STJMediaViewer-1.38.0-macos-arm64-x86_64.dmg
 ```
 
 > 云端 CI：`.cnb.yml` 在 GitCode 的 Linux Runner 上做清单/结构一致性校验；
