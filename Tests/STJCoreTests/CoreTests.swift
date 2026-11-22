@@ -1177,3 +1177,22 @@ final class XMPImportTests: XCTestCase {
     }
 }
 
+
+// MARK: - 多文件拖拽载荷
+
+final class DragPayloadTests: XCTestCase {
+    func testDragsWholeSelectionWhenCardIsSelected() {
+        let ids = DragPayload.assetIDs(dragging: "b", selection: ["a", "b", "c"])
+        XCTAssertEqual(ids, ["a", "b", "c"])
+    }
+
+    func testDragsSingleCardWhenNotSelected() {
+        let ids = DragPayload.assetIDs(dragging: "z", selection: ["a", "b"])
+        XCTAssertEqual(ids, ["z"])
+    }
+
+    func testDragOrderIsStable() {
+        XCTAssertEqual(DragPayload.assetIDs(dragging: "b", selection: ["c", "a", "b"]),
+                       ["a", "b", "c"])
+    }
+}

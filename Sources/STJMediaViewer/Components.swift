@@ -191,6 +191,8 @@ struct CardFramePreferenceKey: PreferenceKey {
 
 struct AssetCardView: View {
     @EnvironmentObject private var model: LibraryModel
+    @StateObject private var dragAnchor = CardDragAnchor()
+    @State private var hovering = false
 
     var asset: Asset
     var density: LibraryDensity
@@ -243,12 +245,21 @@ struct AssetCardView: View {
             }
         )
         .onTapGesture(count: 2) {
-            model.openSelectionInDefaultApp()
+            model.openGallery(asset)
         }
         .onTapGesture {
             model.handleTap(asset: asset, modifiers: NSEvent.modifierFlags)
         }
-        .onDrag { model.dragProvider(for: asset) }
+        .background(CardDragAnchorView(anchor: dragAnchor))
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 5)
+                .onChanged { _ in
+                    dragAnchor.begin(urls: model.dragURLs(for: asset))
+                }
+                .onEnded { _ in
+                    dragAnchor.reset()
+                }
+        )
         .contextMenu { contextMenu }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(asset.fileName)，\(asset.capturedText)，\(asset.city ?? "未填写城市")")
@@ -265,16 +276,39 @@ struct AssetCardView: View {
                     if asset.isRaw { CapsuleBadge(text: "RAW", tint: .orange) }
                     if asset.isVideo { CapsuleBadge(text: "视频", systemImage: "play.fill", tint: .pink) }
                     if asset.isLog { CapsuleBadge(text: asset.logProfile ?? "LOG", tint: .purple) }
+                    if let count = groupCount {
+                        CapsuleBadge(text: "合并·\(count)", systemImage: "rectangle.stack.fill", tint: .teal)
+                    }
                 }
                 .padding(5)
             }
             .overlay(alignment: .topTrailing) {
-                if isSelected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white, Color.accentColor)
-                        .padding(5)
+                VStack(alignment: .trailing, spacing: 4) {
+                    if hovering {
+                        hoverActions
+                            .transition(.opacity.combined(with: .scale(scale: 0.9)))
+                    }
+                    if isSelected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white, Color.accentColor)
+                    } else if asset.aiSubject != nil {
+                        CapsuleBadge(text: "AI", systemImage: "sparkles", tint: .mint)
+                    }
                 }
+                .padding(5)
+            }
+            .overlay(alignment: .bottom) {
+                if let color = colorLabelColor {
+                    RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                        .fill(color)
+                        .frame(height: 3)
+                        .padding(.horizontal, 4)
+                        .padding(.bottom, 3)
+                }
+            }
+            .onHover { value in
+                withAnimation(.easeOut(duration: 0.12)) { hovering = value }
             }
             .overlay(alignment: .bottomLeading) {
                 HStack(spacing: 4) {
@@ -303,44 +337,116 @@ struct AssetCardView: View {
             }
     }
 
+    /// 合并组封面角标上的成员数（非封面返回 nil）。
+    private var groupCount: Int? {
+        guard asset.isGroupCover, let groupID = asset.groupID else { return nil }
+        return model.mergeGroups.first(where: { $0.id == groupID })?.count
+    }
+
+    /// 色标 → 展示颜色（支持中英文两套取值）。
+    private var colorLabelColor: Color? {
+        switch (asset.colorLabel ?? "").lowercased() {
+        case "red", "红": return .red
+        case "orange", "橙": return .orange
+        case "yellow", "黄": return .yellow
+        case "green", "绿": return .green
+        case "blue", "蓝": return .blue
+        case "purple", "紫": return .purple
+        default: return nil
+        }
+    }
+
+    /// 鼠标悬停时冒出的快捷动作（预览 / AI 打标），与 Windows 卡片一致。
+    private var hoverActions: some View {
+        HStack(spacing: 4) {
+            hoverButton("eye", help: "在画廊中预览") {
+                model.openGallery(asset)
+            }
+            hoverButton("sparkles", help: "AI 打标此条") {
+                model.selection = [asset.id]
+                model.aiTagSelection()
+            }
+        }
+    }
+
+    private func hoverButton(_ symbol: String, help: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: symbol)
+                .font(.system(size: 10, weight: .semibold))
+                .frame(width: 20, height: 20)
+                .background(.thinMaterial, in: Circle())
+        }
+        .buttonStyle(.plain)
+        .help(help)
+    }
+
     @ViewBuilder
     private var contextMenu: some View {
-        Button("用默认应用打开") { model.openSelectionInDefaultApp() }
-        Button("在 Finder 中显示") { model.revealSelection() }
-        Divider()
+        // 与 Windows 右键菜单同序：评分 → 色标 → 选用/废片 → 打开类 → 合并组 → 批量/写入 → 合集 → 删除。
         Menu("设置评分") {
             ForEach(0...5, id: \.self) { rating in
                 Button(String(repeating: "★", count: rating) + (rating == 0 ? " 清除评分" : "")) {
-                    model.setRating(rating)
+                    act { model.setRating(rating) }
                 }
             }
         }
-        Button("标记为精选") { model.setPick(1) }
-        Button("标记为废片") { model.setPick(0) }
-        Button("取消选用标记") { model.setPick(nil) }
+        Menu("颜色标签") {
+            ForEach(0..<Self.colorLabelOptions.count, id: \.self) { index in
+                let option = Self.colorLabelOptions[index]
+                Button(option.title) { act { model.setColorLabel(option.value) } }
+            }
+        }
+        Menu("选用 / 废片") {
+            Button("标记为精选") { act { model.setPick(1) } }
+            Button("标记为废片") { act { model.setPick(0) } }
+            Button("取消标记") { act { model.setPick(nil) } }
+        }
+        Divider()
+        Button("在画廊中预览") { act { model.openGallery(asset) } }
+        Button("用默认应用打开") { act { model.openSelectionInDefaultApp() } }
+        Button("在 Finder 中显示") { act { model.revealSelection() } }
+        Button("复制路径") { act { model.copySelectionPaths() } }
+        Button("复制文件名") { act { model.copySelectionFileNames() } }
         Divider()
         if let groupID = asset.groupID, !groupID.isEmpty {
             Button(asset.isGroupCover ? "展开合并组" : "合并组信息") {
                 if let group = model.mergeGroups.first(where: { $0.id == groupID }) {
-                    model.toggleGroupExpansion(group)
+                    act { model.toggleGroupExpansion(group) }
                 }
             }
+            Divider()
         }
-        Button("批量填写…") { model.isBatchEditorPresented = true }
-        Button("写入 XMP 侧车") { model.writeXMP() }
-        Button("导出配对（JPG+RAW）…") { model.exportPairs() }
+        Button("AI 打标此条") { act { model.aiTagSelection() } }
+        Button("写入 XMP 侧车") { act { model.writeXMP() } }
+        Button("导出配对（JPG+RAW）…") { act { model.exportPairs() } }
+        Button("导出带水印…") { act { model.exportWatermarkedSelection() } }
+        Button("批量填写…") { act { model.isBatchEditorPresented = true } }
         Menu("加入合集") {
             ForEach(model.collections) { collection in
-                Button(collection.name) { model.addSelectionToCollection(collection.id) }
+                Button(collection.name) { act { model.addSelectionToCollection(collection.id) } }
             }
             if model.collections.isEmpty {
                 Text("暂无合集")
             }
         }
         Divider()
-        Button("移到废纸篓", role: .destructive) { model.deleteSelection() }
+        Button("移到废纸篓", role: .destructive) { act { model.deleteSelection() } }
     }
+
+    /// 右键未选中的卡片时，先把操作对象切换成这张（Windows 的行为）。
+    private func act(_ body: @escaping () -> Void) {
+        if !isSelected {
+            model.selection = [asset.id]
+        }
+        body()
+    }
+
+    /// 右键「颜色标签」可用项（中英文都写英文规范值，与 Windows 一致）。
+    private static let colorLabelOptions: [(title: String, value: String?)] = [
+        ("红", "red"), ("橙", "orange"), ("黄", "yellow"), ("绿", "green"), ("蓝", "blue"), ("紫", "purple"), ("清除", nil)
+    ]
 }
+
 
 // MARK: - 列表行
 

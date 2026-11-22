@@ -19,7 +19,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-VERSION="${VERSION:-1.36.0}"
+VERSION="${VERSION:-1.37.0}"
 APP_NAME="STJ Media Viewer"
 BUNDLE_NAME="STJMediaViewer.app"
 DIST="$ROOT/dist"

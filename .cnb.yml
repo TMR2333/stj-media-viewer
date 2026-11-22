@@ -1,0 +1,35 @@
+# GitCode / CNB 云原生构建配置。
+#
+# 说明：.app 与 .dmg 必须在 macOS 上构建（AppKit / SwiftUI / CodeSign），
+# 而 GitCode 官方托管 Runner 目前只有 Linux（ubuntu/euler），因此云端流水线
+# 只做「清单与仓库一致性校验」；完整构建请在本机或自建 macOS Runner 上跑
+# `bash scripts/verify.sh --dmg`（README「构建」一节有说明）。
+main:
+  push:
+    - name: 清单与仓库一致性校验
+      docker:
+        image: swift:6.0
+      stages:
+        - name: SwiftPM 清单可解析
+          script: swift package dump-package > /dev/null && echo "Package.swift OK"
+        - name: 仓库结构检查
+          script: |
+            set -e
+            test -f Sources/STJMediaViewer/App.swift
+            test -f Sources/STJCore/Catalog.swift
+            test -d Tests/STJCoreTests
+            test -f scripts/build-dmg.sh
+            test -f README.md
+            echo "结构检查通过"
+  tag_push:
+    - name: 发行版产物清单校验
+      docker:
+        image: swift:6.0
+      stages:
+        - name: 校验版本号与产物命名约定
+          script: |
+            set -e
+            version=$(/usr/bin/awk '/CFBundleShortVersionString/{getline; gsub(/.*<string>|<\/string>.*/,""); print; exit}' Resources/Info.plist)
+            echo "Info.plist 版本：$version"
+            test -n "$version"
+            grep -q "VERSION:-${version}" scripts/build-dmg.sh || echo "提示：build-dmg.sh 默认版本可能未同步"

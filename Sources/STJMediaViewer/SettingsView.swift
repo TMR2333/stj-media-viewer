@@ -305,10 +305,11 @@ struct SettingsView: View {
                 .foregroundStyle(.secondary)
             HStack(spacing: 10) {
                 Link("项目主页", destination: URL(string: "https://gitcode.com/TMR2333/stj-media-viewer-macos")!)
-                Link("分支 macos/native-ui", destination: URL(string: "https://gitcode.com/TMR2333/stj-media-viewer-macos-macos")!)
-                Link("发行版", destination: URL(string: "https://gitcode.com/TMR2333/stj-media-viewer-macos-macos/releases")!)
+                Link("全部发行版", destination: URL(string: "https://gitcode.com/TMR2333/stj-media-viewer-macos/releases")!)
+                Link("Windows 版", destination: URL(string: "https://gitcode.com/TMR2333/stj-media-viewer")!)
             }
             .font(.system(size: 10))
+            updateSection
             HStack(spacing: 8) {
                 Button("打开日志目录") { NSWorkspace.shared.open(AppLog.directoryURL) }
                 Button("打开素材库目录") {
@@ -327,6 +328,42 @@ struct SettingsView: View {
         }
         .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// 更新检查：手动检查 + 有新版时直接给出下载入口。
+    private var updateSection: some View {
+        VStack(spacing: 6) {
+            Divider().frame(width: 260)
+            HStack(spacing: 8) {
+                Button {
+                    model.checkForUpdates()
+                } label: {
+                    Label("检查更新", systemImage: "arrow.triangle.2.circlepath")
+                }
+                .disabled(model.isCheckingUpdate)
+                if model.isCheckingUpdate {
+                    ProgressView().controlSize(.small)
+                }
+            }
+            .font(.system(size: 11))
+            if let update = model.availableUpdate {
+                Text("发现新版本 \(update.version)（当前 \(version)）")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Color.accentColor)
+                Button("下载 \(update.tag)") {
+                    model.openUpdatePage()
+                }
+                .controlSize(.small)
+            } else if let message = model.updateCheckMessage {
+                Text(message)
+                    .font(.system(size: 10))
+                    .foregroundStyle(.secondary)
+            } else {
+                Text("启动时每天自动检查一次；也可以点上面的按钮手动检查。")
+                    .font(.system(size: 10))
+                    .foregroundStyle(.tertiary)
+            }
+        }
     }
 
     private var version: String {

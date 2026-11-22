@@ -53,6 +53,10 @@ final class LibraryModel: ObservableObject {
     @Published var quickLookFallbackCount = 0
     @Published var columnVisibility: NavigationSplitViewVisibility = .all
     @Published var statusMessage: String?
+    /// 检查更新的结果（有新版时非 nil）。
+    @Published var availableUpdate: UpdateInfo?
+    @Published var isCheckingUpdate = false
+    @Published var updateCheckMessage: String?
     @Published var presentedError: String?
     @Published var isBatchEditorPresented = false
     @Published var searchFocused = false
@@ -357,6 +361,15 @@ final class LibraryModel: ObservableObject {
         if defaults.bool(forKey: "showDuplicatesOnLaunch") {
             findDuplicates()
         }
+        // 仅 Debug 构建：自检多文件拖拽的载荷（选中 3 张，打印实际会拖出的文件）。
+        if defaults.bool(forKey: "dragPayloadLogOnLaunch") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                guard let self, let first = self.assets.first else { return }
+                self.selection = Set(self.assets.prefix(3).map { $0.id })
+                let urls = self.dragURLs(for: first)
+                AppLog.info("拖拽载荷自检：选中 \(self.selection.count) 张 → 拖拽 \(urls.count) 个文件：\(urls.map { $0.lastPathComponent }.joined(separator: ", "))")
+            }
+        }
         // 仅 Debug 构建：验收截图用，全选素材并直接开始 AI 打标（无需点菜单）。
         if defaults.bool(forKey: "aiTagAllOnLaunch") {
             Task { @MainActor in
@@ -634,7 +647,9 @@ final class LibraryModel: ObservableObject {
         guard !ids.isEmpty else { return }
         let alert = NSAlert()
         alert.messageText = "把 \(ids.count) 个素材移到废纸篓？"
-        alert.informativeText = "原文件会进入废纸篓，并从 catalog.db 中移除记录。"
+        let totalBytes = selectedAssets.reduce(Int64(0)) { $0 + $1.sizeBytes }
+        let sizeText = ByteCountFormatter.string(fromByteCount: totalBytes, countStyle: .file)
+        alert.informativeText = "共 \(sizeText)。原文件会进入废纸篓（可还原），并从 catalog.db 中移除记录。"
         alert.addButton(withTitle: "移到废纸篓")
         alert.addButton(withTitle: "取消")
         alert.alertStyle = .warning
@@ -697,6 +712,26 @@ final class LibraryModel: ObservableObject {
         var patch = AssetPatch()
         patch.rating = rating
         update(patch, ids: selectedAssets.map(\.id))
+    }
+
+    /// 设置色标（nil 表示清除）。对齐 Windows 右键「颜色标签」与 6–9 快捷键。
+    func setColorLabel(_ label: String?) {
+        var patch = AssetPatch()
+        patch.colorLabel = label.map { PatchValue.set($0) } ?? .clear
+        update(patch, ids: selection.isEmpty ? [] : Array(selection))
+    }
+
+    /// 设置影调（对齐 Windows 检视面板「影调」单选）。
+    func setTone(_ tone: String?) {
+        var patch = AssetPatch()
+        patch.tone = tone.map { PatchValue.set($0) } ?? .clear
+        update(patch, ids: selection.isEmpty ? [] : Array(selection))
+    }
+
+    /// 在画廊中打开当前选中项（Windows 双击卡片的行为）。
+    func openSelectionInGallery() {
+        guard let asset = primarySelection ?? selectedAssets.first else { return }
+        openGallery(asset)
     }
 
     func setPick(_ value: Int?) {
@@ -1002,12 +1037,94 @@ final class LibraryModel: ObservableObject {
         scheduleReload(reason: "显示偏好变化")
     }
 
-    func dragProvider(for asset: Asset) -> NSItemProvider {
-        AppLog.breadcrumb("开始拖拽：\(asset.fileName)")
-        return NSItemProvider(contentsOf: asset.fileURL) ?? NSItemProvider()
+    /// 本次拖拽要带上的文件 URL（拖选中项之一 → 整批；拖未选中 → 只拖它）。
+    func dragURLs(for asset: Asset) -> [URL] {
+        let ids = DragPayload.assetIDs(dragging: asset.id, selection: selection)
+        let byID = Dictionary(uniqueKeysWithValues: assets.map { ($0.id, $0) })
+        let urls = ids.compactMap { byID[$0]?.fileURL }.filter { FileManager.default.fileExists(atPath: $0.path) }
+        return urls.isEmpty ? [asset.fileURL] : urls
     }
 
     // MARK: 提示
+
+    /// 复制所选素材的完整路径（每行一个），与 Windows 版右键行为一致。
+    func copySelectionPaths() {
+        let paths = selectedAssets.map { $0.fileURL.path }
+        guard !paths.isEmpty else { return }
+        let board = NSPasteboard.general
+        board.clearContents()
+        board.setString(paths.joined(separator: "\n"), forType: .string)
+        showStatus(paths.count == 1 ? "已复制路径" : "已复制 \(paths.count) 个路径")
+    }
+
+    /// 复制所选素材的文件名（每行一个）。
+    func copySelectionFileNames() {
+        let names = selectedAssets.map { $0.fileName }
+        guard !names.isEmpty else { return }
+        let board = NSPasteboard.general
+        board.clearContents()
+        board.setString(names.joined(separator: "\n"), forType: .string)
+        showStatus(names.count == 1 ? "已复制文件名" : "已复制 \(names.count) 个文件名")
+    }
+
+    // MARK: 检查更新
+
+    /// 当前应用版本（Info.plist 里的 CFBundleShortVersionString）。
+    var currentVersion: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.0.0"
+    }
+
+    /// 检查更新。`interactive` 为 false 时静默失败（启动自动检查用）。
+    func checkForUpdates(interactive: Bool = true) {
+        guard !isCheckingUpdate else { return }
+        isCheckingUpdate = true
+        updateCheckMessage = interactive ? "正在检查更新…" : nil
+        Task { [weak self] in
+            guard let self else { return }
+            defer { Task { @MainActor in self.isCheckingUpdate = false } }
+            do {
+                let version = self.currentVersion
+                let update = try await UpdateChecker.check(current: version)
+                await MainActor.run {
+                    self.availableUpdate = update
+                    if let update {
+                        self.updateCheckMessage = nil
+                        if interactive {
+                            self.showStatus("发现新版本 \(update.version)，可在发行版页面下载")
+                        }
+                        AppLog.info("检查更新：当前 \(version)，最新 \(update.version)")
+                    } else {
+                        self.updateCheckMessage = "已是最新版本（\(version)）"
+                        if interactive { self.showStatus("已是最新版本（\(version)）") }
+                    }
+                    UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: "lastUpdateCheckAt")
+                }
+            } catch {
+                await MainActor.run {
+                    self.updateCheckMessage = interactive ? "检查失败：\(error.localizedDescription)" : nil
+                    if interactive {
+                        self.showStatus("检查更新失败：\(error.localizedDescription)")
+                    }
+                    AppLog.error("检查更新失败：\(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
+    /// 打开发行版页面，让用户下载新版 dmg。
+    func openUpdatePage() {
+        let url = availableUpdate?.releaseURL
+            ?? URL(string: "https://gitcode.com/\(UpdateChecker.repository)/releases")!
+        NSWorkspace.shared.open(url)
+    }
+
+    /// 启动时每天自动检查一次（不打扰：仅在发现新版时提示）。
+    func autoCheckUpdatesIfNeeded() {
+        let last = UserDefaults.standard.double(forKey: "lastUpdateCheckAt")
+        let day: TimeInterval = 24 * 60 * 60
+        guard Date().timeIntervalSince1970 - last > day else { return }
+        checkForUpdates(interactive: false)
+    }
 
     // MARK: 云同步（WebDAV）
 
@@ -1201,7 +1318,7 @@ final class LibraryModel: ObservableObject {
         statusMessage = message
         statusTask?.cancel()
         statusTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 4_000_000_000)
+            try? await Task.sleep(nanoseconds: 9_000_000_000)
             guard !Task.isCancelled else { return }
             self?.statusMessage = nil
         }

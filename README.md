@@ -6,17 +6,91 @@
 - **独立仓库**：本仓库只包含 macOS 端（原 Windows/WinUI 版在 [stj-media-viewer](https://gitcode.com/TMR2333/stj-media-viewer)）
 - 语言/UI：Swift 6 + SwiftUI，少量 AppKit（打开面板、Finder、QuickLook 面板、键盘事件）
 - 最低系统：**macOS 14 Sonoma**；macOS 26 起自动启用 Liquid Glass 材质
-- 版本：**1.36.0**（Liquid Glass 界面）
-- 发行版：[releases](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases) — 最新 `v1.36.0-macos`
+- 版本：**1.37.0**（Liquid Glass 界面 · 对齐 Windows 交互）
+- 发行版：[releases](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases) — 最新 `v1.37.0-macos`
 - 文档：[实施说明](docs/macos-port.md) · [开发计划](PLAN.md) · [更新日志](CHANGELOG.md) · [原始提示词存档](docs/MACOS-PROMPT.md)
 
 ## 下载
 
 | 平台 | 版本 | 文件 |
 | --- | --- | --- |
-| macOS 原生（Universal） | `v1.36.0-macos` | `STJMediaViewer-1.36.0-macos-arm64-x86_64.dmg` |
+| macOS 原生（Universal，Apple Silicon + Intel） | `v1.37.0-macos` | `STJMediaViewer-1.37.0-macos-arm64-x86_64.dmg` |
+| Windows（WinUI 3） | `v1.25.0` | [stj-media-viewer releases](https://gitcode.com/TMR2333/stj-media-viewer/releases) |
 
-首次打开（ad-hoc 签名，无 Apple Developer ID / 公证）：右键 App → 打开。
+首次打开（ad-hoc 签名，无 Apple Developer ID / 公证）：右键 App →「打开」→ 再点「打开」。
+
+> 两个平台的数据文件互通：macOS 版打开 Windows 版扫描出来的 `catalog.db` 即可直接浏览、编辑，编辑结果 Windows 版也认得（schema 与 `is_pick` / `__unset__` / 多主题等语义一致）。
+
+## 截图
+
+| 素材库（浅色） | 素材库（深色） |
+| --- | --- |
+| ![素材库浅色](shots/main-light.png) | ![素材库深色](shots/main-dark.png) |
+
+| 检视面板 | 画廊（视频 + LUT） |
+| --- | --- |
+| ![检视面板](shots/inspector-light.png) | ![画廊](shots/gallery-dark.png) |
+
+| 地图视图 | 时间线 |
+| --- | --- |
+| ![地图](shots/map-light.png) | ![时间线](shots/timeline-light.png) |
+
+| 重复项检测 | 云端浏览 |
+| --- | --- |
+| ![重复项](shots/duplicates-light.png) | ![云端浏览](shots/remote-browser-light.png) |
+
+| 首次引导 | 云同步设置 |
+| --- | --- |
+| ![引导](shots/onboarding-light.png) | ![云同步设置](shots/cloud-settings-light.png) |
+
+> 截图来自 1.37.0 发布包实机运行（2640×1680，Retina 2x）。Liquid Glass 只在 macOS 26 上呈现，旧系统自动回退半透明材质。
+
+## 快捷键
+
+| 场景 | 快捷键 | 说明 |
+| --- | --- | --- |
+| 通用 | `⌘O` / `⌘I` | 打开素材库 / 扫描导入目录 |
+| | `⌘F` | 聚焦搜索框 |
+| | `⌘A` / `⇧⌘A` | 全选当前筛选结果 / 取消选择 |
+| | `⌘1`–`⌘4` | 小 / 中 / 大网格 / 列表 |
+| | `⌘⌥S` / `⌘⌥I` | 侧栏 / 检视面板开关 |
+| | `⌘,` | 设置 |
+| 网格 | `空格` | QuickLook 快速预览（系统面板） |
+| | `↩` 或双击 | 内置画廊预览（与 Windows 一致） |
+| | `⌘↩` / `⌥⌘R` | 用默认应用打开 / 在 Finder 中显示 |
+| | `←` `→` `↑` `↓` | 移动选中 |
+| | `0`–`5` | 设置评分 |
+| | `6` `7` `8` `9` | 色标 红 / 黄 / 绿 / 蓝 |
+| | `P` / `X` | 标记选用 / 废片 |
+| | `Home` / `End` | 选中首张 / 末张 |
+| | `⌘⌫` / `⇧⌘⌫` | 移到废纸篓 / 批量删除 |
+| 画廊 | `←` `→` / `Home` `End` | 上一张 / 下一张、首末 |
+| | `0`–`5` / `6`–`9` / `P` `X` | 评分 / 色标 / 选用与废片 |
+| | `Esc` | 关闭画廊 |
+| 素材 | `⌥⌘A` | AI 打标所选 |
+| | `⌥⌘D` | 查找重复项 |
+| | `⌥⌘P` | 导出 JPG+RAW 配对 |
+| | `⌥⌘W` | 导出带水印 JPEG |
+| | `⌥⌘U` / `⌥⌘L` | 上传所选到 WebDAV / 浏览云端 |
+| | `⌥⌘T` / `⌥⌘M` | 时间线视图 / 地图视图 |
+| | `⇧⌘G` | 画廊 |
+| | `⇧⌘B` / `⌥⌘B` | 备份 / 恢复素材库 |
+| | `⌥⌘E` | 写入 XMP 侧车 |
+
+## 与 Windows 版对齐情况
+
+同一份 `catalog.db`、同一套语义（`is_pick` 三态、`__unset__` 空值并集、多主题命中、缩略图键），交互尽量照搬 Windows 的节奏：
+
+| 维度 | 对齐情况 |
+| --- | --- |
+| 数据与写入 | ✅ 完全一致：扫描导入、批量编辑、评分/色标/选用、合集、合并组、整理路径回写、XMP 读写、AI 字段 |
+| 网格与选择 | ✅ 四档密度（含列表）、框选、⌘/⇧ 多选、方向键、悬停快捷按钮、色标条、合并组/AI 角标 |
+| 右键菜单 | ✅ 顺序与 Windows 一致：评分 → 色标 → 选用/废片 → 打开类（含复制路径/文件名）→ 合并组 → AI/XMP/导出 → 合集 → 移入废纸篓（确认框带数量与体积） |
+| 快捷键 | ✅ 画廊/网格的 `0–5` `6–9` `P` `X` `←→` `Home/End` 与 Windows 一致 |
+| 状态栏 | ✅ 状态文本 9 秒回落「就绪」、素材/筛选/已选计数、错误常驻；进度条覆盖导入/云同步/AI |
+| 检视面板 | ✅ 元数据 + 可编辑字段；⌘ 多选时批量立即写入（与 Windows 同策略） |
+| 平台差异 | ⚠️ 保留 macOS 原生习惯：搜索框在素材库顶部条、系统 QuickLook（空格）、菜单栏与快捷键表、Liquid Glass 材质；双击=内置画廊、`⌘↩`=外部打开（Windows 用资源管理器双击） |
+| 暂未提供 | ⚠️ Windows 的「导入计划/设备枚举/RAW+JPEG 自动配对导入」与「整理撤销」、自动更新器；macOS 侧以扫描导入 + 备份/恢复兜底 |
 
 ## 已实现（P0/P1）
 
@@ -58,11 +132,18 @@
 ## 构建
 
 ```bash
-cd macos
-swift build -c release            # 本机架构调试构建：swift build
+# 一键验证（清单解析 + 构建 + 单元测试 + stjcheck 自检，可按需打包）
+bash scripts/verify.sh            # 加 --dmg 顺带产出 universal dmg
+
+swift build -c release            # 只构建本机架构
 bash scripts/build-dmg.sh         # universal (arm64 + x86_64) .app + .dmg
-# 产物：dist/STJMediaViewer-1.36.0-macos-arm64-x86_64.dmg
+# 产物：dist/STJMediaViewer-1.37.0-macos-arm64-x86_64.dmg
 ```
+
+> 云端 CI：`.cnb.yml` 在 GitCode 的 Linux Runner 上做清单/结构一致性校验；
+> 真正的 `.app`/`.dmg` 需要 macOS 工具链（AppKit/SwiftUI/codesign），请在本机或
+> 自建 macOS Runner 上执行 `bash scripts/verify.sh --dmg`。检查更新走 GitCode
+> Releases API（设置 → 关于，或帮助菜单），不做自动替换（ad-hoc 签名自替换会打断 TCC 授权）。
 
 可选的正式签名与公证：
 

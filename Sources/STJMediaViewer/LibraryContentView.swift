@@ -495,11 +495,31 @@ struct LibraryContentView: View {
                     .font(.system(size: 10))
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-            } else if model.selection.count > 1 {
-                Text("已选 \(model.selection.count) 项")
-                    .font(.system(size: 10))
-                    .foregroundStyle(.secondary)
             }
+            if let update = model.availableUpdate {
+                Button {
+                    model.openUpdatePage()
+                } label: {
+                    Label("新版本 \(update.version)", systemImage: "arrow.down.circle.fill")
+                        .font(.system(size: 10, weight: .medium))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(Color.accentColor)
+                .help("打开发行版页面查看 \(update.name)")
+            }
+            // 与 Windows 状态栏一致：素材 N / 筛选 N / 已选 N（数值用等宽数字防抖动）。
+            HStack(spacing: 10) {
+                Text("素材 \(model.totalCount)")
+                if model.filter.activeCount > 0 || !model.filter.searchText.isEmpty {
+                    Text("筛选 \(model.assets.count)").foregroundStyle(Color.accentColor)
+                }
+                if !model.selection.isEmpty {
+                    Text("已选 \(model.selection.count)")
+                }
+            }
+            .font(.system(size: 10))
+            .monospacedDigit()
+            .foregroundStyle(.secondary)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 5)

@@ -38,7 +38,27 @@ final class KeyMonitor {
             return event
         }
 
-        // 画廊打开时：← → 翻页，Esc 关闭，其余按键不拦截。
+        // 评分 / 色标 / 选用 / 废片：与 Windows 画廊、预览一致的节奏键。
+        if let rating = Self.ratingFor(keyCode: event.keyCode) {
+            model.setRating(rating)
+            return nil
+        }
+        if let label = Self.colorLabelFor(keyCode: event.keyCode) {
+            model.setColorLabel(label)
+            return nil
+        }
+        switch event.keyCode {
+        case 35: // P
+            model.setPick(1)
+            return nil
+        case 7: // X
+            model.setPick(0)
+            return nil
+        default:
+            break
+        }
+
+        // 画廊打开时：← → 翻页、Home/End 首末、Esc 关闭，其余按键不拦截。
         if model.galleryAssetID != nil {
             switch event.keyCode {
             case 123:
@@ -46,6 +66,12 @@ final class KeyMonitor {
                 return nil
             case 124:
                 model.stepGallery(by: 1)
+                return nil
+            case 115: // Home
+                model.stepGallery(by: -model.assets.count)
+                return nil
+            case 119: // End
+                model.stepGallery(by: model.assets.count)
                 return nil
             case 53:
                 model.closeGallery()
@@ -59,8 +85,14 @@ final class KeyMonitor {
         case 49: // 空格
             model.toggleQuickLook()
             return nil
-        case 36, 76: // 回车 / 小键盘回车
-            model.openSelectionInDefaultApp()
+        case 36, 76: // 回车 / 小键盘回车：Windows 是内置预览，外部打开走菜单 ⌘↩
+            model.openSelectionInGallery()
+            return nil
+        case 115: // Home
+            if let first = model.assets.first { model.selection = [first.id] }
+            return nil
+        case 119: // End
+            if let last = model.assets.last { model.selection = [last.id] }
             return nil
         case 53: // Esc
             QuickLookController.shared.close()
@@ -81,6 +113,30 @@ final class KeyMonitor {
             return nil
         default:
             return event
+        }
+    }
+
+    /// 0–5 → 评分（键位码取自 US 键盘数字行）。
+    static func ratingFor(keyCode: UInt16) -> Int? {
+        switch keyCode {
+        case 29: return 0
+        case 18: return 1
+        case 19: return 2
+        case 20: return 3
+        case 21: return 4
+        case 23: return 5
+        default: return nil
+        }
+    }
+
+    /// 6/7/8/9 → 红/黄/绿/蓝 色标（与 Windows 画廊一致）。
+    static func colorLabelFor(keyCode: UInt16) -> String? {
+        switch keyCode {
+        case 22: return "red"
+        case 26: return "yellow"
+        case 28: return "green"
+        case 25: return "blue"
+        default: return nil
         }
     }
 }

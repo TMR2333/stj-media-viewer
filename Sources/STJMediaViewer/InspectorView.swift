@@ -89,6 +89,16 @@ private struct AssetInspector: View {
                     RoundedRectangle(cornerRadius: 7, style: .continuous)
                         .strokeBorder(Color.primary.opacity(0.12), lineWidth: 0.5)
                 )
+                .overlay(alignment: .bottomTrailing) {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.system(size: 8, weight: .semibold))
+                        .padding(3)
+                        .background(.thinMaterial, in: Circle())
+                        .padding(4)
+                }
+                .contentShape(Rectangle())
+                .onTapGesture { model.openGallery(asset) }
+                .help("点击放大（画廊预览）")
             VStack(alignment: .leading, spacing: 3) {
                 Text(asset.fileName)
                     .font(.system(size: 13, weight: .semibold))
@@ -118,6 +128,10 @@ private struct AssetInspector: View {
                 infoRow("时长", asset.durationText ?? "—")
             }
             infoRow("文件大小", asset.sizeText)
+            if let relative = asset.relativePath, !relative.isEmpty {
+                infoRow("相对路径", relative)
+            }
+            infoRow("修改时间", asset.fileModifiedAt.map { Self.dateFormatter.string(from: $0) } ?? "—")
             infoRow("拍摄时间", asset.capturedText)
             infoRow("地点", asset.locationText)
             infoRow("相机", [asset.cameraMake, asset.cameraModel].compactMap { $0 }.joined(separator: " "))
@@ -442,4 +456,12 @@ enum ColorLabelOption: String, CaseIterable, Identifiable {
         case .purple: return .purple
         }
     }
+}
+private extension AssetInspector {
+    static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "zh_CN")
+        formatter.dateFormat = "yyyy-MM-dd HH:mm"
+        return formatter
+    }()
 }
