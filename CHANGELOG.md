@@ -1,3 +1,22 @@
+## v1.40.0 — 2026-11-23
+
+### 新增
+
+- **iPadOS / iOS 预览（P0）**：`STJCore` 去掉 AppKit 依赖，可在 iOS 17+ 编译；
+  新增 `ios/` 模块（侧栏、网格、检视面板、全屏画廊、筛选、设置）与 `ios/build-sim-app.sh`
+  （无需 Xcode 工程即可打包模拟器 `.app`）。范围与路线见 `docs/mobile-scope.md`。
+
+### 变更
+
+- 核心层图像处理统一为 CoreGraphics/ImageIO（`ImageCodecs`）：缩略图、LUT 预览、水印、AI 打标
+  不再依赖 `NSImage`；`QuickLookController`（QLPreviewPanel）移到 macOS App 层。
+- XMP 侧车写入改为 `Data.write(options: .atomic)`（跨平台）；日志目录在 iOS 下落到 App 容器 `Library/Logs`。
+
+### 验证
+
+- `swift test`：72 项通过；`stjcheck --data-dir .testdata`：20 项通过；macOS 界面与 1.39.0 一致。
+- iOS：`xcrun swiftc -sdk iphoneos -target arm64-apple-ios17.0 -typecheck` 核心层与 `STJMobile` 均 0 error。
+
 ## v1.39.0 — 2026-11-22
 
 RAW+JPG 合并显示（默认开启）与图片 / 视频分库显示。

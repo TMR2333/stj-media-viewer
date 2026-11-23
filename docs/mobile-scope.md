@@ -1,0 +1,85 @@
+# 移动端（iPadOS / iOS）范围与路线
+
+> 本文记录「iPad/iPhone 版与 macOS 版对齐」的现状、可复用范围、明确不做的功能，以及本地怎么跑起来。
+> 对应代码：`ios/Package.swift`（STJMobile 库）、`ios/Sources/STJMobile/`（SwiftUI 视图与移动端库模型）、
+> `ios/App/`（App 入口与 Info.plist）、`ios/build-sim-app.sh`（模拟器打包脚本）。
+
+## 1. 结论先说
+
+- **数据层已经平台无关**：`Sources/STJCore`（约 6.5k 行、22 个文件）不再依赖 AppKit，
+  用 iPhoneOS 26.5 SDK `-typecheck` 零错误；macOS 端 72 项 XCTest 全绿，行为未变。
+- **iPad P0 界面可编译并能在模拟器打包**：侧栏（全部/图片/视频/精选/废片/合集）、网格、
+  检视面板、筛选、搜索、排序、全屏画廊、评分/色标/精选/废片编辑、设置（RAW+JPG 合并、图片/视频分库、密度）。
+- **尚未做**：iPhone 专用布局、后台扫描、LUT/地图/时间线/云同步的移动入口、App Store 打包。
+
+## 2. 复用 / 分叉
+
+| 能力 | macOS | 移动端 | 说明 |
+| --- | --- | --- | --- |
+| catalog.db 读写、筛选/搜索/排序 | ✅ | ✅ 同一套 `STJCore` | 与 Windows 版同 schema |
+| 缩略图（缓存 + QuickLook） | ✅ | ✅ | `ThumbnailStore` 已改为返回 `CGImage` |
+| 评分/色标/精选/废片/批量编辑 | ✅ | ✅ | 移动端用简化的检视面板 |
+| 合集 / 合并组 / RAW+JPG 折叠 | ✅ | ✅ | 折叠开关默认开启 |
+| 全屏画廊 | ✅ | ✅（含左右切换） | 视频播放待接 |
+| 扫描导入 | ✅（`Importer`） | ✅ 选目录后导入 | 用 `.fileImporter` 选文件夹 |
+| LUT / 地图 / 时间线 | ✅ | ⏳ | P1 再接，移动端空间有限 |
+| AI 打标 | ✅ | ⏳ | 复用 `AITagger`，注意流量与后台限制 |
+| WebDAV 云同步 | ✅ | ⏳ | `WebDAVClient` 已平台无关 |
+| 多文件拖拽到 Finder | ✅ | ❌ | iOS 用「分享/导出」替代 |
+| 菜单栏、多个独立窗口、Finder 菜单 | ✅ | ❌ | 系统差异 |
+| 后台常驻扫描 | ✅ | ❌ | iOS 只能 BGProcessingTask，改为「打开时增量扫描」 |
+| 自动更新 | ✅（检查 + 引导下载） | ❌ | 走 App Store |
+
+## 3. 移动端特有的约束
+
+1. **文件访问**：iOS 不能常驻任意目录。做法是用户用「文件」App 选一次素材库目录，
+   App 保存 security-scoped bookmark，之后每次启动解析书签继续访问（`MobileLibraryModel.restoreLastLibrary()`）。
+2. **路径身份**：容器路径每次安装可能变化，因此 `catalog.db` 内建议保存相对路径；
+   当前 P0 直接用绝对路径 + 书签，跨设备迁移时请用「设置与图片数据导入导出」重定位。
+3. **分发**：需要付费 Apple Developer 账号（TestFlight / App Store）。本仓库只发布源码，
+   不提供 `.ipa`/`.app` 下载。
+4. **缩略图缓存**：写入素材库下的 `Cache/thumbs`（与 macOS 版同一个键名规则，可共用缓存）。
+
+## 4. 本地运行（无 Xcode 工程）
+
+```bash
+# 1) 只验证 iOS 编译（不需要模拟器 runtime）
+xcrun swiftc -sdk "$(xcrun --sdk iphoneos --show-sdk-path)" \
+  -target arm64-apple-ios17.0 -typecheck \
+  -I /tmp/iosbuild ios/Sources/STJMobile/*.swift
+
+# 2) 打包成模拟器 .app（自动编译 STJCore + STJMobile + App 入口）
+bash ios/build-sim-app.sh
+
+# 3) 安装到已启动的模拟器并拉起
+xcrun simctl boot "iPad Pro 13-inch (M4)"      # 或 xcrun simctl list devices
+bash ios/build-sim-app.sh --install
+
+# 4) 截图
+xcrun simctl io booted screenshot shots/ipad-main.png
+```
+
+首次运行 App 会提示「打开 / 导入素材库…」：
+- 想快速看效果，把样例库放进 App 沙箱的 Documents/DemoLibrary（脚本 `--demo-library .testdata` 会代劳）；
+- 或用「文件」App 选中真实素材库目录（含 `catalog.db`）。
+
+> 用 Xcode 的方式：新建 iOS App 工程 → 把 `ios/Sources/STJMobile` 与 `ios/App/STJMobileApp.swift`
+> 拖进 target，依赖 `ios/Package.swift`（本地包），Bundle Identifier 用
+> `com.stjarnaperspective.stjmediaviewer.mobile`，图标与签名按自己的开发者账号设置。
+
+## 5. 路线图
+
+| 阶段 | 内容 | 状态 |
+| --- | --- | --- |
+| M0 | `STJCore` 去 AppKit 化、iOS 编译通过、macOS 回归 | ✅ |
+| M1 | iPad P0：库浏览 / 筛选 / 搜索 / 检视编辑 / 画廊 / 导入 | ✅（可编译、可模拟器运行） |
+| M2 | 视频播放、LUT 预览、时间线、多选批处理、合集管理 | ⏳ |
+| M3 | AI 打标、WebDAV 上传/浏览、设置迁移（复用 `SettingsExchange`） | ⏳ |
+| M4 | iPhone 布局（TabView + 单列）、App Store 打包与 TestFlight | ⏳ |
+
+## 6. 已知限制
+
+- 模拟器首次启动要先下载 iOS Runtime（`xcodebuild -downloadPlatform iOS`，约 8.5 GB）。
+- 视频缩略图依赖 QuickLook，模拟器上偶发取不到，会回退到文件图标。
+- 移动端暂不支持 RAW 解码预览（和 macOS 版一致，走 QuickLook/伴生 JPG）。
+- 未做深色/浅色手工切换同步（跟随系统 + 设置项已复用）。

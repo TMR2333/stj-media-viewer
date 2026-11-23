@@ -6,9 +6,9 @@
 - **独立仓库**：本仓库只包含 macOS 端（原 Windows/WinUI 版在 [stj-media-viewer](https://gitcode.com/TMR2333/stj-media-viewer)）
 - 语言/UI：Swift 6 + SwiftUI，少量 AppKit（打开面板、Finder、QuickLook 面板、键盘事件）
 - 最低系统：**macOS 14 Sonoma**；macOS 26 起自动启用 Liquid Glass 材质
-- 版本：**1.39.0**（Liquid Glass 界面 · RAW+JPG 合并显示 · 图片/视频分库）
-- 发行版：[releases](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases) — 最新 `v1.39.0-macos`
-- 文档：[实施说明](docs/macos-port.md) · [开发计划](PLAN.md) · [更新日志](CHANGELOG.md) · [原始提示词存档](docs/MACOS-PROMPT.md)
+- 版本：**1.40.0**（Liquid Glass 界面 · 平台无关核心 · iPad P0 预览）
+- 发行版：[releases](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases) — 最新 `v1.40.0-macos`
+- 文档：[实施说明](docs/macos-port.md) · [开发计划](PLAN.md) · [更新日志](CHANGELOG.md) · [移动端范围](docs/mobile-scope.md) · [原始提示词存档](docs/MACOS-PROMPT.md)
 
 ## 下载
 
@@ -151,6 +151,16 @@ macOS 与 Windows 共用同一套 `catalog.db` schema，因此编辑数据理论
 - **合并策略**：`fillEmpty`（默认，只填空字段，保留本机已有编辑）/ `overwrite`（用文件里的值覆盖已有值）。
 - 格式契约与 Windows 侧实现指引见 [docs/windows-exchange-prompt.md](docs/windows-exchange-prompt.md)。
 
+## 移动端（iPadOS / iOS，实验性）
+
+1.40.0 起 `Sources/STJCore` 已平台无关（去掉 AppKit 依赖），同一份数据模型、SQLite、筛选、
+缩略图、导入、AI、LUT、WebDAV、设置迁移都能在 iOS 上编译；`ios/` 下是 iPad P0 的 SwiftUI 界面。
+
+- 代码：`ios/Package.swift`（`STJMobile` 库）+ `ios/Sources/STJMobile/`（侧栏 / 网格 / 检视 / 画廊 / 筛选 / 设置）
+- 打包：`bash ios/build-sim-app.sh` 直接产出模拟器 `dist/STJMobile.app`（见脚本注释）
+- 范围与路线：[docs/mobile-scope.md](docs/mobile-scope.md)
+- 分发：iOS 需要付费 Apple Developer 账号（TestFlight / App Store），仓库只提供源码；macOS 版不受影响
+
 ## 构建
 
 ```bash
@@ -268,6 +278,8 @@ XMP 回填后的检视面板 `inspector-xmp-light.png`（导入 `/tmp/xmpdemo` �
 - **M4 P3**：时间线与视频播放（1.30.0）、地图与 LUT（1.31.0）、AI 打标（1.32.0）✅
 - **M5 P4**：WebDAV 上传与诊断（1.29.0）、双向同步/云端浏览（1.35.0）、水印与引导（1.33.0）、备份恢复与关于（1.34.0）✅
 - **1.36.0**：Liquid Glass 界面适配（macOS 26+）
+- **1.37.x–1.39.0**：Windows 交互对齐、检查更新、侧栏工具区、跨平台设置迁移、RAW+JPG 合并与图片/视频分库
+- **1.40.0**：`STJCore` 去 AppKit 化（iOS 可编译）+ iPad P0 预览（侧栏/网格/检视/画廊/筛选/设置）
 
 ## 目录
 
@@ -276,13 +288,14 @@ XMP 回填后的检视面板 `inspector-xmp-light.png`（导入 `/tmp/xmpdemo` �
 ├── Sources/STJCore/          # 模型、SQLite、Catalog、缩略图、日志、Keychain、XMP、QuickLook、WebDAV、LUT、AI
 ├── Sources/STJMediaViewer/   # SwiftUI App：三栏、工具栏、检视、设置、菜单、快捷键、Liquid Glass
 ├── Sources/stjcheck/         # 命令行自检（含 --import / --dav-*）
-├── Tests/STJCoreTests/       # XCTest（61 项）
+├── Tests/STJCoreTests/       # XCTest（72 项）
 ├── Resources/                # Info.plist、AppIcon.png
 ├── scripts/build-dmg.sh      # universal 构建 + 签名 + dmg
 ├── scripts/make-sample-library.py
 ├── tools/MockWebDav/         # 测试用 WebDAV mock
 ├── tools/MockAiServer/       # 测试用 OpenAI 兼容 mock
-├── docs/                     # 实施说明与原始提示词存档
+├── ios/                      # iPadOS/iOS 端（STJMobile 库 + App 入口 + 模拟器打包脚本）
+├── docs/                     # 实施说明、移动端范围与原始提示词存档
 ├── shots/                    # 验收截图
 ├── PLAN.md / CHANGELOG.md
 └── Package.swift
