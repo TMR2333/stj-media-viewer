@@ -9,9 +9,9 @@
 
 | 平台 | 文件 | 说明 |
 | --- | --- | --- |
-| Windows 10/11 x64 | [`STJMediaViewer-1.28.2-Setup.exe`](https://gitcode.com/TMR2333/stj-media-viewer/releases/download/latest/STJMediaViewer-1.28.2-Setup.exe) | 安装版（自包含，带开始菜单/桌面快捷方式） |
-| Windows 10/11 x64 | [`STJMediaViewer-1.28.2-portable.exe`](https://gitcode.com/TMR2333/stj-media-viewer/releases/download/latest/STJMediaViewer-1.28.2-portable.exe) | 便携版（免安装，双击即用） |
-| Android 8.0+ | [`STJMediaViewer-Android-0.3.0.apk`](https://gitcode.com/TMR2333/stj-media-viewer/releases/download/latest/STJMediaViewer-Android-0.3.0.apk) | release 签名；`adb install -r` 或直接点开安装 |
+| Windows 10/11 x64 | [`STJMediaViewer-1.28.3-Setup.exe`](https://gitcode.com/TMR2333/stj-media-viewer/releases/download/latest/STJMediaViewer-1.28.3-Setup.exe) | 安装版（自包含，带开始菜单/桌面快捷方式） |
+| Windows 10/11 x64 | [`STJMediaViewer-1.28.3-portable.exe`](https://gitcode.com/TMR2333/stj-media-viewer/releases/download/latest/STJMediaViewer-1.28.3-portable.exe) | 便携版（免安装，双击即用） |
+| Android 8.0+ | [`STJMediaViewer-Android-0.4.0.apk`](https://gitcode.com/TMR2333/stj-media-viewer/releases/download/latest/STJMediaViewer-Android-0.4.0.apk) | release 签名；`adb install -r` 或直接点开安装 |
 | macOS 12+（Apple Silicon / Intel） | [`STJMediaViewer-1.36.0-macos-arm64-x86_64.dmg`](https://gitcode.com/TMR2333/stj-media-viewer/releases/download/latest/STJMediaViewer-1.36.0-macos-arm64-x86_64.dmg) | 通用二进制；macOS 源码在独立仓库 `stj-media-viewer-macos` |
 | 校验 | [`downloads.json`](https://gitcode.com/TMR2333/stj-media-viewer/releases/download/latest/downloads.json) | 各附件的字节数与 SHA-256 |
 
@@ -19,9 +19,9 @@
 
 | 文件 | 大小 | SHA-256 |
 | --- | --- | --- |
-| STJMediaViewer-1.28.2-Setup.exe | 155,444,193 B | `493dca7bf53c813c5399fa3346496efbc7774c866d6140764a25ac2c1ba821ad` |
-| STJMediaViewer-1.28.2-portable.exe | 155,444,193 B | `493dca7bf53c813c5399fa3346496efbc7774c866d6140764a25ac2c1ba821ad` |
-| STJMediaViewer-Android-0.3.0.apk | 14,096,206 B | `9b321eb9591f84c2c2ce48f08c57b042e93a715001eabdabfabd12f996a66f71` |
+| STJMediaViewer-1.28.3-Setup.exe | 155,444,193 B | `2ab6d294465f450f850587989bb604789e5d2a0724da00501ab748191ac7686a` |
+| STJMediaViewer-1.28.3-portable.exe | 155,444,193 B | `2ab6d294465f450f850587989bb604789e5d2a0724da00501ab748191ac7686a` |
+| STJMediaViewer-Android-0.4.0.apk | 14,096,922 B | `91414e7e855d74744c47e1d8d47be8bf8d70eb4e32ea35e721e59cbaea8d6f14` |
 | STJMediaViewer-1.36.0-macos-arm64-x86_64.dmg | 5,104,417 B | `027969cbdc5113fe2988ba43df30eb58363b19370168d54f3944474ff793ae90` |
 
 > Windows 的 Setup 与 portable 是同一份自包含产物（安装器负责释放/建快捷方式），所以哈希相同。
@@ -30,8 +30,8 @@
 
 | 平台 | 版本 | 对应版本 Release |
 | --- | --- | --- |
-| Windows | 1.28.2 | [v1.28.2](https://gitcode.com/TMR2333/stj-media-viewer/releases/tag/v1.28.2) |
-| Android | 0.3.0 | 同仓库 `android/` |
+| Windows | 1.28.3 | [v1.28.3](https://gitcode.com/TMR2333/stj-media-viewer/releases/tag/v1.28.3) |
+| Android | 0.4.0 | 同仓库 `android/` |
 | macOS | 1.36.0 | [v1.36.0-macos](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases/tag/v1.36.0-macos) |
 
 ## 发版时怎么更新这个聚合页

@@ -126,6 +126,13 @@ EOF
 - 素材库排序菜单（拍摄时间/文件名/修改时间/大小/评分/入库时间 + 升降序）；
 - 详情页新增设备标识、相机型号、拍摄时间、纬度/经度编辑。
 
+## 4.7 0.4.0：分享 / 用其他方式打开 / 封面全屏
+
+- 详情页「分享」：`ACTION_SEND`（多选 `ACTION_SEND_MULTIPLE`），`content://` 优先，本地文件走 `FileProvider`；
+- 详情页「用其他方式打开」：`ACTION_VIEW` + 系统选择器，冷门格式 `application/octet-stream`；
+- 详情页封面点击 → 全屏查看（黑色背景、双指缩放/拖动/双击放大，RAW 用内嵌预览）；
+- 新增 `FileProvider` + `res/xml/file_paths.xml`（只授临时读权限）。
+
 ## 5. 权限与 root
 
 | 权限 | 用途 |

@@ -1,5 +1,6 @@
 package com.stjarna.mediaviewer.ui
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -7,15 +8,21 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
@@ -30,6 +37,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.stjarna.mediaviewer.core.ColorLabels
@@ -39,6 +47,7 @@ import com.stjarna.mediaviewer.core.UNSET
 import com.stjarna.mediaviewer.core.MediaAsset
 import com.stjarna.mediaviewer.core.PickState
 import com.stjarna.mediaviewer.core.PostProcessState
+import com.stjarna.mediaviewer.util.AssetActions
 import com.stjarna.mediaviewer.vm.LibraryViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -283,6 +292,7 @@ fun DetailSheet(asset: MediaAsset, vm: LibraryViewModel, onDismiss: () -> Unit) 
     var themes by remember { mutableStateOf(asset.themes.joinToString(",")) }
     var tone by remember { mutableStateOf(asset.tone ?: "") }
     var keywords by remember { mutableStateOf(asset.keywords.joinToString(",")) }
+    var fullscreen by remember { mutableStateOf(false) }
     var deviceKey by remember { mutableStateOf(asset.deviceKey ?: "") }
     var cameraModel by remember { mutableStateOf(asset.cameraModel ?: "") }
     var capturedText by remember {
@@ -295,6 +305,14 @@ fun DetailSheet(asset: MediaAsset, vm: LibraryViewModel, onDismiss: () -> Unit) 
     var latitude by remember { mutableStateOf(asset.latitude?.toString() ?: "") }
     var longitude by remember { mutableStateOf(asset.longitude?.toString() ?: "") }
 
+    if (fullscreen) {
+        FullscreenViewer(
+            asset = asset,
+            loader = com.stjarna.mediaviewer.StjApp.instance.thumbnails,
+            onClose = { fullscreen = false },
+        )
+    }
+
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet) {
         LazyColumn(
             Modifier
@@ -303,12 +321,29 @@ fun DetailSheet(asset: MediaAsset, vm: LibraryViewModel, onDismiss: () -> Unit) 
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             item {
-                AssetThumbnail(
-                    asset = asset,
-                    loader = com.stjarna.mediaviewer.StjApp.instance.thumbnails,
-                    targetPx = 1400,
-                    modifier = Modifier.fillMaxWidth().height(220.dp),
-                )
+                androidx.compose.foundation.layout.Box {
+                    AssetThumbnail(
+                        asset = asset,
+                        loader = com.stjarna.mediaviewer.StjApp.instance.thumbnails,
+                        targetPx = 1400,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(220.dp)
+                            .clickable { fullscreen = true },
+                    )
+                    androidx.compose.material3.Surface(
+                        modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp),
+                        color = androidx.compose.ui.graphics.Color(0x99000000),
+                        shape = MaterialTheme.shapes.small,
+                    ) {
+                        Text(
+                            "点击全屏",
+                            color = androidx.compose.ui.graphics.Color.White,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        )
+                    }
+                }
             }
             item {
                 Text(asset.fileName, style = MaterialTheme.typography.titleMedium)
@@ -324,6 +359,26 @@ fun DetailSheet(asset: MediaAsset, vm: LibraryViewModel, onDismiss: () -> Unit) 
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+
+            item {
+                val context = LocalContext.current
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = { AssetActions.share(context, asset) },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Icon(Icons.Filled.Share, null, Modifier.size(18.dp))
+                        Text(" 分享")
+                    }
+                    OutlinedButton(
+                        onClick = { AssetActions.openWith(context, asset) },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Icon(Icons.Filled.OpenInNew, null, Modifier.size(18.dp))
+                        Text(" 用其他方式打开")
+                    }
+                }
             }
 
             item {

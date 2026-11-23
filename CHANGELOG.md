@@ -7,6 +7,19 @@
 > <https://gitcode.com/TMR2333/stj-media-viewer-macos>。
 > 本文件中涉及 macOS 的条目均为历史记录，不再随本仓库更新。
 
+## v1.28.3 — 2026-11-23
+
+### Android 0.4.0：分享 / 用其他方式打开 / 封面全屏
+
+- 详情页新增「分享」「用其他方式打开」：
+  - 分享走 `ACTION_SEND`（多选用 `ACTION_SEND_MULTIPLE`），优先用 MediaStore/SAF 的 `content://`，本地文件经 `FileProvider` 临时授权；
+  - 「用其他方式打开」走 `ACTION_VIEW` + 系统选择器，RAW 等冷门格式用 `application/octet-stream` 让系统列出所有可用应用；
+  - 文件被移走/不存在时给可读提示，不崩溃。
+- 详情页封面图可点击进入**全屏查看**：黑色背景、沉浸式（隐藏状态栏区域由 Dialog 全屏处理）、双指缩放 / 拖动 / 双击放大，RAW 用内嵌预览。
+- 新增 `FileProvider`（`${applicationId}.fileprovider`）与 `res/xml/file_paths.xml`，只授予接收方临时读权限。
+
+Windows 版本号同步为 1.28.3（无功能变更）。
+
 ## v1.28.2 — 2026-11-23
 
 ### 修复：云相册浏览网格右侧大片空白
