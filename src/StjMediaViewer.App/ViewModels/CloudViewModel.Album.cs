@@ -49,14 +49,17 @@ public sealed partial class CloudViewModel
         AlbumStatus = "正在列出云端目录…";
         try
         {
-            var entries = await Album.ListFolderAsync(target, AlbumPath);
+            var all = await Album.ListFolderAsync(target, AlbumPath);
+            var visible = all.Where(e => e.IsDirectory || !IsCloudNoise(e.FileName)).ToList();
+            var hidden = all.Count - visible.Count;
             AlbumRows.Clear();
             _albumSelection.Clear();
             OnPropertyChanged(nameof(AlbumSelectedCount));
-            foreach (var entry in entries) AlbumRows.Add(new CloudAlbumRow(entry));
-            AlbumStatus = entries.Count == 0
+            foreach (var entry in visible) AlbumRows.Add(new CloudAlbumRow(entry));
+            var summary = visible.Count == 0
                 ? "这个目录是空的"
-                : $"共 {entries.Count} 项（{entries.Count(e => e.IsDirectory)} 个文件夹 / {entries.Count(e => !e.IsDirectory)} 个文件）";
+                : $"共 {visible.Count} 项（{visible.Count(e => e.IsDirectory)} 个文件夹 / {visible.Count(e => !e.IsDirectory)} 个文件）";
+            AlbumStatus = hidden > 0 ? summary + $" · 已隐藏 {hidden} 个 XMP/备份文件" : summary;
             _ = LoadAlbumThumbnailsAsync(target, AlbumRows.ToList());
         }
         catch (Exception ex)
@@ -66,6 +69,15 @@ public sealed partial class CloudViewModel
         }
         finally { AlbumBusy = false; }
     }
+
+    /// <summary>云端目录里不参与"相册"展示的噪音：XMP 边车、备份、临时文件、macOS ._ 资源叉。</summary>
+    private static bool IsCloudNoise(string fileName) =>
+        fileName.EndsWith(".xmp", StringComparison.OrdinalIgnoreCase) ||
+        fileName.EndsWith(".bak", StringComparison.OrdinalIgnoreCase) ||
+        fileName.EndsWith(".tmp", StringComparison.OrdinalIgnoreCase) ||
+        fileName.StartsWith("._", StringComparison.Ordinal) ||
+        string.Equals(fileName, "Thumbs.db", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(fileName, ".DS_Store", StringComparison.OrdinalIgnoreCase);
 
     private async Task LoadAlbumThumbnailsAsync(CloudTarget target, List<CloudAlbumRow> rows)
     {

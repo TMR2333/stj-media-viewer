@@ -104,16 +104,18 @@
                                      Visibility="{x:Bind ViewModel.AlbumBusyVisibility, Mode=OneWay}" />
 
                         <GridView x:Name="AlbumGrid"
-                                  Height="360"
+                                  MaxHeight="640"
                                   ItemsSource="{x:Bind ViewModel.AlbumRows, Mode=OneWay}"
                                   SelectionMode="Multiple"
                                   SelectionChanged="AlbumGrid_SelectionChanged"
                                   DoubleTapped="AlbumGrid_DoubleTapped"
                                   IsItemClickEnabled="False"
+                                  ScrollViewer.VerticalScrollMode="Enabled"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
                                   Padding="2">
                             <GridView.ItemTemplate>
                                 <DataTemplate x:DataType="vm:CloudAlbumRow">
-                                    <Grid Width="128" Height="150" Margin="2" CornerRadius="{ThemeResource AppRadiusSmall}">
+                                    <Grid Width="140" Height="168" Margin="2" CornerRadius="{ThemeResource AppRadiusSmall}">
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="*" />
                                             <RowDefinition Height="Auto" />
@@ -136,7 +138,8 @@
                             </GridView.ItemTemplate>
                             <GridView.ItemsPanel>
                                 <ItemsPanelTemplate>
-                                    <ItemsWrapGrid Orientation="Horizontal" MaximumRowsOrColumns="4" />
+                                    <!-- 按可用宽度自动换行：之前固定 4 列会在大窗口右侧留一大片空白 -->
+                                    <ItemsWrapGrid Orientation="Horizontal" ItemWidth="148" ItemHeight="176" />
                                 </ItemsPanelTemplate>
                             </GridView.ItemsPanel>
                         </GridView>
