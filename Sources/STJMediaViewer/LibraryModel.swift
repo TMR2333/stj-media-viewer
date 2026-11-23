@@ -214,15 +214,7 @@ final class LibraryModel: ObservableObject {
     @Published var cloudSyncProgress: CloudSyncProgress?
     @Published var cloudSyncSummary: String?
     @Published var cloudDiagnostics: [DiagnosticStep]?
-    @Published var isRemoteBrowserPresented = false
-    @Published var remoteEntries: [RemoteEntry] = []
-    @Published var remotePath = ""
-    @Published var remoteSelection: Set<String> = []
-    @Published var isRemoteLoading = false
-    @Published var remoteStatus: String?
-    @Published var isRemoteDownloading = false
-    @Published var remoteDownloadProgress: (done: Int, total: Int)?
-    private var remoteTask: Task<Void, Never>?
+    @Published var isCloudAlbumPresented = false
     private var cloudSyncTask: Task<Void, Never>?
     @Published var organizeSummary: String?
     /// 画廊模式当前查看的素材 ID；非 nil 时弹出画廊窗口。
@@ -399,24 +391,10 @@ final class LibraryModel: ObservableObject {
         }
         // 仅 Debug 构建：本机无辅助功能授权，无法合成菜单点击，用启动参数直接打开重复项面板以便验收截图。
         #if DEBUG
-        if defaults.bool(forKey: "remoteBrowserOnLaunch") {
-            let initialPath = defaults.string(forKey: "remotePathOnLaunch") ?? ""
+        if defaults.bool(forKey: "cloudAlbumOnLaunch") {
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 900_000_000)
-                self.openRemoteBrowser()
-                if !initialPath.isEmpty {
-                    try? await Task.sleep(nanoseconds: 600_000_000)
-                    await self.loadRemoteEntries(initialPath)
-                }
-                if defaults.bool(forKey: "remoteSelectAllOnLaunch") {
-                    try? await Task.sleep(nanoseconds: 500_000_000)
-                    self.remoteSelection = Set(self.remoteEntries.filter { !$0.isDirectory }.map(\.path))
-                }
-                if defaults.bool(forKey: "remoteDownloadAllOnLaunch") {
-                    try? await Task.sleep(nanoseconds: 500_000_000)
-                    self.remoteSelection = Set(self.remoteEntries.filter { !$0.isDirectory }.map(\.path))
-                    self.downloadRemoteSelection()
-                }
+                self.presentCloudAlbum()
             }
         }
         if let text = defaults.string(forKey: "searchTextOnLaunch"), !text.isEmpty {
@@ -1450,103 +1428,16 @@ final class LibraryModel: ObservableObject {
     }
 
 
-    // MARK: - 云端浏览与下载（WebDAV 反向同步）
+    // MARK: - 云相册（WebDAV）
 
-    func openRemoteBrowser() {
-        guard let credentials = SettingsStore.shared.webdavCredentials() else {
-            presentedError = "请先在设置 → 云同步里填写 WebDAV 地址与口令"
+    /// 打开云相册：远端浏览 + 预览 + 导入 + 上传，替代原先分散的「上传」与「浏览云端」两个入口。
+    func presentCloudAlbum() {
+        guard SettingsStore.shared.webdavCredentials() != nil else {
+            presentedError = "请先在设置 → 云同步里填写 WebDAV 地址与账号口令"
             return
         }
-        isRemoteBrowserPresented = true
-        remotePath = ""
-        remoteSelection = []
-        remoteStatus = nil
-        Task { await loadRemoteEntries("", credentials: credentials) }
-    }
-
-    func loadRemoteEntries(_ path: String, credentials: WebDAVCredentials? = nil) async {
-        guard let credentials = credentials ?? SettingsStore.shared.webdavCredentials() else { return }
-        isRemoteLoading = true
-        defer { isRemoteLoading = false }
-        do {
-            let client = WebDAVClient(credentials: credentials)
-            let entries = try await client.listEntries(path)
-            remoteEntries = entries
-            remotePath = path
-            remoteSelection = []
-            remoteStatus = "\(entries.filter { !$0.isDirectory }.count) 个文件 · \(entries.filter(\.isDirectory).count) 个目录"
-            AppLog.breadcrumb("云端浏览：\(path.isEmpty ? "/" : path) — \(entries.count) 项")
-        } catch {
-            remoteStatus = "读取失败：\(error.localizedDescription)"
-            AppLog.error("云端浏览失败：\(path) — \(error.localizedDescription)")
-        }
-    }
-
-    func remoteGoUp() {
-        guard !remotePath.isEmpty else { return }
-        var comps = remotePath.split(separator: "/").map(String.init)
-        _ = comps.popLast()
-        Task { await loadRemoteEntries(comps.joined(separator: "/")) }
-    }
-
-    func enterRemoteDirectory(_ entry: RemoteEntry) {
-        guard entry.isDirectory else { return }
-        Task { await loadRemoteEntries(entry.path) }
-    }
-
-    /// 下载选中的远端文件：落到「数据目录/云同步下载/远端路径」，然后增量导入当前素材库。
-    func downloadRemoteSelection() {
-        guard let credentials = SettingsStore.shared.webdavCredentials(),
-              let dataDir = dataDirectory else { return }
-        let selected = remoteEntries.filter { remoteSelection.contains($0.path) && !$0.isDirectory }
-        guard !selected.isEmpty else {
-            showStatus("请先在云端列表里勾选要下载的文件")
-            return
-        }
-        if isRemoteDownloading { return }
-        isRemoteDownloading = true
-        remoteDownloadProgress = (0, selected.count)
-        let destinationRoot = dataDir.appendingPathComponent("云同步下载", isDirectory: true)
-        let targetPath = remotePath
-        remoteTask?.cancel()
-        remoteTask = Task { [weak self] in
-            guard let self else { return }
-            let client = WebDAVClient(credentials: credentials)
-            var failed = 0
-            for (index, entry) in selected.enumerated() {
-                if Task.isCancelled { break }
-                let destination = destinationRoot.appendingPathComponent(entry.path)
-                do {
-                    try FileManager.default.createDirectory(at: destination.deletingLastPathComponent(),
-                                                            withIntermediateDirectories: true)
-                    _ = try await client.download(relativePath: entry.path, to: destination)
-                } catch {
-                    failed += 1
-                    AppLog.error("云端下载失败：\(entry.path) — \(error.localizedDescription)")
-                }
-                let done = index + 1
-                await MainActor.run { self.remoteDownloadProgress = (done, selected.count) }
-            }
-            let written = selected.count - failed
-            await MainActor.run {
-                self.isRemoteDownloading = false
-                self.remoteDownloadProgress = nil
-                self.showStatus("云端下载 \(written) 个文件" + (failed > 0 ? " · 失败 \(failed)" : ""))
-                AppLog.breadcrumb("云端下载：\(written) 个文件 → \(destinationRoot.path)（失败 \(failed)）")
-            }
-            if written > 0 {
-                await self.importFrom(dataDir)
-            }
-            _ = targetPath
-        }
-    }
-
-    func cancelRemoteDownload() {
-        remoteTask?.cancel()
-        remoteTask = nil
-        isRemoteDownloading = false
-        remoteDownloadProgress = nil
-        showStatus("已取消云端下载")
+        isCloudAlbumPresented = true
+        AppLog.breadcrumb("打开云相册")
     }
 
     /// 设置页「测试连接」：跑连接→鉴权→列目录→上传探针→核验→清理。

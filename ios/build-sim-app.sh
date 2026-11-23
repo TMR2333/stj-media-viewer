@@ -33,7 +33,7 @@ echo "▶ 编译 STJCore（${TARGET}）"
 BUILD="$ROOT/.build/ios-sim"
 rm -rf "$BUILD" && mkdir -p "$BUILD"
 xcrun swiftc \
-  -sdk "$SDK" -target "$TARGET" -parse-as-library -O -wmo \
+  -sdk "$SDK" -target "$TARGET" -parse-as-library -O -DDEBUG -wmo \
   -module-name STJCore \
   -emit-module-path "$BUILD/STJCore.swiftmodule" \
   -c -o "$BUILD/STJCore.o" \
@@ -42,7 +42,7 @@ xcrun swiftc \
 
 echo "▶ 编译 STJMobile + App（${TARGET}）"
 xcrun swiftc \
-  -sdk "$SDK" -target "$TARGET" -parse-as-library -O -wmo \
+  -sdk "$SDK" -target "$TARGET" -parse-as-library -O -DDEBUG -wmo \
   -I "$BUILD" \
   -module-name STJMobile \
   -c -o "$BUILD/STJMobile.o" \

@@ -12,6 +12,7 @@ struct MobileRootView: View {
     @State private var isSelecting = false
     @State private var showsFilters = false
     @State private var showsSettings = false
+    @State private var showsCloudAlbum = false
     @State private var isImporterPresented = false
 
     var body: some View {
@@ -45,6 +46,10 @@ struct MobileRootView: View {
         .task {
             await model.restoreLastLibrary()
             let defaults = UserDefaults.standard
+            if defaults.bool(forKey: "cloudAlbumOnLaunch") {
+                try? await Task.sleep(nanoseconds: 800_000_000)
+                showsCloudAlbum = true
+            }
             if defaults.bool(forKey: "showsInspectorOnLaunch") {
                 model.showsInspector = true
             }
@@ -64,6 +69,11 @@ struct MobileRootView: View {
         }
         .sheet(isPresented: $showsFilters) { MobileFilterView(model: model) }
         .sheet(isPresented: $showsSettings) { NavigationStack { MobileSettingsView(settings: settings, model: model) } }
+        .sheet(isPresented: $showsCloudAlbum) {
+            MobileCloudAlbumView(settings: settings, library: model) { folder in
+                Task { await model.importLibrary(from: folder) }
+            }
+        }
         .sheet(isPresented: $isImporterPresented) {
             DocumentFolderPicker { url in
                 isImporterPresented = false
@@ -120,6 +130,13 @@ struct MobileRootView: View {
             Section("智能分类") {
                 row(.pick, title: "精选", symbol: "star", count: model.facets.picked)
                 row(.rejected, title: "废片", symbol: "trash.slash", count: model.facets.rejected)
+            }
+            Section("工具") {
+                Button {
+                    showsCloudAlbum = true
+                } label: {
+                    Label("云相册（WebDAV）", systemImage: "icloud")
+                }
             }
             Section("系统相册") {
                 Button {

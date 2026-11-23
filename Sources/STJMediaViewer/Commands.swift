@@ -160,9 +160,9 @@ struct AppCommands: Commands {
             if model.isCloudSyncing {
                 Button("取消云同步") { model.cancelCloudSync() }
             } else {
-                Button("浏览云端（WebDAV）…") { model.openRemoteBrowser() }
+                Button("云相册…") { model.presentCloudAlbum() }
                     .keyboardShortcut("l", modifiers: [.command, .option])
-                Button("上传所选到 WebDAV") { model.uploadSelectionToWebDAV() }
+                Button("上传所选到云相册") { model.uploadSelectionToWebDAV() }
                     .keyboardShortcut("u", modifiers: [.command, .option])
                     .disabled(model.selection.isEmpty)
             }

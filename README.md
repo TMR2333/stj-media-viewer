@@ -6,15 +6,15 @@
 - **独立仓库**：本仓库只包含 macOS 端（原 Windows/WinUI 版在 [stj-media-viewer](https://gitcode.com/TMR2333/stj-media-viewer)）
 - 语言/UI：Swift 6 + SwiftUI，少量 AppKit（打开面板、Finder、QuickLook 面板、键盘事件）
 - 最低系统：**macOS 14 Sonoma**；macOS 26 起自动启用 Liquid Glass 材质
-- 版本：**1.41.0**（目录标签页 · Liquid Glass 界面 · 平台无关核心 · iPad P0 预览）
-- 发行版：[releases](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases) — 最新 `v1.41.0-macos`
+- 版本：**1.42.0**（WebDAV 云相册 · 目录标签页 · Liquid Glass 界面 · 平台无关核心 · iPad P0 预览）
+- 发行版：[releases](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases) — 最新 `v1.42.0-macos`
 - 文档：[实施说明](docs/macos-port.md) · [开发计划](PLAN.md) · [更新日志](CHANGELOG.md) · [移动端范围](docs/mobile-scope.md) · [原始提示词存档](docs/MACOS-PROMPT.md)
 
 ## 下载
 
 | 平台 | 版本 | 文件 |
 | --- | --- | --- |
-| macOS 原生（Universal，Apple Silicon + Intel） | `v1.41.0-macos` | `STJMediaViewer-1.41.0-macos-arm64-x86_64.dmg` |
+| macOS 原生（Universal，Apple Silicon + Intel） | `v1.42.0-macos` | `STJMediaViewer-1.42.0-macos-arm64-x86_64.dmg` |
 | Windows（WinUI 3） | `v1.25.0` | [stj-media-viewer releases](https://gitcode.com/TMR2333/stj-media-viewer/releases) |
 
 首次打开（ad-hoc 签名，无 Apple Developer ID / 公证）：右键 App →「打开」→ 再点「打开」。
@@ -45,9 +45,13 @@
 | --- | --- |
 | ![地图](shots/map-light.png) | ![时间线](shots/timeline-light.png) |
 
-| 重复项检测 | 云端浏览 |
+| 重复项检测 | 云相册（WebDAV 远端相册） |
 | --- | --- |
-| ![重复项](shots/duplicates-light.png) | ![云端浏览](shots/remote-browser-light.png) |
+| ![重复项](shots/duplicates-light.png) | ![云相册](shots/cloud-album-light.png) |
+
+| 云相册预览 | 云相册导入（写入本地目录标签页） |
+| --- | --- |
+| ![云相册预览](shots/cloud-album-preview.png) | ![云相册导入](shots/main-light.png) |
 
 | 首次引导 | 云同步设置 |
 | --- | --- |
@@ -61,7 +65,7 @@
 | --- | --- |
 | ![设置与图片数据迁移](shots/settings-exchange.png) | ![目录标签页](shots/tabs-light.png) |
 
-**iPadOS / iOS 预览（1.41.0 / iOS 0.1.2 起，模拟器截图）**
+**iPadOS / iOS 预览（1.42.0 / iOS 0.3.0 起，模拟器截图）**
 
 | iPad 网格（侧栏计数 + 图片/视频分库） | iPad 检视面板（评分/色标/元数据） |
 | --- | --- |
@@ -71,9 +75,13 @@
 | --- | --- |
 | ![iPad 相册](shots/ipad-photos.png) | ![相册大图](shots/ipad-photo-viewer.png) |
 
-| 素材库多选（批量精选/废片） |
+| 素材库多选（批量精选/废片） | iPad 云相册（WebDAV 远端网格） |
+| --- | --- |
+| ![iPad 多选](shots/ipad-multiselect.png) | ![iPad 云相册](shots/ipad-cloud-album.png) |
+
+| 云相册导入后自动建目录索引 |
 | --- |
-| ![iPad 多选](shots/ipad-multiselect.png) |
+| ![iPad 云相册导入](shots/ipad-cloud-import.png) |
 
 > macOS 截图来自 1.40.1 发布包实机运行（主窗口 1800×1053，设置窗口 1120×1576，Retina 2x 缩小）。iPad 截图来自 iOS 26.5 模拟器（iPad Pro 13" M4，2064×2752 缩至 1600 宽）。Liquid Glass 只在 macOS 26 上呈现，旧系统自动回退半透明材质。
 
@@ -87,6 +95,7 @@
 | | `⌥⌘O` | 打开旧版素材库文件（目录里的 `catalog.db`） |
 | | `⌘I` | 扫描导入目录（写入当前工作区库） |
 | | `⌘F` | 聚焦搜索框 |
+| | `⌥⌘L` | 打开云相册（WebDAV 远端浏览 / 导入 / 上传） |
 | | `⌘A` / `⇧⌘A` | 全选当前筛选结果 / 取消选择 |
 | | `⌘1`–`⌘4` | 小 / 中 / 大网格 / 列表 |
 | | `⌘⌥S` / `⌘⌥I` | 侧栏 / 检视面板开关 |
@@ -162,12 +171,22 @@
 | 地图视图 | `⌥⌘M` 或工具栏「地图」：带 GPS 的素材钉在地图上（缩略图图钉），点选选中、双击进画廊；自动缩放到当前筛选结果 |
 | LUT 预览 | 数据目录 `LUTs/` 下放 `.cube` 文件，画廊标题栏「LUT」菜单即时预览（`CIColorCube`，r 最快序解析） |
 | 视频播放 | 画廊中视频直接用 `AVPlayerView` 播放（播放/进度/音量/全屏），不再只显示静态封面 |
-| 云同步 | WebDAV 上传（设置 → 云同步）：按 平铺/年月/地点/年月+设备 分类，XMP 边车同目录上传，上传后核验远端大小；`⌥⌘U` 上传所选，可取消；设置页「测试连接」跑连接→鉴权→列目录→探针→核验→清理 |
-| 侧栏工具区 | 侧栏底部「工具」分区：扫描导入、快速批量填写、AI 打标、导出带水印、查找重复项、上传/浏览云端、备份/恢复，按选中状态自动启用 |
+| 云相册 | `⌥⌘L` 或侧栏「工具 → 云相册」：把 WebDAV 远端目录当作相册浏览（递归列媒体、本地缩略图缓存、双击/长按看大图），选中后一键「导入」到本地目录并自动建标签页索引；「上传本地所选」按 平铺/年月/地点/年月+设备 分类上传（XMP 边车同目录、上传后核验远端大小）。原来分散的「上传所选」「浏览云端」已合并到此入口 |
+| 侧栏工具区 | 侧栏底部「工具」分区：扫描导入、快速批量填写、AI 打标、导出带水印、查找重复项、云相册、备份/恢复，按选中状态自动启用 |
 | 设置与图片数据迁移 | `⇧⌘X` 导出 / `⇧⌘I` 导入：把界面设置 + 评分/色标/选用/地点/主题/影调/关键词/标题/调色状态打包成跨平台 JSON（`stj-media-viewer/exchange` v1），与 Windows 版互通；可选「只填空字段」或「覆盖已有值」 |
 | 外观 | 跟随系统 / 浅色 / 深色；中文界面；语义字号 |
 | 日志 | `~/Library/Logs/STJMediaViewer/app.log`（导航面包屑 `[nav]`、网络一行摘要 `[net]`、5MB 轮转） |
 | API Key | 存 macOS 钥匙串（`com.stjarnaperspective.stjmediaviewer`），不写数据库 |
+
+## 云相册（WebDAV）
+
+「云相册」把 WebDAV 服务端的目录当成一个相册来用，替代了原来分散的「上传所选」与「浏览云端」两个入口：
+
+- 入口：侧栏「工具 → 云相册…」或菜单 `⌥⌘L`；先在 设置 → 云同步 填服务器地址 / 账号 / 口令 / 远端根目录，并可用「测试连接」跑一遍六步诊断。
+- 浏览与预览：递归列出远端媒体（图片 + 视频，最多 4 层、5000 个），缩略图下载到应用工作区缓存 `CloudCache/`（不写素材目录），双击或长按看大图。
+- 导入：勾选远端素材 →「导入所选」，下载到 `~/Pictures/STJ Media Viewer/云相册导入-时间戳/`，随后自动作为新目录标签页建立索引，评分/色标/主题/AI/整理等全部可用。
+- 导出：在素材库里选好素材 → 云相册里点「上传本地所选」，按设置的布局（平铺 / 年月 / 地点 / 年月+设备）上传，含 XMP 边车，并在上传后核验远端大小。
+- iPad / iPhone 端同一套逻辑：侧栏「工具 → 云相册（WebDAV）」，网格选择后「导入 N」，也可以把本地所选上传到云端。
 
 ## 跨平台迁移：设置与图片数据导入导出
 
@@ -215,7 +234,7 @@ bash scripts/verify.sh            # 加 --dmg 顺带产出 universal dmg
 
 swift build -c release            # 只构建本机架构
 bash scripts/build-dmg.sh         # universal (arm64 + x86_64) .app + .dmg
-# 产物：dist/STJMediaViewer-1.41.0-macos-arm64-x86_64.dmg
+# 产物：dist/STJMediaViewer-1.42.0-macos-arm64-x86_64.dmg
 ```
 
 > 云端 CI：`.cnb.yml` 在 GitCode 的 Linux Runner 上做清单/结构一致性校验；
@@ -302,7 +321,7 @@ swift run -q stjcheck --data-dir /path/to/media-folder
 主界面 `main-light.png` / `main-dark.png`，检视面板 `inspector-light.png` / `inspector-dark.png`，
 画廊 `gallery-light.png` / `gallery-dark.png`，重复项面板 `duplicates-light.png`，
 XMP 回填后的检视面板 `inspector-xmp-light.png`（导入 `/tmp/xmpdemo` 后截图），
-云同步设置页与上传进度 `cloud-settings-light.png` / `cloud-settings.png`、`cloud-sync-light.png` / `cloud-sync-dark.png`，
+云相册 `cloud-album-light.png` / `cloud-album-preview.png`、云同步设置页与上传进度 `cloud-settings-light.png` / `cloud-settings.png` / `cloud-sync-light.png` / `cloud-sync-dark.png`，
 时间线 `timeline-light.png` / `timeline-dark.png`，画廊内视频播放 `video-gallery-dark.png`，
 地图视图 `map-light.png`、画廊 LUT 预览 `gallery-lut-dark.png`、AI 打标结果 `inspector-ai-light.png`、
 水印导出样例 `watermark-export.jpg`、首次引导 `onboarding-light.png`。

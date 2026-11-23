@@ -99,13 +99,9 @@ struct SidebarView: View {
                         enabled: model.dataDirectory != nil && !model.isDuplicateScanning) {
                     model.findDuplicates()
                 }
-                toolRow("上传所选到云端", symbol: "icloud.and.arrow.up", shortcut: "⌥⌘U",
-                        enabled: !model.selection.isEmpty && !model.isCloudSyncing) {
-                    model.uploadSelectionToWebDAV()
-                }
-                toolRow("浏览云端…", symbol: "icloud", shortcut: "⌥⌘L",
-                        enabled: model.dataDirectory != nil && !model.isRemoteLoading) {
-                    model.openRemoteBrowser()
+                toolRow("云相册…", symbol: "photo.stack", shortcut: "⌥⌘L",
+                        enabled: true) {
+                    model.presentCloudAlbum()
                 }
                 toolRow("备份素材库…", symbol: "externaldrive.badge.timemachine", shortcut: "⇧⌘B",
                         enabled: model.dataDirectory != nil) {

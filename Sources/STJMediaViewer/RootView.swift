@@ -82,6 +82,9 @@ struct RootView: View {
             OnboardingView().environmentObject(model).environmentObject(settings)
                 .presentationBackground(.clear)
         }
+        .sheet(isPresented: $model.isCloudAlbumPresented) {
+            CloudAlbumView(library: model, settings: settings)
+        }
         .sheet(isPresented: $model.isDuplicateSheetPresented) {
             DuplicatesView()
                 .environmentObject(model)

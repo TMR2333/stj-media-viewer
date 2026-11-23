@@ -1,3 +1,15 @@
+## v1.42.0 — 2026-11-23
+
+### 新增
+- **WebDAV 云相册（macOS + iPadOS / iOS）**：新增 `STJCore/CloudAlbum` 统一核心，把远端 WebDAV 目录当相册浏览——递归列媒体、缩略图按需下载并缓存到应用工作区 `CloudCache/`、双击预览大图（视频抽帧）；「导入所选」下载到 `~/Pictures/STJ Media Viewer/云相册导入-时间戳` 并自动建立目录标签页索引；「上传本地所选」复用 `CloudSync` 布局（平铺/年月/地点/年月+设备）与 XMP 边车、上传后核验远端大小。
+- macOS 新增 `CloudAlbumModel` / `CloudAlbumView`（网格 + 选中 + 预览浮层 + 导入/上传进度）；iPad 新增 `MobileCloudAlbumModel` / `MobileCloudAlbumView`，侧栏「工具 → 云相册（WebDAV）」，设置页增加云相册服务器配置（地址/账号/口令/远端根目录/上传布局）。
+- 新增 6 项 `CloudAlbumTests`（媒体过滤/缓存键/递归与深度限制/导入落盘/失败记录）。
+
+### 变更
+- **原有云同步合并进云相册**：侧栏与素材菜单的「上传所选到云端」「浏览云端…」合并为单个「云相册…」入口（`⌥⌘L`），上传改为在云相册内点「上传本地所选」；删除旧 `RemoteBrowserView`。
+- 云相册导入目录放在 `~/Pictures/STJ Media Viewer/`（可写时），否则退回应用工作区；素材目录仍然只读。
+- iOS 0.3.0：云相册、设置页云相册配置、模拟器构建脚本带 `-DDEBUG` 以便验收启动参数。
+
 ## v0.2.1-ios — 2026-11-23
 
 ### 新增

@@ -6,6 +6,8 @@ struct MobileSettingsView: View {
     @ObservedObject var settings: SettingsStore
     @ObservedObject var model: MobileLibraryModel
     @Environment(\.dismiss) private var dismiss
+    @State private var webdavPassword = ""
+    @State private var passwordNote: String?
 
     var body: some View {
         Form {
@@ -17,6 +19,47 @@ struct MobileSettingsView: View {
                 Text("素材读取")
             } footer: {
                 Text("合并显示时优先显示 RAW 文件，JPG 伴生文件仅在导出时配对。")
+            }
+
+            Section {
+                TextField("服务器地址，如 https://dav.example.com/dav", text: $settings.webdavEndpoint)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .keyboardType(.URL)
+                TextField("用户名", text: $settings.webdavUsername)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                SecureField(settings.hasWebDAVPassword ? "口令（已保存，留空则不修改）" : "口令", text: $webdavPassword)
+                TextField("远端根目录，如 photos", text: $settings.webdavRemoteRoot)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                Picker("上传布局", selection: $settings.webdavLayout) {
+                    ForEach(CloudLayout.allCases, id: \.rawValue) { layout in
+                        Text(layout.title).tag(layout.rawValue)
+                    }
+                }
+                Button("保存口令") {
+                    if webdavPassword.isEmpty {
+                        passwordNote = "请先输入口令"
+                    } else {
+                        settings.setWebDAVPassword(webdavPassword)
+                        webdavPassword = ""
+                        passwordNote = "口令已保存到钥匙串"
+                    }
+                }
+                if settings.hasWebDAVPassword {
+                    Button("清除口令", role: .destructive) {
+                        settings.setWebDAVPassword("")
+                        passwordNote = "口令已清除"
+                    }
+                }
+                if let passwordNote {
+                    Text(passwordNote).font(.caption).foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("云相册（WebDAV）")
+            } footer: {
+                Text("配置后可在侧栏「工具 → 云相册」浏览远端相册、预览、导入到素材库，或把本地所选素材上传到云端。")
             }
 
             Section("网格") {

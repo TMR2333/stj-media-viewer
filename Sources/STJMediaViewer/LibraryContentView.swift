@@ -45,9 +45,6 @@ struct LibraryContentView: View {
             }
             #endif
         }
-        .sheet(isPresented: $model.isRemoteBrowserPresented) {
-            RemoteBrowserView().environmentObject(model)
-        }
         .onChange(of: model.searchFocused) { _, focused in
             if focused {
                 searchFocusRequested.toggle()
