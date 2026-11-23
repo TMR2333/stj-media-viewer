@@ -20,6 +20,12 @@
 
 Windows 版本号同步为 1.28.3（无功能变更）。
 
+### 发布整理：全平台下载统一到一个发行版
+
+- Windows Setup/portable、Android APK、macOS dmg、`downloads.json` 全部放在同一个版本 Release（当前 v1.28.3）；
+- README / `docs/DOWNLOADS.md` 统一指向该页；旧 `latest` 聚合页改为跳转提示；
+- 新增 `tools/gc-upload-cfg.py`、`tools/gc-release.py` 便于后续上传/改说明。
+
 ## v1.28.2 — 2026-11-23
 
 ### 修复：云相册浏览网格右侧大片空白

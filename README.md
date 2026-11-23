@@ -679,9 +679,9 @@ macOS 版是独立的 SwiftUI 原生应用（NavigationSplitView 三栏、Liquid
 
 ## 3.5 下载：全平台统一入口
 
-Windows / Android / macOS 的安装包统一放在**一个聚合发行版**里（固定 `latest` 标签，附件随版本更新）：
+Windows / Android / macOS 的安装包统一放在**最新版本的那个发行版**里（一个 Release 包含全部平台）：
 
-👉 **<https://gitcode.com/TMR2333/stj-media-viewer/releases/tag/latest>**
+👉 **<https://gitcode.com/TMR2333/stj-media-viewer/releases/tag/v1.28.3>**（最新版本 Release = 全平台下载页）
 
 | 平台 | 文件 |
 | --- | --- |
@@ -690,7 +690,7 @@ Windows / Android / macOS 的安装包统一放在**一个聚合发行版**里�
 | macOS 12+ | `STJMediaViewer-1.36.0-macos-arm64-x86_64.dmg`（源码在独立仓库） |
 
 校验值与各平台版本对照见 [`docs/DOWNLOADS.md`](docs/DOWNLOADS.md)。
-历史版本仍保留在各 `vX.Y.Z` Release，便于回滚。
+历史版本仍保留在各 `vX.Y.Z` Release，便于回滚；`latest` 旧聚合页只作跳转提示。
 
 ## 3.6 Android 移动伴生版（Material 3 Expressive）
 
