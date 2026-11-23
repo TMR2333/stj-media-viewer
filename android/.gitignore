@@ -1,0 +1,12 @@
+.gradle/
+build/
+*/build/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+*.iml
+.idea/
+# Android 发布签名（本地生成，不入库）
+stj-release.jks
+keystore.properties

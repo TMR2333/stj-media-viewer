@@ -615,7 +615,7 @@ ffmpeg 是可选的：把 `ffmpeg.exe` 放到 `tools/ffmpeg/bin/`（或 PATH）�
 | 产物 | 大小 | 说明 |
 | --- | --- | --- |
 | `STJMediaViewer-Setup.exe` | ≈143 MB | **安装包**，带图形界面：可**自定义安装目录**、可选创建桌面快捷方式；装到用户目录，不需要管理员权限 |
-| `STJMediaViewer-1.26.0-portable.exe` | ≈143 MB | **便携版**：单文件，双击后解压到 `%LOCALAPPDATA%\StjMediaViewerPortable` 并直接启动；不写注册表、不建快捷方式 |
+| `STJMediaViewer-1.27.0-portable.exe` | ≈143 MB | **便携版**：单文件，双击后解压到 `%LOCALAPPDATA%\StjMediaViewerPortable` 并直接启动；不写注册表、不建快捷方式 |
 
 > 旧的 `*-portable-win-x64.zip` 已废弃：压缩包里的 exe 直接双击容易踩「没解压就在压缩包里运行 / SmartScreen 拦截」，
 > 现在改成**单文件便携 exe**，双击即用。
@@ -646,8 +646,8 @@ STJMediaViewer-Setup.exe                      交互式安装（选目录）
 STJMediaViewer-Setup.exe /S                   静默安装到默认目录
 STJMediaViewer-Setup.exe /S /D=D:\Apps\STJ  静默安装到指定目录
 STJMediaViewer-Setup.exe /uninstall           卸载（/S 静默；/D= 指定安装目录）
-STJMediaViewer-1.26.0-portable.exe            便携版：解压 + 启动
-STJMediaViewer-1.26.0-portable.exe /D=D:\STJ 便携版解压到指定目录
+STJMediaViewer-1.27.0-portable.exe            便携版：解压 + 启动
+STJMediaViewer-1.27.0-portable.exe /D=D:\STJ 便携版解压到指定目录
 ```
 
 **卸载**：Windows 设置 → 应用 → 已安装的应用（或 `Setup.exe /uninstall`）。
@@ -676,6 +676,22 @@ macOS 版是独立的 SwiftUI 原生应用（NavigationSplitView 三栏、Liquid
 
 本仓库（Windows / WinUI 3 主版本）不再包含 macOS 源码、构建脚本与相关文档；
 历史上发布过的 macOS 版本（`v1.25.0-macos` … `v1.35.0-macos`）仍可从原发行版页面下载。
+
+## 3.6 Android 移动伴生版（Material 3 Expressive）
+
+仓库新增 `android/`：**Kotlin + Jetpack Compose 原生**，遵循 Material 3 Expressive 设计规范
+（动态取色 / 大标题 / 弹性动效 / 超圆角卡片），与 Windows 共享同一套索引库字段语义和
+`stj-media-viewer/exchange` v1 交换文件。
+
+- **保留**：扫描（系统相册 / SAF 目录 / root 任意目录）、九维筛选中移动端常用的部分、
+  搜索排序、详情编辑（评分/色标/选用三态/城市/主题/影调/关键词）、写回 XMP、
+  批量编辑、交换文件导入导出、离线城市反查、root 模式；
+- **舍弃**：视频转码/LUT 代理、地图、时间线、合集筛选 UI、重复检测、文件整理落盘（root 可后续加）、
+  AI 批量队列、水印工作台；
+- 详细说明与构建步骤：[`android/README.md`](android/README.md)；
+  真机验收清单：[`docs/ANDROID-ACCEPTANCE.md`](docs/ANDROID-ACCEPTANCE.md)。
+
+**Release 附件新增**：`STJMediaViewer-Android-0.1.0.apk`（release 签名，minSdk 26 / targetSdk 36）。
 
 ## 4. 工程与验证
 
@@ -767,9 +783,9 @@ dotnet build tools/SelfCheck/StjMediaViewer.SelfCheck.csproj
 
 ### 3.5 版本号与发行流程
 
-当前版本 **v1.26.0**，历史见 [CHANGELOG.md](CHANGELOG.md)。
+当前版本 **v1.27.0**，历史见 [CHANGELOG.md](CHANGELOG.md)。
 
-- 规则：每次对外更新都 **+1 版本号**（`1.25.0` → `1.26.0` → `1.26.1` → …），同步改应用/安装器/便携版；
+- 规则：每次对外更新都 **+1 版本号**（`1.26.0` → `1.27.0` → `1.27.1` → …），同步改应用/安装器/便携版；
 - 每次发版：`git tag v<版本>` + 推送到 GitCode + 创建发行版（Release）；
 - 一键脚本（版本、构建、提交、打标签、推送、创建发行版）：
 
@@ -780,7 +796,7 @@ powershell -ExecutionPolicy Bypass -File tools/release.ps1 -Version 1.0.4 -Notes
 
 - 仓库：<https://gitcode.com/TMR2333/stj-media-viewer>
 - 发行版：<https://gitcode.com/TMR2333/stj-media-viewer/releases>
-  - v1.26.0：安装包 + 便携版（Release 附件直下）
+  - v1.27.0：Windows 安装包 + 便携版 + Android APK（Release 附件直下）
 
 **每次更新都会：**改版本号 → 构建 → 提交 → 打 tag → 推送 → 建发行版并上传安装包/便携版。
 

@@ -215,6 +215,20 @@ UI 只通过 ViewModel 访问服务；所有长任务都吃 `CancellationToken`�
 - 经验：交换格式必须有 `format` + `formatVersion` 明确校验（不做"尽力而为"解析）；
   三态字段（`is_pick`）必须保留 null 语义；按"文件名+大小"匹配足以跨平台，因为路径会变、文件不会变。
 
+### 5.14.2 Android 移动伴生版（Material 3 Expressive）
+
+- 同一仓库 `android/`：`core` 纯 Kotlin/JVM（模型/格式/筛选/交换/XMP/RAW 预览/地理编码，可单测），
+  `app` 做平台与 UI（Compose + Material 3 Expressive）。
+- 数据契约：assets 字段与 Windows `catalog.db` 同名同义，额外 `content_uri` 存 SAF/MediaStore 地址；
+  交换文件与桌面版完全互通。
+- 扫描三来源：MediaStore、SAF 目录树、root 目录（`su -c find/stat`）；缩略图：BitmapFactory 采样、
+  RAW 内嵌预览、视频首帧；编辑写回 `.xmp` 边车（root 模式下可写受限目录）。
+- **经验**：移动端不要 1:1 移植桌面功能——先把"看 + 筛 + 改 + 交换"做扎实；
+  系统存储权限是最大约束（SAF/MediaStore 优先，root 只作为可选增强）；
+  Compose 版本必须和 AGP/compileSdk 对齐（本次踩过：新版 compose/core 要求 AGP 9.1 + SDK 37，
+  退回 compose 1.11.4 + material3 1.4.0 + compileSdk 36 才编得过）。
+- 验收清单：[ANDROID-ACCEPTANCE.md](ANDROID-ACCEPTANCE.md)。
+
 ### 5.15 关于 / 设置
 
 - 关于：作者卡（TMR、一个货成、一只马子、大肥鱼），可点进 B 站/抖音，项目地址。

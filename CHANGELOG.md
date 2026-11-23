@@ -7,6 +7,32 @@
 > <https://gitcode.com/TMR2333/stj-media-viewer-macos>。
 > 本文件中涉及 macOS 的条目均为历史记录，不再随本仓库更新。
 
+## v1.27.0 — 2026-11-23
+
+### 新增：Android 移动伴生版（0.1.0，Material 3 Expressive）
+
+仓库新增 `android/`，Kotlin + Jetpack Compose 原生实现，按 Material 3 Expressive 规范设计
+（Material You 动态取色、LargeTopAppBar 滚动折叠、弹性/超圆角卡片、ModalBottomSheet、FilterChip、
+SegmentedButton 三态），与 Windows 版共享同一套 SQLite 字段语义与 `stj-media-viewer/exchange` v1 交换文件。
+
+- **扫描**：系统相册（MediaStore）、SAF 目录树、**root 任意目录**（可选开关，`su` 探测）；
+- **元数据**：EXIF（时间/相机/GPS/方向）、视频时长尺寸、RAW 内嵌预览（TIFF IFD 快路径 + 全文件流式扫描）、
+  离线城市反查（31,701 城市，与桌面版同一份数据）；
+- **素材库**：自适应网格、三档密度、RAW/LOG/视频角标、长按多选、批量编辑；
+- **筛选**：类型/格式/设备/地点（未分类）/年份/主题（未填写）/影调/评分/色标/选用三态/未调色/Log，
+  多选同组 OR、跨组 AND，实时分面计数；
+- **编辑**：评分/色标/选用/调色/Log/城市/标题/主题/影调/关键词，保存写索引库并**写回 XMP 边车**
+  （root 模式可写普通应用无权限的目录）；
+- **交换文件**：与 Windows / macOS 双向导入导出，导入预览 + 只填空/覆盖两种策略，合集按名字重建；
+- **刻意舍弃**（移动端用不上/系统限制大）：视频转码/LUT 代理、地图、时间线、合集筛选 UI、重复检测、
+  文件整理落盘（root 可后续加）、AI 批量队列、水印工作台。
+
+验证：core 单元测试 **26 项全过**（格式识别、筛选语义、分面、交换文件、XMP、RAW 预览、地理编码），
+`assembleDebug` / `assembleRelease` 均通过，release APK 已签名并校验（minSdk 26 / targetSdk 36）。
+自检（Windows）465 项 / 0 失败。
+
+下载：Windows 安装包 / 便携版 + **STJMediaViewer-Android-0.1.0.apk**。
+
 ## v1.26.0 — 2026-11-22
 
 ### 新增：设置与图片数据导入导出（跨平台交换文件 v1）

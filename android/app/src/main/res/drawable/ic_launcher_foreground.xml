@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 光圈/相机抽象图形：外圈 + 六片光圈叶片 -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#F4F1EA"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:pathData="M32,54a22,22 0 1,0 44,0a22,22 0 1,0 -44,0" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#F4F1EA"
+        android:strokeWidth="2.6"
+        android:strokeLineCap="round"
+        android:pathData="M54,36L66.5,45L66.5,63L54,72L41.5,63L41.5,45Z" />
+    <path
+        android:fillColor="#E9A23B"
+        android:pathData="M54,46.5a7.5,7.5 0 1,0 0.01,0Z" />
+</vector>
