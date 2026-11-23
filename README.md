@@ -677,6 +677,21 @@ macOS 版是独立的 SwiftUI 原生应用（NavigationSplitView 三栏、Liquid
 本仓库（Windows / WinUI 3 主版本）不再包含 macOS 源码、构建脚本与相关文档；
 历史上发布过的 macOS 版本（`v1.25.0-macos` … `v1.35.0-macos`）仍可从原发行版页面下载。
 
+## 3.5 下载：全平台统一入口
+
+Windows / Android / macOS 的安装包统一放在**一个聚合发行版**里（固定 `latest` 标签，附件随版本更新）：
+
+👉 **<https://gitcode.com/TMR2333/stj-media-viewer/releases/tag/latest>**
+
+| 平台 | 文件 |
+| --- | --- |
+| Windows 10/11 x64 | `STJMediaViewer-1.28.2-Setup.exe` / `STJMediaViewer-1.28.2-portable.exe` |
+| Android 8.0+ | `STJMediaViewer-Android-0.3.0.apk` |
+| macOS 12+ | `STJMediaViewer-1.36.0-macos-arm64-x86_64.dmg`（源码在独立仓库） |
+
+校验值与各平台版本对照见 [`docs/DOWNLOADS.md`](docs/DOWNLOADS.md)。
+历史版本仍保留在各 `vX.Y.Z` Release，便于回滚。
+
 ## 3.6 Android 移动伴生版（Material 3 Expressive）
 
 仓库新增 `android/`：**Kotlin + Jetpack Compose 原生**，遵循 Material 3 Expressive 设计规范
