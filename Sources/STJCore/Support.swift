@@ -250,8 +250,21 @@ public final class SettingsStore: ObservableObject {
         static let webdavPasswordAccount = "webdav.password"
     }
 
+    /// 仅调试构建使用：通过启动参数传入，避免无交互环境下读取钥匙串触发系统授权弹窗。
+    private let apiKeyOverride: String?
+    private let webdavPasswordOverride: String?
+
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        #if DEBUG
+        let overrideAPIKey = defaults.string(forKey: "aiAPIKey")
+        let overrideWebDAVPassword = defaults.string(forKey: "webdavPassword")
+        #else
+        let overrideAPIKey: String? = nil
+        let overrideWebDAVPassword: String? = nil
+        #endif
+        self.apiKeyOverride = overrideAPIKey
+        self.webdavPasswordOverride = overrideWebDAVPassword
         self.appearance = AppearanceMode(rawValue: defaults.string(forKey: Keys.appearance) ?? "system") ?? .system
         self.density = LibraryDensity(rawValue: defaults.string(forKey: Keys.density) ?? "medium") ?? .medium
         self.showsInspector = defaults.object(forKey: Keys.showsInspector) as? Bool ?? true
@@ -272,12 +285,19 @@ public final class SettingsStore: ObservableObject {
         self.watermarkOpacity = defaults.object(forKey: Keys.watermarkOpacity) as? Double ?? 0.75
         self.watermarkIncludesCameraModel = defaults.object(forKey: Keys.watermarkIncludesCamera) as? Bool ?? false
         self.hasCompletedOnboarding = defaults.bool(forKey: Keys.onboardingDone)
+        #if DEBUG
+        // 调试构建不主动读取钥匙串：自动化运行时无人点击系统授权弹窗。
+        self.hasAPIKey = overrideAPIKey?.isEmpty == false
+        self.hasWebDAVPassword = overrideWebDAVPassword?.isEmpty == false
+        #else
         self.hasAPIKey = Keychain.get(Keys.apiKeyAccount)?.isEmpty == false
         self.hasWebDAVPassword = Keychain.get(Keys.webdavPasswordAccount)?.isEmpty == false
+        #endif
     }
 
     public var apiKey: String? {
-        Keychain.get(Keys.apiKeyAccount)
+        if let apiKeyOverride { return apiKeyOverride }
+        return Keychain.get(Keys.apiKeyAccount)
     }
 
     /// 当前设置对应的水印样式。
@@ -300,7 +320,12 @@ public final class SettingsStore: ObservableObject {
     // MARK: WebDAV
 
     public var webdavPassword: String? {
-        Keychain.get(Keys.webdavPasswordAccount)
+        if let webdavPasswordOverride { return webdavPasswordOverride }
+        #if DEBUG
+        return nil
+        #else
+        return Keychain.get(Keys.webdavPasswordAccount)
+        #endif
     }
 
     public func setWebDAVPassword(_ value: String) {

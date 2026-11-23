@@ -1,3 +1,16 @@
+## v1.42.1 — 2026-11-23（macOS / iOS 0.3.1）
+
+### 修复
+- **带路径前缀的 WebDAV 云相册为空**：修复 `WebDAVClient.listEntries` 只按「远端根目录」计算 `href` 基准、忽略 endpoint 自带路径（如 123 云盘 `https://webdav.123pan.cn/webdav`）的问题——此前根目录会被误算成 `webdav`，后续请求全部 404，云相册显示「空的」。新增 `hrefBasePath`（endpoint 路径 + 远端根目录）统一换算相对路径。
+- **云相册子目录路径未拼接父级**：修复 `CloudAlbum.listMedia` 递归时把子目录相对名直接当下一层路径的问题，第二级目录起请求地址缺少父路径导致 404；现在逐级拼接父路径。
+- **云相册容错**：单个目录 403/404 不再让整个相册加载失败，仅记录日志（`云相册：跳过目录 …`）并继续。
+- **云相册缩略图缓存膨胀**：网格缩略图改为下载到临时目录、解码后立即删除（不再把数十 MB 的原图长期缓存进 `CloudCache`，实测 3254 张可膨胀到 872 MB）；新增 `CloudAlbum.pruneCache(maxBytes: 512MB)` 在打开云相册时按时间清理。
+- **调试构建不再触发钥匙串授权弹窗**：`SettingsStore` 在 DEBUG 下不再于 `init` 读取钥匙串，改用启动参数 `-webdavPassword` / `-aiAPIKey` 覆盖，便于无交互环境验收（release 行为不变）。
+
+### 变更
+- 新增 2 项回归测试：`testListEntriesStripsEndpointPathPrefix`、`testListMediaJoinsNestedPaths`（CloudAlbumTests 共 8 项，全量 84 项）。
+- iOS 0.3.1：同步上述核心修复，iPad 云相册可正常列出 123 云盘内容。
+
 ## v1.42.0 — 全平台统一发行版
 
 - 新增 tag `v1.42.0` 的**全平台统一发行版**：一个页面包含 Windows 1.28.1（Setup / portable）、macOS 1.42.0 dmg、iPadOS/iOS 0.3.0 IPA、Android 0.3.0 APK 共 5 个附件（约 317 MB），各平台单独发行版保留。

@@ -126,3 +126,9 @@ iPad/iPhone 端也不再要求目录里存在 `catalog.db`：用户用「文件�
 - 导出：素材库里多选后，在云相册里点「上传本地 N」按设置的布局上传到 WebDAV。
 - 与 macOS 共用 `STJCore/CloudAlbum`，行为一致；密码走钥匙串（Keychain），不写 UserDefaults。
 
+
+## 云相册兼容性（0.3.1）
+
+- 支持 endpoint 自带路径前缀的 WebDAV（如 123 云盘 `https://webdav.123pan.cn/webdav`）：`href` 前缀由 endpoint 路径 + 远端根目录共同决定。
+- 递归列目录时逐级拼接父路径；单个目录 403/404 只跳过并记日志。
+- 网格缩略图下载到临时目录、解码即删；`CloudCache` 只保留主动预览/导入的文件，并按 512 MB 上限自动清理。

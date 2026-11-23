@@ -67,6 +67,49 @@ final class CloudAlbumTests: XCTestCase {
         XCTAssertNotEqual(first, CloudAlbum.cacheURL(for: renamed))
     }
 
+    // MARK: - endpoint 带路径前缀（123pan 等）
+
+    func testListEntriesStripsEndpointPathPrefix() async throws {
+        let creds = WebDAVCredentials(endpoint: URL(string: "https://webdav.example.cn/webdav")!,
+                                      username: "u", password: "p", remoteRoot: "")
+        let client = WebDAVClient(credentials: creds, configuration: MockURLProtocol.configuration())
+        MockURLProtocol.handler = { request, _ in
+            XCTAssertTrue(request.url?.path.hasSuffix("/webdav") == true, "实际路径：\(request.url?.path ?? "nil")")
+            return (207, [:], self.multistatus([
+                ("/webdav/", true, 0),
+                ("/webdav/%E5%AA%92%E4%BD%93%E6%96%87%E4%BB%B6/", true, 0),
+                ("/webdav/cover.jpg", false, 512),
+            ]))
+        }
+        let entries = try await client.listEntries("")
+        XCTAssertEqual(entries.map(\.path), ["媒体文件", "cover.jpg"])
+        XCTAssertEqual(entries.first?.isDirectory, true)
+        XCTAssertEqual(entries.last?.size, 512)
+    }
+
+    func testListMediaJoinsNestedPaths() async throws {
+        MockURLProtocol.handler = { request, _ in
+            let path = request.url?.path ?? ""
+            if path.hasSuffix("/album") {
+                return (207, [:], self.multistatus([
+                    ("/album/", true, 0),
+                    ("/album/Sony%20A7C%20II/", true, 0),
+                ]))
+            }
+            if path.contains("Sony A7C II") {
+                return (207, [:], self.multistatus([
+                    ("/album/Sony%20A7C%20II/", true, 0),
+                    ("/album/Sony%20A7C%20II/DSC01165.jpg", false, 1234),
+                ]))
+            }
+            return (404, [:], Data())
+        }
+        let client = WebDAVClient(credentials: credentials(), configuration: MockURLProtocol.configuration())
+        let items = try await CloudAlbum.listMedia(client, root: "", maxDepth: 4, limit: 50)
+        XCTAssertEqual(items.map(\.path), ["Sony A7C II/DSC01165.jpg"])
+        XCTAssertEqual(items.first?.name, "DSC01165.jpg")
+    }
+
     // MARK: - 远端列举
 
     func testListMediaFiltersNonMediaAndRecurses() async throws {

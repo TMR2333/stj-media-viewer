@@ -6,24 +6,26 @@
 - **独立仓库**：本仓库只包含 macOS 端（原 Windows/WinUI 版在 [stj-media-viewer](https://gitcode.com/TMR2333/stj-media-viewer)）
 - 语言/UI：Swift 6 + SwiftUI，少量 AppKit（打开面板、Finder、QuickLook 面板、键盘事件）
 - 最低系统：**macOS 14 Sonoma**；macOS 26 起自动启用 Liquid Glass 材质
-- 版本：**1.42.0**（WebDAV 云相册 · 目录标签页 · Liquid Glass 界面 · 平台无关核心 · iPad P0 预览）
-- 发行版：[releases](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases) — **全平台统一版 `v1.42.0`**（含 Windows / macOS / iOS / Android 安装包）
+- 版本：**1.42.1**（WebDAV 云相册 · 目录标签页 · Liquid Glass 界面 · 平台无关核心 · iPad P0 预览）
+- 发行版：[releases](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases) — **全平台统一版 `v1.42.0`**（含 Windows / macOS / iOS / Android 安装包；macOS/iOS 修复合集见 `v1.42.1-macos` / `v0.3.1-ios`）
 - 文档：[实施说明](docs/macos-port.md) · [开发计划](PLAN.md) · [更新日志](CHANGELOG.md) · [移动端范围](docs/mobile-scope.md) · [原始提示词存档](docs/MACOS-PROMPT.md)
 
 ## 下载
 
 **⭐ 全平台统一发行版：[`v1.42.0` — STJ Media Viewer 1.42.0（Windows / macOS / iOS / Android）](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases/tag/v1.42.0)**
+**🔧 云相册修复版：[`v1.42.1-macos`](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases/tag/v1.42.1-macos) · [`v0.3.1-ios`](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases/tag/v0.3.1-ios)**
 一个页面拿全部安装包（Windows 安装版/免安装版、macOS dmg、iPadOS/iOS IPA、Android APK）。
 
 | 平台 | 版本 | 文件 |
 | --- | --- | --- |
 | Windows 10/11（WinUI 3） | `1.28.1` | `STJMediaViewer-1.28.1-Setup.exe`（安装版）/ `STJMediaViewer-1.28.1-portable.exe`（免安装） |
-| macOS 14+（Universal，Apple Silicon + Intel） | `1.42.0` | `STJMediaViewer-1.42.0-macos-arm64-x86_64.dmg` |
+| macOS 14+（Universal，Apple Silicon + Intel） | `1.42.1` | `STJMediaViewer-1.42.1-macos-arm64-x86_64.dmg` |
 | iPadOS / iOS 17+ | `0.3.0` | `STJMobile-0.3.0-unsigned.ipa`（未签名，需自行重签安装） |
 | Android 8+ | `0.3.0` | `STJMediaViewer-Android-0.3.0.apk` |
 
 各平台单独发行版（历史）：
-- macOS：[`v1.42.0-macos`](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases/tag/v1.42.0-macos)
+- macOS：[`v1.42.1-macos`](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases/tag/v1.42.1-macos)
+- iOS / iPadOS：[`v0.3.1-ios`](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases/tag/v0.3.1-ios)
 - iPadOS / iOS：[`v0.3.0-ios`](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases/tag/v0.3.0-ios)
 - Windows：[stj-media-viewer releases](https://gitcode.com/TMR2333/stj-media-viewer/releases)（最新 `v1.28.1`）
 
@@ -75,7 +77,7 @@
 | --- | --- |
 | ![设置与图片数据迁移](shots/settings-exchange.png) | ![目录标签页](shots/tabs-light.png) |
 
-**iPadOS / iOS 预览（1.42.0 / iOS 0.3.0 起，模拟器截图）**
+**iPadOS / iOS 预览（iOS 0.3.1 起，模拟器截图）**
 
 | iPad 网格（侧栏计数 + 图片/视频分库） | iPad 检视面板（评分/色标/元数据） |
 | --- | --- |
@@ -193,6 +195,10 @@
 「云相册」把 WebDAV 服务端的目录当成一个相册来用，替代了原来分散的「上传所选」与「浏览云端」两个入口：
 
 - 入口：侧栏「工具 → 云相册…」或菜单 `⌥⌘L`；先在 设置 → 云同步 填服务器地址 / 账号 / 口令 / 远端根目录，并可用「测试连接」跑一遍六步诊断。
+
+> **兼容性（1.42.1 起）**：支持 endpoint 自带路径前缀的 WebDAV 服务（例如 123 云盘 `https://webdav.123pan.cn/webdav`）——协议里的 `href` 会带 `/webdav/` 前缀，客户端会自动对齐；子目录递归会逐级拼接父路径，个别目录 403/404 不会让整个相册失败。
+>
+> **缓存策略（1.42.1 起）**：网格缩略图下载到临时目录、解码后立即删除，不再把原图（RAW/视频动辄几十 MB）长期写进 `CloudCache`；`CloudCache` 仅存你主动预览/导入时的文件，并在打开云相册时按 512 MB 上限自动清理。
 - 浏览与预览：递归列出远端媒体（图片 + 视频，最多 4 层、5000 个），缩略图下载到应用工作区缓存 `CloudCache/`（不写素材目录），双击或长按看大图。
 - 导入：勾选远端素材 →「导入所选」，下载到 `~/Pictures/STJ Media Viewer/云相册导入-时间戳/`，随后自动作为新目录标签页建立索引，评分/色标/主题/AI/整理等全部可用。
 - 导出：在素材库里选好素材 → 云相册里点「上传本地所选」，按设置的布局（平铺 / 年月 / 地点 / 年月+设备）上传，含 XMP 边车，并在上传后核验远端大小。

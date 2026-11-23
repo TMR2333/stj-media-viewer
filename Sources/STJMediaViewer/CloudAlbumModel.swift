@@ -50,6 +50,7 @@ final class CloudAlbumModel: ObservableObject {
         thumbnails = [:]
         loadTask = Task { [weak self] in
             do {
+                CloudAlbum.pruneCache()
                 let listed = try await CloudAlbum.listMedia(client, root: "")
                 guard let self, !Task.isCancelled else { return }
                 self.items = listed

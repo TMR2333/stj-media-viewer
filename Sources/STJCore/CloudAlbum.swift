@@ -126,15 +126,25 @@ public enum CloudAlbum {
             let current = queue.removeFirst()
             if visited.contains(current.path) { continue }
             visited.insert(current.path)
-            let entries = try await client.listEntries(current.path)
+            let entries: [RemoteEntry]
+            do {
+                entries = try await client.listEntries(current.path)
+            } catch {
+                // 单个目录列不出来（某些 WebDAV 服务对特定目录返回 404/403）不应中断整个相册；
+                // 根目录失败才向上抛错，其余记一条日志后继续。
+                if current.depth == 0, results.isEmpty { throw error }
+                AppLog.error("云相册：跳过目录 \(current.path.isEmpty ? "/" : current.path)（\(error.localizedDescription)）")
+                continue
+            }
             for entry in entries {
+                let childPath = current.path.isEmpty ? entry.path : current.path + "/" + entry.path
                 if entry.isDirectory {
                     if current.depth + 1 < maxDepth {
-                        queue.append((entry.path, current.depth + 1))
+                        queue.append((childPath, current.depth + 1))
                     }
                     continue
                 }
-                let item = CloudAlbumItem(path: entry.path,
+                let item = CloudAlbumItem(path: childPath,
                                           name: entry.name,
                                           size: entry.size,
                                           modified: entry.modified,
@@ -176,12 +186,57 @@ public enum CloudAlbum {
         return destination
     }
 
-    /// 缩略图（缓存原图后用 ImageIO 下采样，避免把原图整读进内存）。
+    /// 缩略图临时目录：缩略图只下到临时目录，解码后立即删除，不占长期缓存。
+    public static var thumbnailTempRoot: URL {
+        FileManager.default.temporaryDirectory.appendingPathComponent("STJMediaViewer-CloudThumbs", isDirectory: true)
+    }
+
+    /// 缩略图（临时下载 → ImageIO 下采样 → 立刻删除原文件）。
+    /// 远端原图往往几十 MB（RAW/大 JPG），如果按原图长期缓存会把磁盘撑爆，因此这里只用临时文件。
     public static func thumbnail(for item: CloudAlbumItem,
                                  client: WebDAVClient,
                                  maxPixel: Int = 480) async -> CGImage? {
-        guard let file = try? await ensureCached(item, client: client) else { return nil }
-        return ImageCodecs.decode(at: file, maxPixelSize: maxPixel)
+        let fileManager = FileManager.default
+        let tempRoot = thumbnailTempRoot
+        try? fileManager.createDirectory(at: tempRoot, withIntermediateDirectories: true)
+        let key = SHA1.hexDigest(Data((item.path + "|" + String(item.size)).utf8))
+        let ext = item.fileExtension.isEmpty ? "bin" : item.fileExtension
+        let temporary = tempRoot.appendingPathComponent("\(key).\(ext)")
+        do {
+            try await client.download(relativePath: item.path, to: temporary)
+        } catch {
+            try? fileManager.removeItem(at: temporary)
+            return nil
+        }
+        defer { try? fileManager.removeItem(at: temporary) }
+        if item.isVideo {
+            return ThumbnailStore.videoFrameImage(at: temporary, maxPixel: maxPixel)
+        }
+        return ImageCodecs.decode(at: temporary, maxPixelSize: maxPixel)
+    }
+
+    /// 清理云相册原图缓存（预览/导入用），超过上限时按修改时间从旧到新删。
+    @discardableResult
+    public static func pruneCache(maxBytes: Int64 = 512 * 1024 * 1024,
+                                  fileManager: FileManager = .default) -> Int64 {
+        let root = cacheRoot
+        guard let names = try? fileManager.contentsOfDirectory(atPath: root.path) else { return 0 }
+        var files: [(url: URL, size: Int64, date: Date)] = []
+        var total: Int64 = 0
+        for name in names {
+            let url = root.appendingPathComponent(name)
+            guard let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey]),
+                  let size = values.fileSize else { continue }
+            files.append((url, Int64(size), values.contentModificationDate ?? .distantPast))
+            total += Int64(size)
+        }
+        guard total > maxBytes else { return total }
+        files.sort { $0.date < $1.date }
+        for file in files where total > maxBytes {
+            try? fileManager.removeItem(at: file.url)
+            total -= file.size
+        }
+        return total
     }
 
     /// 预览大图（下采样到 2400px）。

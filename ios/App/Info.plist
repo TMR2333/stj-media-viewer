@@ -17,17 +17,26 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.3.0</string>
+	<string>0.3.1</string>
 	<key>CFBundleVersion</key>
-	<string>1</string>
+	<string>31</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>UIApplicationSupportsMultipleScenes</key>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>STJ Media Viewer 需要读取系统相册，以便在应用内浏览、筛选并标记收藏你的照片。</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>STJ Media Viewer 仅在你主动点击收藏时记录相册照片的收藏状态。</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>STJ Media Viewer 需要读取系统相册，以便在应用内浏览、筛选并标记收藏你的照片。</string>
+	<key>UIApplicationSupportsMultipleScenes</key>
+	<true/>
+	<key>UIDeviceFamily</key>
+	<array>
+		<integer>1</integer>
+		<integer>2</integer>
+	</array>
+	<key>UIFileSharingEnabled</key>
+	<true/>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIRequiredDeviceCapabilities</key>
@@ -47,14 +56,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>UIDeviceFamily</key>
-	<array>
-		<integer>1</integer>
-		<integer>2</integer>
-	</array>
-	<key>UIFileSharingEnabled</key>
-	<true/>
-	<key>LSSupportsOpeningDocumentsInPlace</key>
-	<true/>
 </dict>
 </plist>

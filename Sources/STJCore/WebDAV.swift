@@ -74,6 +74,17 @@ public actor WebDAVClient {
             .map(String.init)
     }
 
+    /// 服务器返回的 `href` 是「站点绝对路径」，可能带 endpoint 自带的路径前缀
+    /// （例如 123pan 的 `https://webdav.123pan.cn/webdav` 返回 `/webdav/…`）。
+    /// 这里把「endpoint 路径 + 远端根目录」作为 href 前缀，避免把 `/webdav` 当成一个普通目录。
+    private var hrefBasePath: String {
+        var parts: [String] = []
+        let endpointPath = credentials.endpoint.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if !endpointPath.isEmpty { parts.append(endpointPath) }
+        parts.append(contentsOf: rootParts)
+        return parts.isEmpty ? "" : "/" + parts.joined(separator: "/")
+    }
+
     /// endpoint + 绝对远端路径（path 可含多级，逐段百分号编码；不以 `/` 开头）。
     private func absoluteURL(_ path: String) -> URL? {
         var base = credentials.endpoint.absoluteString
@@ -282,22 +293,21 @@ public actor WebDAVClient {
             throw WebDAVError.httpStatus(http.statusCode, relativePath)
         }
         let entries = RemoteEntryParser.parse(data)
-        let rootPrefix = "/" + credentials.remoteRoot.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        let base = rootPrefix == "/" ? "" : rootPrefix
-        let current = base + "/" + relativePath.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let base = hrefBasePath
+        let relativeInput = relativePath.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        let selfPath = relativeInput.isEmpty ? base : base + "/" + relativeInput
         return entries.compactMap { entry in
             let trimmed = entry.path.hasSuffix("/") ? String(entry.path.dropLast()) : entry.path
-            guard trimmed == current || trimmed == current + "/" else {
-                guard trimmed.hasPrefix(base.isEmpty ? "/" : base + "/") else { return nil }
-                var relative = trimmed
-                if !base.isEmpty { relative = String(relative.dropFirst(base.count + 1)) }
-                else { relative = String(relative.dropFirst()) }
-                relative = relative.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-                guard !relative.isEmpty else { return nil }
-                return RemoteEntry(path: relative, name: entry.name.isEmpty ? (relative as NSString).lastPathComponent : entry.name,
-                                   isDirectory: entry.isDirectory, size: entry.size, modified: entry.modified)
-            }
-            return nil
+            guard trimmed != selfPath, !trimmed.isEmpty else { return nil }
+            let prefix = selfPath.isEmpty ? "/" : selfPath + "/"
+            guard trimmed.hasPrefix(prefix) else { return nil }
+            let relative = trimmed
+                .dropFirst(prefix.count)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            guard !relative.isEmpty else { return nil }
+            return RemoteEntry(path: relative,
+                               name: entry.name.isEmpty ? String(relative.split(separator: "/").last ?? "") : entry.name,
+                               isDirectory: entry.isDirectory, size: entry.size, modified: entry.modified)
         }
         .sorted { lhs, rhs in
             if lhs.isDirectory != rhs.isDirectory { return lhs.isDirectory }
