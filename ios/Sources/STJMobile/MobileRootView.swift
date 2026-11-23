@@ -9,6 +9,7 @@ struct MobileRootView: View {
     @State private var section: SidebarSection? = .all
     @StateObject private var photos = PhotoLibraryModel()
     @State private var showsPhotos = false
+    @State private var isSelecting = false
     @State private var showsFilters = false
     @State private var showsSettings = false
     @State private var isImporterPresented = false
@@ -19,16 +20,21 @@ struct MobileRootView: View {
         } detail: {
             Group {
                 if showsPhotos {
-                    MobilePhotosView(photos: photos)
+                    MobilePhotosView(photos: photos) { folder in
+                        showsPhotos = false
+                        Task { await model.importLibrary(from: folder) }
+                    }
                         .navigationTitle("系统相册")
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar { photosToolbarContent }
                 } else {
-                    content
-                        .navigationTitle(title)
-                        .navigationBarTitleDisplayMode(.inline)
-                        .searchable(text: $model.filter.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索文件名、城市、关键词")
-                        .toolbar { toolbarContent }
+                    VStack(spacing: 0) {
+                        MobileSearchField(text: $model.filter.searchText)
+                        content
+                    }
+                    .navigationTitle(title)
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar { toolbarContent }
                         .inspector(isPresented: $model.showsInspector) {
                             MobileInspectorView(model: model)
                                 .inspectorColumnWidth(min: 260, ideal: 300, max: 360)
@@ -39,6 +45,15 @@ struct MobileRootView: View {
         .task {
             await model.restoreLastLibrary()
             let defaults = UserDefaults.standard
+            if defaults.bool(forKey: "showsInspectorOnLaunch") {
+                model.showsInspector = true
+            }
+            if defaults.bool(forKey: "selectModeOnLaunch") {
+                isSelecting = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
+                    model.selection = Set(model.assets.prefix(3).map(\.id))
+                }
+            }
             if defaults.bool(forKey: "openPhotosOnLaunch") {
                 showsPhotos = true
                 await photos.requestAccessAndLoad()
@@ -132,7 +147,7 @@ struct MobileRootView: View {
                 Button {
                     isImporterPresented = true
                 } label: {
-                    Label("打开 / 导入素材库…", systemImage: "folder.badge.plus")
+                    Label("打开图片文件夹…", systemImage: "folder.badge.plus")
                 }
                 Button {
                     showsSettings = true
@@ -180,11 +195,11 @@ struct MobileRootView: View {
     private var content: some View {
         if model.catalog == nil {
             ContentUnavailableView {
-                Label("还没有打开素材库", systemImage: "externaldrive.badge.questionmark")
+                Label("还没有打开目录", systemImage: "folder.badge.questionmark")
             } description: {
-                Text("用「文件」App 选一个含 catalog.db 的目录，或者把整个素材目录导入新建库。")
+                Text("选择一个图片文件夹即可直接浏览：应用只读取其中的图片与视频，不会在目录里写入素材库文件。")
             } actions: {
-                Button("打开 / 导入素材库…") { isImporterPresented = true }
+                Button("打开图片文件夹…") { isImporterPresented = true }
                     .buttonStyle(.borderedProminent)
             }
         } else if model.assets.isEmpty && !model.isLoading {
@@ -208,12 +223,41 @@ struct MobileRootView: View {
                                         spacing: 12)],
                       spacing: 12) {
                 ForEach(model.assets) { asset in
-                    MobileAssetCard(model: model, asset: asset)
+                    MobileAssetCard(model: model, asset: asset, selectionMode: isSelecting)
                 }
             }
             .padding(12)
         }
-        .overlay(alignment: .bottom) { statusBar }
+        .overlay(alignment: .bottom) {
+            VStack(spacing: 0) {
+                if isSelecting {
+                    selectionBar
+                }
+                statusBar
+            }
+        }
+    }
+
+    private var selectionBar: some View {
+        HStack(spacing: 14) {
+            Text("已选 \(model.selection.count)").font(.footnote.weight(.medium))
+            Spacer()
+            Button {
+                model.setPick(1)
+            } label: { Label("精选", systemImage: "star") }
+                .disabled(model.selection.isEmpty)
+            Button {
+                model.setPick(0)
+            } label: { Label("废片", systemImage: "xmark.circle") }
+                .disabled(model.selection.isEmpty)
+            Button("全选") {
+                model.selection = Set(model.assets.map(\.id))
+            }
+        }
+        .font(.footnote)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+        .background(.bar)
     }
 
     private var statusBar: some View {
@@ -256,6 +300,12 @@ struct MobileRootView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Button(isSelecting ? "完成" : "多选") {
+                isSelecting.toggle()
+                if !isSelecting { model.selection.removeAll() }
+            }
+        }
         ToolbarItemGroup(placement: .primaryAction) {
             Menu {
                 ForEach(Self.sortOptions) { option in
@@ -288,17 +338,55 @@ struct MobileRootView: View {
     }
 }
 
+// MARK: - 搜索栏（自绘，避免与检视面板在导航栏下重叠）
+
+struct MobileSearchField: View {
+    @Binding var text: String
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+            TextField("搜索文件名、城市、关键词", text: $text)
+                .textFieldStyle(.plain)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+                .focused($focused)
+                .submitLabel(.search)
+            if !text.isEmpty {
+                Button {
+                    text = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Color.primary.opacity(0.06)))
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+    }
+}
+
 // MARK: - 卡片
 
 private struct MobileAssetCard: View {
     @ObservedObject var model: MobileLibraryModel
     let asset: Asset
+    var selectionMode = false
     @State private var hoveringHighlight = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             MobileThumbnailView(asset: asset, targetSize: CGFloat(model.density.thumbnailMinWidth) * 2)
+                .frame(maxWidth: .infinity)
                 .frame(height: CGFloat(model.density.thumbnailMinWidth) * 0.75)
+                .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 .overlay(alignment: .topLeading) { badges }
                 .overlay {
@@ -307,14 +395,32 @@ private struct MobileAssetCard: View {
                             .strokeBorder(Color.accentColor, lineWidth: 3)
                     }
                 }
+                .overlay(alignment: .topLeading) {
+                    if selectionMode && model.selection.contains(asset.id) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.title3)
+                            .symbolRenderingMode(.palette)
+                            .foregroundStyle(.white, Color.accentColor)
+                            .padding(6)
+                    }
+                }
             Text(asset.fileName)
                 .font(.caption)
                 .lineLimit(1)
                 .truncationMode(.middle)
         }
         .contentShape(Rectangle())
-        .onTapGesture { model.select(asset) }
-        .onTapGesture(count: 2) { model.galleryAssetID = asset.id }
+        .onTapGesture {
+            if selectionMode {
+                if model.selection.contains(asset.id) { model.selection.remove(asset.id) }
+                else { model.selection.insert(asset.id) }
+            } else {
+                model.select(asset)
+            }
+        }
+        .onTapGesture(count: 2) {
+            if !selectionMode { model.galleryAssetID = asset.id }
+        }
         .contextMenu {
             ForEach(0...5, id: \.self) { rating in
                 Button {

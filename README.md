@@ -71,6 +71,10 @@
 | --- | --- |
 | ![iPad 相册](shots/ipad-photos.png) | ![相册大图](shots/ipad-photo-viewer.png) |
 
+| 素材库多选（批量精选/废片） |
+| --- |
+| ![iPad 多选](shots/ipad-multiselect.png) |
+
 > macOS 截图来自 1.40.1 发布包实机运行（主窗口 1800×1053，设置窗口 1120×1576，Retina 2x 缩小）。iPad 截图来自 iOS 26.5 模拟器（iPad Pro 13" M4，2064×2752 缩至 1600 宽）。Liquid Glass 只在 macOS 26 上呈现，旧系统自动回退半透明材质。
 
 ## 快捷键
@@ -182,10 +186,11 @@ macOS 与 Windows 共用同一套 `catalog.db` schema，因此编辑数据理论
 缩略图、导入、AI、LUT、WebDAV、设置迁移都能在 iOS 上编译；`ios/` 下是 iPad P0 的 SwiftUI 界面。
 
 - 代码：`ios/Package.swift`（`STJMobile` 库）+ `ios/Sources/STJMobile/`（侧栏 / 网格 / 检视 / 画廊 / 筛选 / 设置 / 系统相册）
-- **系统相册**：侧栏「相册」直接读取 iOS 照片库（PhotoKit，只读浏览 + 收藏切换），与素材库解耦，不写入工作区库
+- **系统相册**：侧栏「相册」直接读取 iOS 照片库（PhotoKit，浏览 + 收藏切换）；「多选 → 导入 N」可把原图导出到 `Documents/相册导入-*` 并自动索引成新目录标签页，导入后即可评分/色标/AI
+- **多选**：素材库与相册都有「多选」按钮，支持批量精选/废片/全选（相册多选后直接导入素材库）
 - 模拟器：`bash ios/build-sim-app.sh --install` 产出 `dist/STJMobile.app` 并装进已启动的模拟器
 - 真机 IPA：`bash ios/build-ipa.sh` 产出 `dist/STJMobile-<版本>-unsigned.ipa`（未签名，需自签后安装）
-- 已发布 IPA：[v0.2.0-ios](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases/tag/v0.2.0-ios)（`STJMobile-0.2.0-unsigned.ipa`，arm64，最低 iOS 17.0；含系统相册）
+- 已发布 IPA：[v0.2.1-ios](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases/tag/v0.2.1-ios)（`STJMobile-0.2.1-unsigned.ipa`，arm64，最低 iOS 17.0；含系统相册与相册导入）
 - 范围与路线：[docs/mobile-scope.md](docs/mobile-scope.md)
 
 ### 安装到 iPhone / iPad（未签名 IPA）

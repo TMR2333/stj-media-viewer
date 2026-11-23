@@ -58,7 +58,7 @@ xcrun swiftc \
 
 echo "▶ 组装 .app"
 cp "$ROOT/ios/App/Info.plist" "$APP/Info.plist"
-cp "$ROOT/Resources/AppIcon.png" "$APP/AppIcon.png" 2>/dev/null || true
+cp "$ROOT/ios/App/AppIcon.png" "$APP/AppIcon.png" 2>/dev/null || cp "$ROOT/Resources/AppIcon.png" "$APP/AppIcon.png" 2>/dev/null || true
 # 生成图标集（iOS 需要 Assets.car 才能显示图标，这里退化为 Info.plist 引用原始 png 也能跑）
 /usr/libexec/PlistBuddy -c "Delete :CFBundleIconFile" "$APP/Info.plist" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon.png" "$APP/Info.plist" 2>/dev/null || true

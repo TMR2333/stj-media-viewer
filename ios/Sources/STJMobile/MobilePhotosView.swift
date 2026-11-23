@@ -4,7 +4,13 @@ import UIKit
 /// iPad/iPhone：系统相册网格。
 struct MobilePhotosView: View {
     @ObservedObject var photos: PhotoLibraryModel
+    var onImport: ((URL) -> Void)? = nil
+
     @State private var previewItem: PhotoItem?
+    @State private var isSelecting = false
+    @State private var selectedIDs: Set<String> = []
+    @State private var isExporting = false
+    @State private var exportNote: String?
 
     private var columns: [GridItem] {
         [GridItem(.adaptive(minimum: 104, maximum: 144), spacing: 8)]
@@ -41,11 +47,102 @@ struct MobilePhotosView: View {
                 await photos.requestAccessAndLoad()
             }
             openPreselectedIfNeeded()
+            applyDebugLaunchHooks()
         }
         .onChange(of: photos.selectedPhotoID) { _, _ in openPreselectedIfNeeded() }
         .onChange(of: photos.items) { _, _ in openPreselectedIfNeeded() }
         .fullScreenCover(item: $previewItem) { item in
             MobilePhotoViewer(photos: photos, startID: item.id)
+        }
+        .toolbar { photoToolbar }
+        .overlay(alignment: .top) {
+            if let exportNote {
+                Text(exportNote)
+                    .font(.caption)
+                    .padding(.horizontal, 12).padding(.vertical, 7)
+                    .background(.regularMaterial, in: Capsule())
+                    .padding(.top, 6)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .overlay {
+            if isExporting {
+                ZStack {
+                    Color.black.opacity(0.25).ignoresSafeArea()
+                    VStack(spacing: 10) {
+                        ProgressView()
+                        Text("正在导出到素材库…").font(.footnote)
+                    }
+                    .padding(18)
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
+                }
+            }
+        }
+    }
+
+    @ToolbarContentBuilder
+    private var photoToolbar: some ToolbarContent {
+        ToolbarItem(placement: .topBarLeading) {
+            Button(isSelecting ? "完成" : "多选") {
+                isSelecting.toggle()
+                selectedIDs.removeAll()
+            }
+        }
+        if isSelecting {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    importSelected()
+                } label: {
+                    Label("导入 \(selectedIDs.count)", systemImage: "square.and.arrow.down")
+                        .labelStyle(.titleAndIcon)
+                }
+                .disabled(selectedIDs.isEmpty || isExporting)
+            }
+        }
+    }
+
+    private func toggleSelection(_ item: PhotoItem) {
+        if selectedIDs.contains(item.id) { selectedIDs.remove(item.id) } else { selectedIDs.insert(item.id) }
+    }
+
+    private func importSelected() {
+        guard !selectedIDs.isEmpty else { return }
+        let chosen = photos.items.filter { selectedIDs.contains($0.id) }
+        isExporting = true
+        exportNote = nil
+        Task {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyyMMdd-HHmmss"
+            let folder = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+                .appendingPathComponent("相册导入-\(formatter.string(from: Date()))", isDirectory: true)
+            do {
+                let urls = try await photos.export(chosen, to: folder)
+                exportNote = "已导出 \(urls.count) 张，正在加入素材库…"
+                isExporting = false
+                isSelecting = false
+                selectedIDs.removeAll()
+                if urls.isEmpty {
+                    exportNote = "没有可导出的照片（可能是 iCloud 原件未下载）"
+                } else {
+                    onImport?(folder)
+                }
+            } catch {
+                isExporting = false
+                exportNote = "导入失败：\(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func applyDebugLaunchHooks() {
+        let defaults = UserDefaults.standard
+        if defaults.bool(forKey: "photoSelectOnLaunch"), !photos.items.isEmpty {
+            isSelecting = true
+            selectedIDs = Set(photos.items.prefix(3).map(\.id))
+        }
+        if defaults.bool(forKey: "photoImportOnLaunch"), !photos.items.isEmpty {
+            isSelecting = true
+            selectedIDs = Set(photos.items.prefix(2).map(\.id))
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) { importSelected() }
         }
     }
 
@@ -60,9 +157,14 @@ struct MobilePhotosView: View {
             LazyVGrid(columns: columns, spacing: 8) {
                 ForEach(photos.items) { item in
                     Button {
-                        previewItem = item
+                        if isSelecting {
+                            toggleSelection(item)
+                        } else {
+                            previewItem = item
+                        }
                     } label: {
-                        PhotoThumbnailCell(photos: photos, item: item)
+                        PhotoThumbnailCell(photos: photos, item: item,
+                                           isSelected: isSelecting && selectedIDs.contains(item.id))
                     }
                     .buttonStyle(.plain)
                 }
@@ -80,25 +182,34 @@ struct MobilePhotosView: View {
     }
 }
 
-private struct PhotoThumbnailCell: View {
-    @ObservedObject var photos: PhotoLibraryModel
+private struct PhotoThumbnailCell: View, Equatable {
+    let photos: PhotoLibraryModel
     let item: PhotoItem
+    var isSelected = false
     @State private var image: UIImage?
 
+    static func == (lhs: PhotoThumbnailCell, rhs: PhotoThumbnailCell) -> Bool {
+        lhs.item.id == rhs.item.id && lhs.isSelected == rhs.isSelected
+    }
+
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            Rectangle().fill(Color(uiColor: .tertiarySystemFill))
-            if let image {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-            } else {
-                Image(systemName: "photo")
-                    .foregroundStyle(.secondary)
+        Color.clear
+            .aspectRatio(1, contentMode: .fit)
+            .overlay {
+                ZStack(alignment: .bottomLeading) {
+                    Rectangle().fill(Color(uiColor: .tertiarySystemFill))
+                    if let image {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        Image(systemName: "photo")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .clipped()
             }
-        }
-        .frame(height: 116)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(alignment: .topTrailing) {
             if item.isFavorite {
                 Image(systemName: "heart.fill")
@@ -108,8 +219,17 @@ private struct PhotoThumbnailCell: View {
                     .padding(5)
             }
         }
+        .overlay(alignment: .topLeading) {
+            if isSelected {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.title3)
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(.white, Color.accentColor)
+                    .padding(6)
+            }
+        }
         .overlay(alignment: .bottomLeading) {
-            Text(item.dateText)
+            Text(item.shortDateText)
                 .font(.caption2)
                 .lineLimit(1)
                 .padding(.horizontal, 6)

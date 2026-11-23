@@ -66,7 +66,7 @@ xcrun swiftc \
 echo "▶ 组装 App 包"
 cp "$ROOT/ios/App/Info.plist" "$APP_DIR/Info.plist"
 /usr/libexec/PlistBuddy -c "Delete :CFBundleIconFile" "$APP_DIR/Info.plist" 2>/dev/null || true
-cp "$ROOT/Resources/AppIcon.png" "$APP_DIR/AppIcon.png" 2>/dev/null || true
+cp "$ROOT/ios/App/AppIcon.png" "$APP_DIR/AppIcon.png" 2>/dev/null || cp "$ROOT/Resources/AppIcon.png" "$APP_DIR/AppIcon.png" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon.png" "$APP_DIR/Info.plist" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :MinimumOSVersion string 17.0" "$APP_DIR/Info.plist" 2>/dev/null || \
   /usr/libexec/PlistBuddy -c "Set :MinimumOSVersion 17.0" "$APP_DIR/Info.plist"

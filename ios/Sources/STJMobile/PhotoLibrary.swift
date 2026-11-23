@@ -12,6 +12,14 @@ struct PhotoItem: Identifiable, Hashable {
     let isVideo: Bool
     let durationSeconds: Double
 
+    var shortDateText: String {
+        guard let creationDate else { return "未知日期" }
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "zh_CN")
+        f.dateFormat = "MM-dd HH:mm"
+        return f.string(from: creationDate)
+    }
+
     var dateText: String {
         guard let creationDate else { return "未知日期" }
         let formatter = DateFormatter()
@@ -107,6 +115,11 @@ final class PhotoLibraryModel: ObservableObject {
 
     // MARK: - 缩略图与大图
 
+    /// 已缓存的缩略图（同步读取，供列表重绘时避免异步闪烁）。
+    func cachedThumbnail(for item: PhotoItem) -> UIImage? {
+        thumbnails[item.id]
+    }
+
     func thumbnail(for item: PhotoItem, size: CGSize) -> UIImage? {
         if let cached = thumbnails[item.id] { return cached }
         guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [item.id], options: nil).firstObject else {
@@ -175,6 +188,46 @@ final class PhotoLibraryModel: ObservableObject {
                 if degraded { return }
                 continuation.resume(returning: result)
             }
+        }
+    }
+
+
+    /// 把相册原图导出到指定目录（供素材库导入），返回写入的文件 URL。
+    func export(_ items: [PhotoItem], to directory: URL) async throws -> [URL] {
+        let fm = FileManager.default
+        try fm.createDirectory(at: directory, withIntermediateDirectories: true)
+        var written: [URL] = []
+        for item in items {
+            guard let asset = PHAsset.fetchAssets(withLocalIdentifiers: [item.id], options: nil).firstObject,
+                  let resource = PHAssetResource.assetResources(for: asset).first(where: {
+                      $0.type == .photo || $0.type == .fullSizePhoto || $0.type == .alternatePhoto
+                  }) else { continue }
+            let destination = uniqueURL(directory.appendingPathComponent(resource.originalFilename), fileManager: fm)
+            do {
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                    PHAssetResourceManager.default().writeData(for: resource, toFile: destination, options: nil) { error in
+                        if let error { continuation.resume(throwing: error) } else { continuation.resume(returning: ()) }
+                    }
+                }
+                written.append(destination)
+            } catch {
+                message = "导出失败：\(resource.originalFilename) — \(error.localizedDescription)"
+            }
+        }
+        return written
+    }
+
+    private func uniqueURL(_ url: URL, fileManager: FileManager) -> URL {
+        guard fileManager.fileExists(atPath: url.path) else { return url }
+        let base = url.deletingPathExtension().lastPathComponent
+        let ext = url.pathExtension
+        var index = 1
+        while true {
+            let candidate = url.deletingLastPathComponent()
+                .appendingPathComponent("\(base)-\(index)")
+                .appendingPathExtension(ext)
+            if !fileManager.fileExists(atPath: candidate.path) { return candidate }
+            index += 1
         }
     }
 
