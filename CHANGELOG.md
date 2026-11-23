@@ -1,3 +1,8 @@
+## v1.42.0 — 全平台统一发行版
+
+- 新增 tag `v1.42.0` 的**全平台统一发行版**：一个页面包含 Windows 1.28.1（Setup / portable）、macOS 1.42.0 dmg、iPadOS/iOS 0.3.0 IPA、Android 0.3.0 APK 共 5 个附件（约 317 MB），各平台单独发行版保留。
+- README 下载区改为「全平台统一发行版」优先，并注明 Windows Setup 与 portable 在本版本为同一份二进制。
+
 ## v1.42.0 — 2026-11-23
 
 ### 新增

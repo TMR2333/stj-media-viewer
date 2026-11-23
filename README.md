@@ -7,15 +7,25 @@
 - 语言/UI：Swift 6 + SwiftUI，少量 AppKit（打开面板、Finder、QuickLook 面板、键盘事件）
 - 最低系统：**macOS 14 Sonoma**；macOS 26 起自动启用 Liquid Glass 材质
 - 版本：**1.42.0**（WebDAV 云相册 · 目录标签页 · Liquid Glass 界面 · 平台无关核心 · iPad P0 预览）
-- 发行版：[releases](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases) — 最新 `v1.42.0-macos`
+- 发行版：[releases](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases) — **全平台统一版 `v1.42.0`**（含 Windows / macOS / iOS / Android 安装包）
 - 文档：[实施说明](docs/macos-port.md) · [开发计划](PLAN.md) · [更新日志](CHANGELOG.md) · [移动端范围](docs/mobile-scope.md) · [原始提示词存档](docs/MACOS-PROMPT.md)
 
 ## 下载
 
+**⭐ 全平台统一发行版：[`v1.42.0` — STJ Media Viewer 1.42.0（Windows / macOS / iOS / Android）](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases/tag/v1.42.0)**
+一个页面拿全部安装包（Windows 安装版/免安装版、macOS dmg、iPadOS/iOS IPA、Android APK）。
+
 | 平台 | 版本 | 文件 |
 | --- | --- | --- |
-| macOS 原生（Universal，Apple Silicon + Intel） | `v1.42.0-macos` | `STJMediaViewer-1.42.0-macos-arm64-x86_64.dmg` |
-| Windows（WinUI 3） | `v1.25.0` | [stj-media-viewer releases](https://gitcode.com/TMR2333/stj-media-viewer/releases) |
+| Windows 10/11（WinUI 3） | `1.28.1` | `STJMediaViewer-1.28.1-Setup.exe`（安装版）/ `STJMediaViewer-1.28.1-portable.exe`（免安装） |
+| macOS 14+（Universal，Apple Silicon + Intel） | `1.42.0` | `STJMediaViewer-1.42.0-macos-arm64-x86_64.dmg` |
+| iPadOS / iOS 17+ | `0.3.0` | `STJMobile-0.3.0-unsigned.ipa`（未签名，需自行重签安装） |
+| Android 8+ | `0.3.0` | `STJMediaViewer-Android-0.3.0.apk` |
+
+各平台单独发行版（历史）：
+- macOS：[`v1.42.0-macos`](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases/tag/v1.42.0-macos)
+- iPadOS / iOS：[`v0.3.0-ios`](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases/tag/v0.3.0-ios)
+- Windows：[stj-media-viewer releases](https://gitcode.com/TMR2333/stj-media-viewer/releases)（最新 `v1.28.1`）
 
 首次打开（ad-hoc 签名，无 Apple Developer ID / 公证）：右键 App →「打开」→ 再点「打开」。
 
