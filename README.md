@@ -67,6 +67,10 @@
 | --- | --- |
 | ![iPad 网格](shots/ipad-main.png) | ![iPad 检视](shots/ipad-inspector.png) |
 
+| iPad 系统相册（PhotoKit） | 相册大图浏览（收藏/翻页） |
+| --- | --- |
+| ![iPad 相册](shots/ipad-photos.png) | ![相册大图](shots/ipad-photo-viewer.png) |
+
 > macOS 截图来自 1.40.1 发布包实机运行（主窗口 1800×1053，设置窗口 1120×1576，Retina 2x 缩小）。iPad 截图来自 iOS 26.5 模拟器（iPad Pro 13" M4，2064×2752 缩至 1600 宽）。Liquid Glass 只在 macOS 26 上呈现，旧系统自动回退半透明材质。
 
 ## 快捷键
@@ -177,10 +181,11 @@ macOS 与 Windows 共用同一套 `catalog.db` schema，因此编辑数据理论
 1.40.0 起 `Sources/STJCore` 已平台无关（去掉 AppKit 依赖），同一份数据模型、SQLite、筛选、
 缩略图、导入、AI、LUT、WebDAV、设置迁移都能在 iOS 上编译；`ios/` 下是 iPad P0 的 SwiftUI 界面。
 
-- 代码：`ios/Package.swift`（`STJMobile` 库）+ `ios/Sources/STJMobile/`（侧栏 / 网格 / 检视 / 画廊 / 筛选 / 设置）
+- 代码：`ios/Package.swift`（`STJMobile` 库）+ `ios/Sources/STJMobile/`（侧栏 / 网格 / 检视 / 画廊 / 筛选 / 设置 / 系统相册）
+- **系统相册**：侧栏「相册」直接读取 iOS 照片库（PhotoKit，只读浏览 + 收藏切换），与素材库解耦，不写入工作区库
 - 模拟器：`bash ios/build-sim-app.sh --install` 产出 `dist/STJMobile.app` 并装进已启动的模拟器
 - 真机 IPA：`bash ios/build-ipa.sh` 产出 `dist/STJMobile-<版本>-unsigned.ipa`（未签名，需自签后安装）
-- 已发布 IPA：[v0.1.1-ios](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases/tag/v0.1.1-ios)（`STJMobile-0.1.1-unsigned.ipa`，arm64，最低 iOS 17.0）
+- 已发布 IPA：[v0.2.0-ios](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases/tag/v0.2.0-ios)（`STJMobile-0.2.0-unsigned.ipa`，arm64，最低 iOS 17.0；含系统相册）
 - 范围与路线：[docs/mobile-scope.md](docs/mobile-scope.md)
 
 ### 安装到 iPhone / iPad（未签名 IPA）
@@ -205,7 +210,7 @@ bash scripts/verify.sh            # 加 --dmg 顺带产出 universal dmg
 
 swift build -c release            # 只构建本机架构
 bash scripts/build-dmg.sh         # universal (arm64 + x86_64) .app + .dmg
-# 产物：dist/STJMediaViewer-1.39.0-macos-arm64-x86_64.dmg
+# 产物：dist/STJMediaViewer-1.41.0-macos-arm64-x86_64.dmg
 ```
 
 > 云端 CI：`.cnb.yml` 在 GitCode 的 Linux Runner 上做清单/结构一致性校验；

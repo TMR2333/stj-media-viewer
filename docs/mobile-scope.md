@@ -104,3 +104,13 @@ iPad/iPhone 端也不再要求目录里存在 `catalog.db`：用户用「文件�
 （沙箱内 `Library/Application Support/STJMediaViewer/workspace.sqlite`）记录索引，素材目录保持只读；
 缩略图缓存写在应用沙箱内。旧素材库（带 `catalog.db`）仍可通过同一入口浏览。
 
+
+## 系统相册（iOS 0.2.0 起）
+
+- 数据源：PhotoKit（`PHPhotoLibrary` / `PHCachingImageManager`），与素材库完全解耦——相册内容不进入
+  `workspace.sqlite`，也不会写回系统照片库（只有用户主动点「收藏」时才改收藏状态）。
+- 权限：`NSPhotoLibraryUsageDescription`（读取）+ `NSPhotoLibraryAddUsageDescription`（收藏写回），
+  首次进入相册请求 `.readWrite`；拒绝时展示「去设置里允许」引导并可重试。
+- 范围：按 `creationDate` 倒序浏览最近 5000 张照片，网格缩略图（PHCachingImageManager + 内存缓存）、
+  全屏翻页大图、日期/像素尺寸展示、收藏切换；暂不支持评分/色标/主题/删除等素材库级编辑。
+- 后续可做：从相册「导入到素材库」（复制到工作区目录并建索引）、按相册/收藏/时间范围筛选、Live Photo 与视频。

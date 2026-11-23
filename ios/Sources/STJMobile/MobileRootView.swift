@@ -7,6 +7,8 @@ struct MobileRootView: View {
     @ObservedObject var settings: SettingsStore
 
     @State private var section: SidebarSection? = .all
+    @StateObject private var photos = PhotoLibraryModel()
+    @State private var showsPhotos = false
     @State private var showsFilters = false
     @State private var showsSettings = false
     @State private var isImporterPresented = false
@@ -15,17 +17,36 @@ struct MobileRootView: View {
         NavigationSplitView {
             sidebar
         } detail: {
-            content
-                .navigationTitle(title)
-                .navigationBarTitleDisplayMode(.inline)
-                .searchable(text: $model.filter.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索文件名、城市、关键词")
-                .toolbar { toolbarContent }
-                .inspector(isPresented: $model.showsInspector) {
-                    MobileInspectorView(model: model)
-                        .inspectorColumnWidth(min: 260, ideal: 300, max: 360)
+            Group {
+                if showsPhotos {
+                    MobilePhotosView(photos: photos)
+                        .navigationTitle("系统相册")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar { photosToolbarContent }
+                } else {
+                    content
+                        .navigationTitle(title)
+                        .navigationBarTitleDisplayMode(.inline)
+                        .searchable(text: $model.filter.searchText, placement: .navigationBarDrawer(displayMode: .always), prompt: "搜索文件名、城市、关键词")
+                        .toolbar { toolbarContent }
+                        .inspector(isPresented: $model.showsInspector) {
+                            MobileInspectorView(model: model)
+                                .inspectorColumnWidth(min: 260, ideal: 300, max: 360)
+                        }
                 }
+            }
         }
-        .task { await model.restoreLastLibrary() }
+        .task {
+            await model.restoreLastLibrary()
+            let defaults = UserDefaults.standard
+            if defaults.bool(forKey: "openPhotosOnLaunch") {
+                showsPhotos = true
+                await photos.requestAccessAndLoad()
+                if defaults.bool(forKey: "openPhotoPreview") {
+                    photos.selectFirstIfNeeded()
+                }
+            }
+        }
         .sheet(isPresented: $showsFilters) { MobileFilterView(model: model) }
         .sheet(isPresented: $showsSettings) { NavigationStack { MobileSettingsView(settings: settings, model: model) } }
         .sheet(isPresented: $isImporterPresented) {
@@ -85,6 +106,20 @@ struct MobileRootView: View {
                 row(.pick, title: "精选", symbol: "star", count: model.facets.picked)
                 row(.rejected, title: "废片", symbol: "trash.slash", count: model.facets.rejected)
             }
+            Section("系统相册") {
+                Button {
+                    showsPhotos = true
+                } label: {
+                    HStack {
+                        Label("相册", systemImage: "photo.stack")
+                        Spacer()
+                        if showsPhotos {
+                            Image(systemName: "checkmark").font(.caption.weight(.semibold))
+                        }
+                    }
+                }
+                .foregroundStyle(showsPhotos ? Color.accentColor : .primary)
+            }
             if !model.collections.isEmpty {
                 Section("合集") {
                     ForEach(model.collections) { collection in
@@ -125,6 +160,7 @@ struct MobileRootView: View {
     }
 
     private func applySection(_ newValue: SidebarSection?) {
+        showsPhotos = false
         var next = model.filter
         next.kinds = []
         next.pick = nil
@@ -201,6 +237,21 @@ struct MobileRootView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(.bar)
+    }
+
+    @ToolbarContentBuilder
+    private var photosToolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            Button {
+                Task { await photos.refresh() }
+            } label: {
+                Label("刷新", systemImage: "arrow.clockwise")
+            }
+            .disabled(photos.isLoading)
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            Text("共 \(photos.items.count) 张").font(.caption).foregroundStyle(.secondary)
+        }
     }
 
     @ToolbarContentBuilder

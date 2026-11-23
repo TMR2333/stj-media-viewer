@@ -17,13 +17,17 @@
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
-	<string>0.1.2</string>
+	<string>0.2.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSupportsMultipleScenes</key>
 	<true/>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>STJ Media Viewer 需要读取系统相册，以便在应用内浏览、筛选并标记收藏你的照片。</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>STJ Media Viewer 仅在你主动点击收藏时记录相册照片的收藏状态。</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 	<key>UIRequiredDeviceCapabilities</key>
