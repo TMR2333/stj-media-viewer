@@ -83,3 +83,17 @@ xcrun simctl io booted screenshot shots/ipad-main.png
 - 视频缩略图依赖 QuickLook，模拟器上偶发取不到，会回退到文件图标。
 - 移动端暂不支持 RAW 解码预览（和 macOS 版一致，走 QuickLook/伴生 JPG）。
 - 未做深色/浅色手工切换同步（跟随系统 + 设置项已复用）。
+
+
+## 安装到真机（未签名 IPA，v0.1.1 起）
+
+```bash
+bash ios/build-ipa.sh                     # 产出 dist/STJMobile-<版本>-unsigned.ipa
+bash ios/build-ipa.sh --sign "Apple Development: 你的名字 (TEAMID)" \
+                      --profile ~/Downloads/STJMobile.mobileprovision   # 有证书时签名
+```
+
+- 未签名 IPA 结构：`Payload/STJMediaViewer.app/{STJMobile,Info.plist,AppIcon.png}`，
+  可执行文件为 `arm64`、`platform IOS`、`minos 17.0`。
+- 安装方式：Sideloadly / AltStore / Xcode 个人免费账号重签；免费证书 7 天过期。
+- 应用内不会自动更新；素材库路径通过「打开 / 导入素材库」选择文件夹（安全作用域书签持久化）。

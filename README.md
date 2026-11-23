@@ -163,9 +163,24 @@ macOS 与 Windows 共用同一套 `catalog.db` schema，因此编辑数据理论
 缩略图、导入、AI、LUT、WebDAV、设置迁移都能在 iOS 上编译；`ios/` 下是 iPad P0 的 SwiftUI 界面。
 
 - 代码：`ios/Package.swift`（`STJMobile` 库）+ `ios/Sources/STJMobile/`（侧栏 / 网格 / 检视 / 画廊 / 筛选 / 设置）
-- 打包：`bash ios/build-sim-app.sh` 直接产出模拟器 `dist/STJMobile.app`（见脚本注释）
+- 模拟器：`bash ios/build-sim-app.sh --install` 产出 `dist/STJMobile.app` 并装进已启动的模拟器
+- 真机 IPA：`bash ios/build-ipa.sh` 产出 `dist/STJMobile-<版本>-unsigned.ipa`（未签名，需自签后安装）
+- 已发布 IPA：[v0.1.1-ios](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases/tag/v0.1.1-ios)（`STJMobile-0.1.1-unsigned.ipa`，arm64，最低 iOS 17.0）
 - 范围与路线：[docs/mobile-scope.md](docs/mobile-scope.md)
-- 分发：iOS 需要付费 Apple Developer 账号（TestFlight / App Store），仓库只提供源码；macOS 版不受影响
+
+### 安装到 iPhone / iPad（未签名 IPA）
+
+仓库里的 IPA 是**未签名**的（本机没有 Apple 开发证书，无法产出可直接安装的签名包），
+需要用自己的 Apple ID 重签一次，三种常见方式：
+
+1. **Sideloadly**（Windows/macOS 图形工具）：连设备 → 拖入 IPA → 填 Apple ID → Start。
+2. **AltStore / SideStore**：把 IPA 放进源或用「My Apps → +」导入。
+3. **Xcode**：`Window → Devices and Simulators` → 拖入 IPA（Xcode 会用已登录账号重签）。
+
+注意事项：
+- 免费 Apple ID 签名 **7 天过期**，到期需重签；付费开发者账号可 1 年，才适合 TestFlight/App Store。
+- 首次安装需在设备上「设置 → 通用 → VPN与设备管理」里信任开发者证书。
+- 应用未上架 App Store，也无推送/CloudKit 等 entitlement；素材库放在 App 沙箱或「文件」App 目录。
 
 ## 构建
 
