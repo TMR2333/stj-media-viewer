@@ -1,4 +1,5 @@
-import AppKit
+import CoreGraphics
+import CoreText
 import Foundation
 
 /// 水印样式（导出时叠加在图片右下角等位置）。
@@ -68,70 +69,109 @@ public enum WatermarkError: Error, LocalizedError {
 
 /// 导出带水印的 JPEG。
 public enum Watermarker {
-    public static func render(_ image: NSImage, style: WatermarkStyle, asset: Asset? = nil) -> NSImage {
-        let size = image.size
-        guard size.width > 1, size.height > 1 else { return image }
-        let composed = NSImage(size: size)
-        composed.lockFocus()
-        image.draw(in: NSRect(origin: .zero, size: size))
+    /// 用 Core Graphics + Core Text 在图像上叠加文字水印，返回新图。
+    /// 只用 CoreGraphics/CoreText，macOS 与 iOS 共用同一份实现。
+    public static func render(_ image: CGImage, style: WatermarkStyle, asset: Asset? = nil) -> CGImage? {
+        let width = image.width
+        let height = image.height
+        guard width > 1, height > 1 else { return nil }
+        let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+        guard let context = CGContext(data: nil,
+                                      width: width,
+                                      height: height,
+                                      bitsPerComponent: 8,
+                                      bytesPerRow: 0,
+                                      space: colorSpace,
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+            return nil
+        }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
 
         var lines: [String] = [style.text]
         if style.includesCameraModel, let model = asset?.cameraModel, !model.isEmpty {
             lines.append(model)
         }
         lines = lines.filter { !$0.trimmingCharacters(in: .whitespaces).isEmpty }
-        if !lines.isEmpty {
-            let shortEdge = min(size.width, size.height)
-            let fontSize = max(9, shortEdge * style.relativeFontSize)
-            let shadow = NSShadow()
-            shadow.shadowColor = NSColor.black.withAlphaComponent(0.55)
-            shadow.shadowBlurRadius = fontSize * 0.25
-            shadow.shadowOffset = NSSize(width: 0, height: -fontSize * 0.06)
+        guard !lines.isEmpty else { return context.makeImage() }
 
+        let shortEdge = Double(min(width, height))
+        let fontSize = max(9, shortEdge * style.relativeFontSize)
+        let font = CTFontCreateWithName("HelveticaNeue-Medium" as CFString, fontSize, nil)
+        let margin = shortEdge * 0.03
+        let lineGap = fontSize * 0.15
+        let alpha = style.opacity
+
+        var lineWidths: [Double] = []
+        var lineHeights: [Double] = []
+        var ctLines: [CTLine] = []
+        for line in lines {
             let attributes: [NSAttributedString.Key: Any] = [
-                .font: NSFont.systemFont(ofSize: fontSize, weight: .semibold),
-                .foregroundColor: NSColor.white.withAlphaComponent(style.opacity),
-                .shadow: shadow,
+                kCTFontAttributeName as NSAttributedString.Key: font,
+                kCTForegroundColorAttributeName as NSAttributedString.Key: CGColor(red: 1, green: 1, blue: 1, alpha: alpha),
             ]
-            let texts = lines.map { NSAttributedString(string: $0, attributes: attributes) }
-            let widths = texts.map { $0.size().width }
-            let heights = texts.map { $0.size().height }
-            let margin = shortEdge * 0.03
-            let blockWidth = widths.max() ?? 0
-            let blockHeight = heights.reduce(0, +) + fontSize * 0.15 * Double(max(0, texts.count - 1))
-            var origin: NSPoint
-            switch style.position {
-            case .bottomRight: origin = NSPoint(x: size.width - margin - blockWidth, y: margin)
-            case .bottomLeft: origin = NSPoint(x: margin, y: margin)
-            case .topRight: origin = NSPoint(x: size.width - margin - blockWidth, y: size.height - margin - blockHeight)
-            case .topLeft: origin = NSPoint(x: margin, y: size.height - margin - blockHeight)
-            case .bottomCenter: origin = NSPoint(x: (size.width - blockWidth) / 2, y: margin)
-            }
-            var y = origin.y + blockHeight
-            for (index, text) in texts.enumerated() {
-                let h = heights[index]
-                y -= h
-                var x = origin.x
-                if style.position == .bottomRight || style.position == .topRight {
-                    x = size.width - margin - widths[index]
-                } else if style.position == .bottomCenter {
-                    x = (size.width - widths[index]) / 2
-                }
-                text.draw(at: NSPoint(x: x, y: y))
-                y -= fontSize * 0.15
-            }
+            let attributed = NSAttributedString(string: line, attributes: attributes)
+            let ctLine = CTLineCreateWithAttributedString(attributed)
+            var ascent: CGFloat = 0
+            var descent: CGFloat = 0
+            var leading: CGFloat = 0
+            let lineWidth = CTLineGetTypographicBounds(ctLine, &ascent, &descent, &leading)
+            lineWidths.append(Double(lineWidth))
+            lineHeights.append(Double(ascent + descent))
+            ctLines.append(ctLine)
         }
-        composed.unlockFocus()
-        return composed
+
+        let blockWidth = lineWidths.max() ?? 0
+        let blockHeight = lineHeights.reduce(0, +) + lineGap * Double(max(0, ctLines.count - 1))
+        var originX: Double
+        var originY: Double
+        switch style.position {
+        case .bottomRight:
+            originX = Double(width) - margin - blockWidth
+            originY = margin
+        case .bottomLeft:
+            originX = margin
+            originY = margin
+        case .topRight:
+            originX = Double(width) - margin - blockWidth
+            originY = Double(height) - margin - blockHeight
+        case .topLeft:
+            originX = margin
+            originY = Double(height) - margin - blockHeight
+        case .bottomCenter:
+            originX = (Double(width) - blockWidth) / 2
+            originY = margin
+        }
+
+        context.saveGState()
+        context.setShadow(offset: CGSize(width: 0, height: -fontSize * 0.06),
+                          blur: CGFloat(fontSize * 0.25),
+                          color: CGColor(red: 0, green: 0, blue: 0, alpha: 0.55))
+        var cursorY = originY + blockHeight
+        for (index, ctLine) in ctLines.enumerated() {
+            let lineHeight = lineHeights[index]
+            let x: Double
+            switch style.position {
+            case .bottomRight, .topRight:
+                x = Double(width) - margin - lineWidths[index]
+            case .bottomCenter:
+                x = (Double(width) - lineWidths[index]) / 2
+            default:
+                x = originX
+            }
+            cursorY -= lineHeight
+            context.textPosition = CGPoint(x: x, y: cursorY + Double(CTFontGetDescent(font)))
+            CTLineDraw(ctLine, context)
+            cursorY -= Double(lineGap)
+        }
+        context.restoreGState()
+        return context.makeImage()
     }
 
     /// 从原图（非缩略图）加载并叠加水印，生成 JPEG data。
     public static func jpegData(for asset: Asset, style: WatermarkStyle, quality: CGFloat = 0.92) -> Data? {
-        guard let image = ImageLoader.previewImage(at: asset.fileURL, maxPixelSize: 6000) else { return nil }
-        let composed = render(image, style: style, asset: asset)
-        guard let tiff = composed.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiff) else { return nil }
-        return bitmap.representation(using: .jpeg, properties: [.compressionFactor: quality])
+        guard let image = ImageLoader.previewImage(at: asset.fileURL, maxPixelSize: 6000),
+              let composed = render(image, style: style, asset: asset) else { return nil }
+        return ImageCodecs.jpegData(composed, quality: quality)
     }
 
     /// 把选中素材导出到目录，文件名为 `原文件名_水印.jpg`，重名自动加序号。

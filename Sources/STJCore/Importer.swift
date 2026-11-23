@@ -1,7 +1,7 @@
 import Foundation
 import AVFoundation
 import ImageIO
-import AppKit
+import CoreGraphics
 
 // MARK: - 缩略图生成
 
@@ -42,8 +42,7 @@ public enum ThumbnailMaker {
             let target = cacheDirectory.appendingPathComponent("\(thumbKey)_\(size).jpg")
             if fileManager.fileExists(atPath: target.path) { continue }
             guard let scaled = scale(image, maxPixelSize: size) else { continue }
-            let bitmap = NSBitmapImageRep(cgImage: scaled)
-            guard let data = bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.82]) else { continue }
+            guard let data = ImageCodecs.jpegData(scaled, quality: 0.82) else { continue }
             try? data.write(to: target)
         }
         return thumbKey

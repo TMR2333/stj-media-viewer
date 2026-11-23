@@ -716,7 +716,7 @@ final class CoreTests: XCTestCase {
         }
         let image = ImageLoader.previewImage(at: imageAsset.fileURL, maxPixelSize: 1_600)
         XCTAssertNotNil(image, "JPEG 应该能通过 ImageIO 解出预览图")
-        XCTAssertEqual(image?.size.width, 1_200, "样例 JPEG 都是 1200x800，降采样后宽度不变")
+        XCTAssertEqual(image?.width, 1_200, "样例 JPEG 都是 1200x800，降采样后宽度不变")
         XCTAssertNil(ImageLoader.previewImage(at: URL(fileURLWithPath: "/tmp/definitely-missing-stj.jpg")),
                      "不存在的文件应返回 nil 而不是崩溃")
     }

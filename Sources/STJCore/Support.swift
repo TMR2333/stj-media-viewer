@@ -1,8 +1,7 @@
-import AppKit
+import CoreGraphics
 import Combine
 import Foundation
 import ImageIO
-@preconcurrency import Quartz
 import QuickLookThumbnailing
 import Security
 
@@ -12,8 +11,15 @@ import Security
 /// 要求：导航面包屑与网络请求都以一行摘要形式记录，方便事后排查。
 public enum AppLog {
     public static let directoryURL: URL = {
+        #if os(macOS)
         let base = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Logs/STJMediaViewer", isDirectory: true)
+        #else
+        // iOS / iPadOS：写进 App 容器的 Library/Logs（同一套路径语义，可在「文件」App 里导出）。
+        let support = FileManager.default.urls(for: .libraryDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory())
+        let base = support.appendingPathComponent("Logs/STJMediaViewer", isDirectory: true)
+        #endif
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         return base
     }()
@@ -308,7 +314,7 @@ public enum ThumbnailSource: String, Sendable {
 }
 
 public struct ThumbnailResult: Sendable {
-    public let image: NSImage
+    public let image: CGImage
     public let source: ThumbnailSource
 }
 
@@ -317,7 +323,12 @@ public struct ThumbnailResult: Sendable {
 public final class ThumbnailStore: @unchecked Sendable {
     public static let shared = ThumbnailStore()
 
-    private let cache = NSCache<NSString, NSImage>()
+    private final class ImageBox {
+        let image: CGImage
+        init(_ image: CGImage) { self.image = image }
+    }
+
+    private let cache = NSCache<NSString, ImageBox>()
     private let ioQueue = DispatchQueue(label: "com.stjarnaperspective.stjmediaviewer.thumbs", attributes: .concurrent)
     private var cacheDirectory: URL?
     private var thumbnailIndex: [String: URL]?
@@ -402,18 +413,18 @@ public final class ThumbnailStore: @unchecked Sendable {
     public func image(for asset: Asset, targetSize: CGFloat = 360) async -> ThumbnailResult? {
         let key = "\(asset.path)|\(asset.thumbKeyCandidate)|\(Int(targetSize))"
         if let cached = cache.object(forKey: key as NSString) {
-            return ThumbnailResult(image: cached, source: .cached)
+            return ThumbnailResult(image: cached.image, source: .cached)
         }
         if let url = cachedThumbnailURL(for: asset), let image = await loadImage(at: url, asset: asset) {
-            cache.setObject(image, forKey: key as NSString)
+            cache.setObject(ImageBox(image), forKey: key as NSString)
             return ThumbnailResult(image: image, source: .cached)
         }
         if let image = await quickLookImage(for: asset) {
-            cache.setObject(image, forKey: key as NSString)
+            cache.setObject(ImageBox(image), forKey: key as NSString)
             return ThumbnailResult(image: image, source: .quickLook)
         }
         if let image = await loadImage(at: asset.fileURL, asset: asset) {
-            cache.setObject(image, forKey: key as NSString)
+            cache.setObject(ImageBox(image), forKey: key as NSString)
             return ThumbnailResult(image: image, source: .fileSystem)
         }
         return nil
@@ -450,10 +461,10 @@ public final class ThumbnailStore: @unchecked Sendable {
         return nil
     }
 
-    private func loadImage(at url: URL, asset: Asset) async -> NSImage? {
+    private func loadImage(at url: URL, asset: Asset) async -> CGImage? {
         await withCheckedContinuation { continuation in
             ioQueue.async {
-                let image = NSImage(contentsOf: url)
+                let image = ImageCodecs.decode(at: url, maxPixelSize: nil)
                 if image == nil {
                     ThumbnailStore.logFailure("缓存缩略图解码失败：\(url.lastPathComponent)")
                 }
@@ -462,7 +473,7 @@ public final class ThumbnailStore: @unchecked Sendable {
         }
     }
 
-    public func quickLookImage(for asset: Asset, maxPixel: Int = 1024) async -> NSImage? {
+    public func quickLookImage(for asset: Asset, maxPixel: Int = 1024) async -> CGImage? {
         let url = asset.fileURL
         guard FileManager.default.fileExists(atPath: url.path) else {
             ThumbnailStore.logFailure("文件不存在，无法生成 QuickLook 缩略图：\(url.lastPathComponent)")
@@ -473,7 +484,7 @@ public final class ThumbnailStore: @unchecked Sendable {
                                                   representationTypes: [.thumbnail, .lowQualityThumbnail])
         do {
             let representation = try await QLThumbnailGenerator.shared.generateBestRepresentation(for: request)
-            return representation.nsImage
+            return representation.cgImage
         } catch {
             ThumbnailStore.logFailure("QuickLook 生成失败：\(url.lastPathComponent) — \(error.localizedDescription)")
             return nil
@@ -502,58 +513,14 @@ enum ThumbnailNaming {
     }
 }
 
-// MARK: - Quick Look
-
-/// 空格键快速查看（原生 QLPreviewPanel）。
-@MainActor
-public final class QuickLookController: NSObject, QLPreviewPanelDataSource, QLPreviewPanelDelegate {
-    public static let shared = QuickLookController()
-
-    private var items: [NSURL] = []
-
-    public func toggle(items urls: [URL]) {
-        guard !urls.isEmpty else { return }
-        guard let panel = QLPreviewPanel.shared() else { return }
-        if panel.isVisible {
-            panel.orderOut(nil)
-            return
-        }
-        items = urls as [NSURL]
-        panel.dataSource = self
-        panel.delegate = self
-        panel.makeKeyAndOrderFront(nil)
-    }
-
-    public func close() {
-        QLPreviewPanel.shared()?.orderOut(nil)
-    }
-
-    public func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int {
-        items.count
-    }
-
-    public func previewPanel(_ panel: QLPreviewPanel!, previewItemAt index: Int) -> (any QLPreviewItem)! {
-        items[index]
-    }
-}
-
 // MARK: - XMP 侧车
 
 /// 全屏画廊用的原始图像加载：优先用 ImageIO 直接解出大尺寸缩略图，
 /// 避免把 6000 万像素原图整个读进内存。视频与无解码器的文件返回 nil，
 /// 由调用方回退到 QuickLook 缩略图。
 public enum ImageLoader {
-    public static func previewImage(at url: URL, maxPixelSize: Int = 2400) -> NSImage? {
-        guard let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
-        let options: [CFString: Any] = [
-            kCGImageSourceCreateThumbnailFromImageAlways: true,
-            kCGImageSourceCreateThumbnailWithTransform: true,
-            kCGImageSourceThumbnailMaxPixelSize: maxPixelSize,
-        ]
-        guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary) else {
-            return nil
-        }
-        return NSImage(cgImage: image, size: NSSize(width: image.width, height: image.height))
+    public static func previewImage(at url: URL, maxPixelSize: Int = 2400) -> CGImage? {
+        ImageCodecs.decode(at: url, maxPixelSize: maxPixelSize)
     }
 }
 
@@ -610,17 +577,13 @@ public enum XMPWriter {
             let url = xmpURL(for: asset)
             let content = packet(for: asset)
             guard let data = content.data(using: .utf8) else { throw XMPError.cannotEncode }
-            var coordError: NSError?
-            var writeError: Error?
-            NSFileCoordinator(filePresenter: nil).coordinate(writingItemAt: url, options: .forReplacing, error: &coordError) { destination in
-                do {
-                    try data.write(to: destination, options: .atomic)
-                } catch {
-                    writeError = error
-                }
+            do {
+                try FileManager.default.createDirectory(at: url.deletingLastPathComponent(),
+                                                        withIntermediateDirectories: true)
+                try data.write(to: url, options: .atomic)
+            } catch {
+                throw XMPError.writeFailed(error.localizedDescription)
             }
-            if let coordError { throw XMPError.writeFailed(coordError.localizedDescription) }
-            if let writeError { throw XMPError.writeFailed(writeError.localizedDescription) }
             written.append(url)
         }
         return written

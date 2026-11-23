@@ -1,4 +1,4 @@
-import AppKit
+import CoreGraphics
 import CoreImage
 import Foundation
 
@@ -103,13 +103,13 @@ public enum LUTDirectory {
 }
 
 public enum LUTPreview {
-    /// 把 LUT 应用到 NSImage，返回渲染后的新图（失败返回原图）。
-    public static func render(_ image: NSImage, lut: CubeLUT) -> NSImage {
-        guard let tiff = image.tiffRepresentation,
-              let ciImage = CIImage(data: tiff),
-              let output = lut.apply(to: ciImage) else { return image }
-        let context = CIContext()
-        guard let cgImage = context.createCGImage(output, from: output.extent) else { return image }
-        return NSImage(cgImage: cgImage, size: image.size)
+    /// 把 LUT 应用到图像，返回渲染结果（失败返回 nil，由调用方决定回退策略）。
+    /// 输入输出都用 `CGImage`，macOS / iOS 共用。
+    public static func render(_ image: CGImage, lut: CubeLUT) -> CGImage? {
+        let context = CIContext(options: [.useSoftwareRenderer: false])
+        let size = CGSize(width: image.width, height: image.height)
+        let input = CIImage(cgImage: image)
+        guard let output = lut.apply(to: input) else { return nil }
+        return context.createCGImage(output, from: CGRect(origin: .zero, size: size))
     }
 }

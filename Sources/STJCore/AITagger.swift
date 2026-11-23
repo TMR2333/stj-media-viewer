@@ -1,4 +1,4 @@
-import AppKit
+import CoreGraphics
 import Foundation
 
 /// AI 分类建议：字段对齐 Windows 端 `AiJsonParser`（theme/tone/keywords/subject/mood/is_log/quality/confidence）。
@@ -321,8 +321,7 @@ public enum AIProgress {
         return nil
     }
 
-    private static func jpegData(_ image: NSImage) -> Data? {
-        guard let tiff = image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiff) else { return nil }
-        return bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.82])
+    private static func jpegData(_ image: CGImage) -> Data? {
+        ImageCodecs.jpegData(image, quality: 0.82)
     }
 }

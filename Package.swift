@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "STJMediaViewer",
-    platforms: [.macOS(.v14)],
+    platforms: [.macOS(.v14), .iOS(.v17)],
     products: [
         .executable(name: "STJMediaViewer", targets: ["STJMediaViewer"]),
         .executable(name: "stjcheck", targets: ["stjcheck"]),

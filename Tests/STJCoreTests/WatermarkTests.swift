@@ -15,43 +15,53 @@ final class WatermarkTests: XCTestCase {
         return candidates.first { FileManager.default.fileExists(atPath: $0.appendingPathComponent("catalog.db").path) }
     }
 
-    private func image(width: CGFloat = 200, height: CGFloat = 120) -> NSImage {
-        let image = NSImage(size: NSSize(width: width, height: height))
-        image.lockFocus()
-        NSColor(calibratedRed: 0.10, green: 0.35, blue: 0.85, alpha: 1).setFill()
-        NSRect(x: 0, y: 0, width: width, height: height).fill()
-        image.unlockFocus()
-        return image
+    /// 纯蓝底图（CoreGraphics 绘制，核心层与测试都不再依赖 NSImage）。
+    private func makeImage(width: Int = 200, height: Int = 120) -> CGImage {
+        let context = CGContext(data: nil, width: width, height: height, bitsPerComponent: 8,
+                                bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+                                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
+        context.setFillColor(CGColor(red: 0.10, green: 0.35, blue: 0.85, alpha: 1))
+        context.fill(CGRect(x: 0, y: 0, width: width, height: height))
+        return context.makeImage()!
     }
 
-    private func pixel(_ image: NSImage, x: Int, y: Int) -> NSColor? {
-        guard let tiff = image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiff) else { return nil }
-        let px = x * bitmap.pixelsWide / Int(image.size.width)
-        // NSBitmapImageRep 的 y 轴从顶部开始，而绘图坐标从底部开始
-        let py = bitmap.pixelsHigh - 1 - y * bitmap.pixelsHigh / Int(image.size.height)
-        return bitmap.colorAt(x: min(max(0, px), bitmap.pixelsWide - 1),
-                              y: min(max(0, py), bitmap.pixelsHigh - 1))
+    /// 取某个像素的 RGBA 字节（用 1×1 重绘采样，避免依赖图像内部布局）。
+    private func pixel(_ image: CGImage, x: Int, y: Int) -> [UInt8] {
+        let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: 4)
+        defer { buffer.deallocate() }
+        buffer.initialize(repeating: 0, count: 4)
+        guard let context = CGContext(data: buffer, width: 1, height: 1, bitsPerComponent: 8,
+                                      bytesPerRow: 4, space: CGColorSpaceCreateDeviceRGB(),
+                                      bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else {
+            return [0, 0, 0, 0]
+        }
+        // y 轴：CoreGraphics 原点在左下，传入的 y 也按左下计。
+        context.draw(image, in: CGRect(x: -CGFloat(x), y: -CGFloat(y),
+                                       width: CGFloat(image.width), height: CGFloat(image.height)))
+        return [buffer[0], buffer[1], buffer[2], buffer[3]]
     }
 
     func testRenderKeepsSizeAndDrawsOverlay() {
-        let source = image()
+        let source = makeImage()
         let rendered = Watermarker.render(source, style: WatermarkStyle(text: "STJ 测试", position: .bottomRight, opacity: 0.9))
-        XCTAssertEqual(rendered.size, source.size)
+        let output = try! XCTUnwrap(rendered)
+        XCTAssertEqual(output.width, source.width)
+        XCTAssertEqual(output.height, source.height)
         var changed = 0
         for x in stride(from: 140, through: 196, by: 2) {
-            for y in stride(from: 2, through: 18, by: 2) where pixel(source, x: x, y: y) != pixel(rendered, x: x, y: y) {
+            for y in stride(from: 2, through: 18, by: 2) where pixel(source, x: x, y: y) != pixel(output, x: x, y: y) {
                 changed += 1
             }
         }
         XCTAssertGreaterThan(changed, 3, "右下角应叠加文字像素")
         // 中心区域不应被水印影响
-        XCTAssertEqual(pixel(source, x: 100, y: 60), pixel(rendered, x: 100, y: 60))
+        XCTAssertEqual(pixel(source, x: 100, y: 60), pixel(output, x: 100, y: 60))
     }
 
     func testEmptyTextProducesNoOverlay() {
-        let source = image()
-        let rendered = Watermarker.render(source, style: WatermarkStyle(text: "   "))
-        XCTAssertEqual(pixel(source, x: 180, y: 8), pixel(rendered, x: 180, y: 8))
+        let source = makeImage()
+        let output = try! XCTUnwrap(Watermarker.render(source, style: WatermarkStyle(text: "   ")))
+        XCTAssertEqual(pixel(source, x: 180, y: 8), pixel(output, x: 180, y: 8))
     }
 
     func testExportSkipsVideosAndWritesJPEG() throws {
@@ -75,6 +85,6 @@ final class WatermarkTests: XCTestCase {
         let files = try FileManager.default.contentsOfDirectory(atPath: directory.path)
         XCTAssertEqual(files.count, 1)
         XCTAssertTrue(files[0].hasSuffix("_水印.jpg"))
-        XCTAssertNotNil(NSImage(contentsOfFile: directory.appendingPathComponent(files[0]).path))
+        XCTAssertNotNil(ImageCodecs.decode(at: directory.appendingPathComponent(files[0])))
     }
 }

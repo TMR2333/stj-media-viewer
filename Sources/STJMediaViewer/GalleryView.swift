@@ -8,7 +8,7 @@ struct GalleryView: View {
     @EnvironmentObject private var model: LibraryModel
     @Environment(\.dismiss) private var dismiss
 
-    @State private var image: NSImage?
+    @State private var image: CGImage?
     @State private var loadFailed = false
 
     var body: some View {
@@ -102,10 +102,10 @@ struct GalleryView: View {
         .help("画廊预览 LUT（.cube 文件放在数据目录 LUTs/）")
     }
 
-    private func applyLUTIfNeeded(_ image: NSImage) -> NSImage {
+    private func applyLUTIfNeeded(_ image: CGImage) -> CGImage {
         guard let name = model.galleryLUTName,
               let lut = model.availableLUTs.first(where: { $0.name == name }) else { return image }
-        return LUTPreview.render(image, lut: lut)
+        return LUTPreview.render(image, lut: lut) ?? image
     }
 
     // MARK: 图像区域
@@ -119,7 +119,7 @@ struct GalleryView: View {
                     .padding(.horizontal, 20)
                     .padding(.vertical, 10)
             } else if let image {
-                Image(nsImage: image)
+                Image(decorative: image, scale: 1)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .padding(.horizontal, 28)

@@ -140,7 +140,7 @@ struct ThumbnailView: View {
     var asset: Asset
     var targetSize: CGFloat
 
-    @State private var image: NSImage?
+    @State private var image: CGImage?
     @State private var failed = false
 
     var body: some View {
@@ -148,7 +148,7 @@ struct ThumbnailView: View {
             if let image {
                 Color.clear
                     .overlay(
-                        Image(nsImage: image)
+                        Image(decorative: image, scale: 1)
                             .resizable()
                             .aspectRatio(contentMode: .fill)
                     )
