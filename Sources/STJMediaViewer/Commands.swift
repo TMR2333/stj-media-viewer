@@ -9,10 +9,24 @@ struct AppCommands: Commands {
 
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
-            Button("打开素材库…") {
-                Task { await model.openFromPanel() }
+            Button("打开图片文件夹…") {
+                Task { await model.openFolderFromPanel() }
             }
             .keyboardShortcut("o", modifiers: .command)
+            Button("新建目录标签页…") {
+                Task { await model.openFolderFromPanel(multiple: false) }
+            }
+            .keyboardShortcut("t", modifiers: .command)
+            Button("关闭标签页") {
+                if let id = model.activeFolderTabID { model.closeFolderTab(id) }
+            }
+            .keyboardShortcut("w", modifiers: [.command, .shift])
+            .disabled(model.activeFolderTabID == nil)
+            Divider()
+            Button("打开素材库文件（catalog.db）…") {
+                Task { await model.openFromPanel() }
+            }
+            .keyboardShortcut("o", modifiers: [.command, .option])
             Button("导入 / 扫描素材目录…") {
                 model.importLibraryFolder()
             }

@@ -126,10 +126,10 @@ struct SidebarView: View {
                     Image(systemName: "externaldrive")
                         .foregroundStyle(.secondary)
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(model.dataDirectory?.lastPathComponent ?? "未打开素材库")
+                        Text(model.activeFolderTab?.name ?? "未打开目录")
                             .font(.system(size: 11, weight: .medium))
                             .lineLimit(1)
-                        Text(model.dataDirectory?.path ?? "请选择包含 catalog.db 的目录")
+                        Text(model.activeFolderTab?.path ?? "选择一个图片文件夹即可直接浏览（不写入任何素材库文件）")
                             .font(.system(size: 9))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)

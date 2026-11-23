@@ -334,6 +334,8 @@ public struct AssetFilter: Equatable, Sendable {
     public var unsetDimensions: Set<FilterDimension> = []
     public var collectionIDs: Set<String> = []
     public var mergeGroupIDs: Set<String> = []
+    /// 目录标签页范围（空 = 全部目录）。属于上下文范围，不算用户可见的筛选条件。
+    public var libraryIDs: Set<String> = []
     /// 折叠 RAW+JPG 配对：只显示 RAW 封面，隐藏同目录同名的 JPG 伴生文件。
     /// 这是显示偏好而不是筛选条件，不计入 `isEmpty` / `activeCount`。
     public var foldRawPairs: Bool = false

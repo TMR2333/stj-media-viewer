@@ -139,6 +139,8 @@ public enum Importer {
     @discardableResult
     public static func importFolder(
         _ root: URL,
+        databaseURL overrideDatabaseURL: URL? = nil,
+        cacheDirectory overrideCacheDirectory: URL? = nil,
         libraryName: String? = nil,
         recursive: Bool = true,
         generateThumbnails: Bool = true,
@@ -148,8 +150,10 @@ public enum Importer {
         var summary = ImportSummary()
         // 解析符号链接后再扫描：避免同一素材目录经不同路径（如 /tmp 与 /private/tmp）被重复入库。
         let rootURL = root.resolvingSymlinksInPath().standardizedFileURL
-        let databaseURL = rootURL.appendingPathComponent(libraryRootMarker)
+        let databaseURL = overrideDatabaseURL ?? rootURL.appendingPathComponent(libraryRootMarker)
         summary.databaseURL = databaseURL
+        try FileManager.default.createDirectory(at: databaseURL.deletingLastPathComponent(),
+                                                withIntermediateDirectories: true)
 
         let database = try Database(path: databaseURL.path, readOnly: false)
         try CatalogSchema.create(in: database)
@@ -160,7 +164,7 @@ public enum Importer {
         summary.failures = scan.failures
         summary.failed = scan.failures.count
 
-        let cacheDirectory = rootURL.appendingPathComponent("Cache/thumbs", isDirectory: true)
+        let cacheDirectory = overrideCacheDirectory ?? rootURL.appendingPathComponent("Cache/thumbs", isDirectory: true)
         summary.cacheDirectory = cacheDirectory
 
         let existingColumns = try database.tableColumns("assets")

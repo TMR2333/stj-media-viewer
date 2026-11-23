@@ -24,6 +24,7 @@ struct LibraryContentView: View {
 
     var body: some View {
         VStack(spacing: 0) {
+            FolderTabBar()
             if let group = model.expandedGroup {
                 groupBanner(group)
             }
@@ -290,7 +291,7 @@ struct LibraryContentView: View {
                 Label(model.filter.isEmpty ? "素材库是空的" : "没有符合条件的素材",
                       systemImage: model.filter.isEmpty ? "photo.on.rectangle.angled" : "line.3.horizontal.decrease.circle")
             } description: {
-                Text(model.filter.isEmpty ? "这个素材库里还没有素材，或用 Windows 版重新扫描一次。" : "试着调整筛选条件或清除搜索关键词。")
+                Text(model.filter.isEmpty ? "这个目录里还没有被索引的图片或视频。" : "试着调整筛选条件或清除搜索关键词。")
             } actions: {
                 if !model.filter.isEmpty {
                     Button("清除筛选") { model.clearFilters() }

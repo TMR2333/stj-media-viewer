@@ -34,6 +34,11 @@ struct STJMediaViewerApp: App {
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    func applicationWillFinishLaunching(_ notification: Notification) {
+        // 关闭系统窗口标签页（macOS 自带的「窗口标签」会把多个窗口合成顶部胶囊，和本应用的目录标签条混淆）。
+        NSWindow.allowsAutomaticWindowTabbing = false
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         // 记住主窗口位置与大小（P0「窗口恢复」）。

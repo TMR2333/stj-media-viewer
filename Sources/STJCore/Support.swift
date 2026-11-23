@@ -10,6 +10,35 @@ import Security
 
 /// 应用日志：写入 ~/Library/Logs/STJMediaViewer/app.log，并镜像到系统日志。
 /// 要求：导航面包屑与网络请求都以一行摘要形式记录，方便事后排查。
+/// 应用自己维护的工作区（目录标签页共享同一个数据库，不再把 catalog.db 写进素材目录）。
+public enum WorkspacePaths {
+    /// 应用支持目录：macOS ~/Library/Application Support/STJMediaViewer，iOS 沙箱 Library/Application Support/STJMediaViewer。
+    public static var directory: URL {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory())
+        return base.appendingPathComponent("STJMediaViewer", isDirectory: true)
+    }
+
+    /// 目录标签页使用的数据库（所有打开过的目录都存在这里，素材文件本身不动）。
+    public static var databaseURL: URL {
+        let dir = directory
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir.appendingPathComponent("workspace.sqlite")
+    }
+
+    /// 目录标签页缩略图缓存根目录。
+    public static var thumbnailRoot: URL {
+        let dir = directory.appendingPathComponent("Cache/thumbs", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return dir
+    }
+
+    /// 目录的稳定标识：规范路径（解析符号链接后）。
+    public static func libraryID(for directory: URL) -> String {
+        directory.resolvingSymlinksInPath().standardizedFileURL.path
+    }
+}
+
 public enum AppLog {
     public static let directoryURL: URL = {
         #if os(macOS)

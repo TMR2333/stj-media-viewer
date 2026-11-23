@@ -1,3 +1,24 @@
+## v1.41.0 — 2026-11-23
+
+### 新增
+- **目录标签页（macOS + iOS）**：顶部标签条在多个图片目录之间切换，`⌘O` 打开图片文件夹、`⌘T` 新建标签页、`⇧⌘W` 关闭，标签与当前激活项跨启动恢复。
+- **不再绑定「素材库文件」**：左下角选择直接识别目录中的图片/视频，素材目录保持只读——不创建 `catalog.db`、不生成 `Cache/`；索引与编辑结果存进应用私有工作区库 `~/Library/Application Support/STJMediaViewer/workspace.sqlite`，缩略图缓存也移到应用目录。
+- 仍保留旧入口 `⌥⌘O` 打开带 `catalog.db` 的素材库（与 Windows 版共用，编辑直接写回）。
+
+### 变更
+- `STJCore`：新增 `WorkspacePaths`（应用目录/工作区库/缓存根）、`AssetFilter.libraryIDs`（按库过滤）、`Catalog(databaseURL:)` 与 `Catalog.libraryID(forDirectory:)`；`Importer.importFolder` 支持 `databaseURL` / `cacheDirectory` 覆盖，导入不再写素材目录。
+- 缩略图 QuickLook 失败时视频统一用 `AVAssetImageGenerator` 抽帧兜底（macOS + iOS）。
+- iOS 端同步切换为工作区模式：`MobileLibraryModel` 不再要求目录里有 `catalog.db`，首次选择目录自动索引；IPA 版本号 0.1.2。
+
+### 修复
+- 目录标签过滤值改为 `libraries.id`（UUID）反查，修复切换标签后列表为空。
+- 恢复标签页时补设 `dataDirectory`，修复重启后主区域显示"未打开"空态。
+- 缩略图缓存改写工作区目录，修复索引时把 `Cache/thumbs` 写进用户素材目录的问题。
+
+### 测试
+- 新增 `Tests/STJCoreTests/WorkspaceTests.swift` 3 项：导入不在素材目录落文件、多目录按库隔离、`/tmp` 与 `/private/tmp` 解析为同一库；`swift test` 共 **75 项全过**，`stjcheck` 20 项全过。
+
+
 ## v1.40.1 — 2026-11-23
 
 ### 移动端修复（iPadOS / iOS 预览）

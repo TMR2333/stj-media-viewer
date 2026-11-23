@@ -6,20 +6,30 @@
 - **独立仓库**：本仓库只包含 macOS 端（原 Windows/WinUI 版在 [stj-media-viewer](https://gitcode.com/TMR2333/stj-media-viewer)）
 - 语言/UI：Swift 6 + SwiftUI，少量 AppKit（打开面板、Finder、QuickLook 面板、键盘事件）
 - 最低系统：**macOS 14 Sonoma**；macOS 26 起自动启用 Liquid Glass 材质
-- 版本：**1.40.0**（Liquid Glass 界面 · 平台无关核心 · iPad P0 预览）
-- 发行版：[releases](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases) — 最新 `v1.40.0-macos`
+- 版本：**1.41.0**（目录标签页 · Liquid Glass 界面 · 平台无关核心 · iPad P0 预览）
+- 发行版：[releases](https://gitcode.com/TMR2333/stj-media-viewer-macos/releases) — 最新 `v1.41.0-macos`
 - 文档：[实施说明](docs/macos-port.md) · [开发计划](PLAN.md) · [更新日志](CHANGELOG.md) · [移动端范围](docs/mobile-scope.md) · [原始提示词存档](docs/MACOS-PROMPT.md)
 
 ## 下载
 
 | 平台 | 版本 | 文件 |
 | --- | --- | --- |
-| macOS 原生（Universal，Apple Silicon + Intel） | `v1.39.0-macos` | `STJMediaViewer-1.39.0-macos-arm64-x86_64.dmg` |
+| macOS 原生（Universal，Apple Silicon + Intel） | `v1.41.0-macos` | `STJMediaViewer-1.41.0-macos-arm64-x86_64.dmg` |
 | Windows（WinUI 3） | `v1.25.0` | [stj-media-viewer releases](https://gitcode.com/TMR2333/stj-media-viewer/releases) |
 
 首次打开（ad-hoc 签名，无 Apple Developer ID / 公证）：右键 App →「打开」→ 再点「打开」。
 
 > 两个平台的数据文件互通：macOS 版打开 Windows 版扫描出来的 `catalog.db` 即可直接浏览、编辑，编辑结果 Windows 版也认得（schema 与 `is_pick` / `__unset__` / 多主题等语义一致）。
+
+## 目录标签页：直接读目录，不在素材目录里留任何文件
+
+从 1.41.0 起，左下角「打开图片文件夹…」**不再要求、也不会创建 `catalog.db`**：选中任意图片目录即可直接浏览。
+
+- 每个标签页 = 一个目录；顶部标签条可在多个目录之间切换（`⌘T` 新建、`⇧⌘W` 关闭、`+` 按钮）。
+- 索引与编辑结果统一存在应用自己的**工作区库**：`~/Library/Application Support/STJMediaViewer/workspace.sqlite`。
+- 缩略图缓存也在应用目录：`~/Library/Application Support/STJMediaViewer/Cache/thumbs`。
+- 素材目录**保持只读**：不新建 `catalog.db`、不生成 `Cache/`、不改动任何文件（删除素材仍按用户操作进废纸篓）。
+- 仍然兼容旧模式：`⌥⌘O` 可以打开带 `catalog.db` 的素材库（与 Windows 版共用），此时编辑直接写回该库。
 
 ## 截图
 
@@ -47,11 +57,11 @@
 | --- | --- |
 | ![RAW+JPG 合并](shots/raw-jpg-merge.png) | ![媒体库设置](shots/settings-media.png) |
 
-| 设置与图片数据迁移（跨平台） |
-| --- |
-| ![设置与图片数据迁移](shots/settings-exchange.png) |
+| 设置与图片数据迁移（跨平台） | 目录标签页（多目录，不写素材目录） |
+| --- | --- |
+| ![设置与图片数据迁移](shots/settings-exchange.png) | ![目录标签页](shots/tabs-light.png) |
 
-**iPadOS / iOS 预览（1.40.1 起，模拟器截图）**
+**iPadOS / iOS 预览（1.41.0 / iOS 0.1.2 起，模拟器截图）**
 
 | iPad 网格（侧栏计数 + 图片/视频分库） | iPad 检视面板（评分/色标/元数据） |
 | --- | --- |
@@ -63,7 +73,11 @@
 
 | 场景 | 快捷键 | 说明 |
 | --- | --- | --- |
-| 通用 | `⌘O` / `⌘I` | 打开素材库 / 扫描导入目录 |
+| 通用 | `⌘O` | 打开图片文件夹并作为标签页浏览（直接识别，不需要 catalog.db） |
+| | `⌘T` | 新建目录标签页（选一个目录） |
+| | `⇧⌘W` | 关闭当前目录标签页 |
+| | `⌥⌘O` | 打开旧版素材库文件（目录里的 `catalog.db`） |
+| | `⌘I` | 扫描导入目录（写入当前工作区库） |
 | | `⌘F` | 聚焦搜索框 |
 | | `⌘A` / `⇧⌘A` | 全选当前筛选结果 / 取消选择 |
 | | `⌘1`–`⌘4` | 小 / 中 / 大网格 / 列表 |
@@ -112,7 +126,8 @@
 | 能力 | 说明 |
 | --- | --- |
 | 三栏骨架 | `NavigationSplitView`：侧栏（全部素材 / 图片素材 / 视频素材 / 智能分类 / 合并组 / 合集 / 工具）+ 网格/列表 + `.inspector` 检视面板 |
-| 打开素材库 | `⌘O` 选择含 `catalog.db` 的目录；记住上次打开的素材库 |
+| 目录标签页 | 顶部标签条在多个目录间切换；`⌘O` 打开图片文件夹、`⌘T` 新建、`⇧⌘W` 关闭；首次访问自动索引，标签页与应用重启后自动恢复 |
+| 打开旧素材库 | `⌥⌘O` 选择含 `catalog.db` 的目录（与 Windows 版共用同一份库） |
 | 扫描导入 | `⌘I` 选目录：没有 `catalog.db` 时按 Windows 兼容 schema 建库；已有库则增量扫描（按路径/大小/修改时间跳过未变文件）；自动生成 `Cache/thumbs` 缩略图并写 `thumb_key`；重复导入保留用户评分/主题等编辑 |
 | 网格 / 列表 | 密度小 / 中 / 大 / 列表；`⌘1`–`⌘4` 切换 |
 | 选择 | 单击、⌘ 点、⇧ 点范围选择、`⌘A` 全选、方向键移动、Esc 取消 |

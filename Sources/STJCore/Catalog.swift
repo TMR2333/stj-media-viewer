@@ -23,6 +23,39 @@ public final class Catalog: @unchecked Sendable {
         _ = try db.scalarInt("SELECT count(*) FROM assets;")
     }
 
+    /// 直接按数据库文件打开（目录标签页的工作区数据库）。
+    public init(databaseURL: URL) throws {
+        self.directory = databaseURL.deletingLastPathComponent().standardizedFileURL
+        self.databaseURL = databaseURL.standardizedFileURL
+        guard FileManager.default.fileExists(atPath: databaseURL.path) else {
+            throw DatabaseError.notFound("工作区数据库不存在：\(databaseURL.path)")
+        }
+        let db = try Database(path: databaseURL.path, readOnly: true)
+        _ = try db.scalarInt("SELECT count(*) FROM assets;")
+    }
+
+    /// 通过目录路径找到 libraries 表里的库 ID（兼容 /tmp 与 /private/tmp 两种写法）。
+    public func libraryID(forDirectory directory: URL) throws -> String? {
+        let db = try Database(path: databaseURL.path, readOnly: true)
+        guard try db.tableExists("libraries") else { return nil }
+        let resolved = directory.resolvingSymlinksInPath().standardizedFileURL.path
+        let raw = directory.standardizedFileURL.path
+        var candidates: Set<String> = [resolved, raw]
+        if raw.hasPrefix("/private/") {
+            candidates.insert(String(raw.dropFirst("/private".count)))
+        } else {
+            candidates.insert("/private" + raw)
+        }
+        let rows: [(String, String)] = try db.query("SELECT id, path FROM libraries;") { st in
+            ((try? st.string(0)) ?? "", (try? st.string(1)) ?? "")
+        }
+        for (id, path) in rows {
+            let normalized = URL(fileURLWithPath: path).resolvingSymlinksInPath().standardizedFileURL.path
+            if candidates.contains(path) || candidates.contains(normalized) { return id }
+        }
+        return nil
+    }
+
     // MARK: - 列与表探测
 
     private var columns: Set<String> {
@@ -293,6 +326,10 @@ public final class Catalog: @unchecked Sendable {
 
         if coverOnly, try has("group_id") {
             pieces.append("(is_group_cover = 1 OR group_id IS NULL OR group_id = '')")
+        }
+        if !filter.libraryIDs.isEmpty, try has("library_id") {
+            pieces.append("assets.library_id IN (\(Array(repeating: "?", count: filter.libraryIDs.count).joined(separator: ", ")))")
+            binds.append(contentsOf: filter.libraryIDs.sorted())
         }
         if let expandedGroupID, try has("group_id") {
             pieces.append("group_id = ?")

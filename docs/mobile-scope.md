@@ -97,3 +97,10 @@ bash ios/build-ipa.sh --sign "Apple Development: 你的名字 (TEAMID)" \
   可执行文件为 `arm64`、`platform IOS`、`minos 17.0`。
 - 安装方式：Sideloadly / AltStore / Xcode 个人免费账号重签；免费证书 7 天过期。
 - 应用内不会自动更新；素材库路径通过「打开 / 导入素材库」选择文件夹（安全作用域书签持久化）。
+
+## 1.41.0 起的目录模式（与 macOS 一致）
+
+iPad/iPhone 端也不再要求目录里存在 `catalog.db`：用户用「文件」App 选一个目录后，应用直接用工作区库
+（沙箱内 `Library/Application Support/STJMediaViewer/workspace.sqlite`）记录索引，素材目录保持只读；
+缩略图缓存写在应用沙箱内。旧素材库（带 `catalog.db`）仍可通过同一入口浏览。
+

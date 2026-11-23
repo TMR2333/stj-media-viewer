@@ -68,16 +68,56 @@ final class MobileLibraryModel: ObservableObject {
         }
     }
 
-    /// 用「文件」App 选择包含 catalog.db 的目录。
+    /// 用「文件」App 选目录：直接识别其中的图片/视频，不要求 catalog.db，也不写素材目录。
     func open(directory url: URL) async throws {
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-        let catalog = try Catalog(directory: url)
+        let catalog = try ensureWorkspaceCatalog()
         self.catalog = catalog
         self.directory = url
-        ThumbnailStore.shared.configure(cacheDirectory: url.appendingPathComponent("Cache/thumbs"))
+        ThumbnailStore.shared.configure(cacheDirectory: WorkspacePaths.thumbnailRoot)
+        await activateLibrary(directory: url)
         saveBookmark(for: url)
-        await reload(reason: "打开素材库")
+        await reload(reason: "打开目录")
+    }
+
+    /// 打开/创建工作区库（应用私有，不接触素材目录）。
+    private func ensureWorkspaceCatalog() throws -> Catalog {
+        let dbURL = WorkspacePaths.databaseURL
+        if !FileManager.default.fileExists(atPath: dbURL.path) {
+            let database = try Database(path: dbURL.path, readOnly: false)
+            try CatalogSchema.create(in: database)
+        }
+        return try Catalog(databaseURL: dbURL)
+    }
+
+    /// 首次访问目录时索引，并把筛选范围限定到这个目录对应的库。
+    private func activateLibrary(directory url: URL) async {
+        guard let catalog else { return }
+        var libraryID = (try? catalog.libraryID(forDirectory: url)) ?? WorkspacePaths.libraryID(for: url)
+        var scopedFilter = filter
+        scopedFilter.libraryIDs = [libraryID]
+        let known = (try? catalog.count(filter: scopedFilter)) ?? 0
+        if known == 0 {
+            isImporting = true
+            importHint = "正在扫描…"
+            let root = url
+            do {
+                let summary = try await Task.detached(priority: .userInitiated) {
+                    try Importer.importFolder(root,
+                                              databaseURL: WorkspacePaths.databaseURL,
+                                              cacheDirectory: WorkspacePaths.thumbnailRoot,
+                                              libraryName: root.lastPathComponent)
+                }.value
+                importHint = summary.descriptionText
+                libraryID = (try? catalog.libraryID(forDirectory: url)) ?? libraryID
+            } catch {
+                errorMessage = "索引失败：\(error.localizedDescription)"
+            }
+            isImporting = false
+        }
+        filter.libraryIDs = [libraryID]
+        selection = []
     }
 
     /// 导入 / 扫描一个目录（P0：把选中的目录当作素材库根）。
@@ -89,8 +129,13 @@ final class MobileLibraryModel: ObservableObject {
         do {
             let scoped = root.startAccessingSecurityScopedResource()
             defer { if scoped { root.stopAccessingSecurityScopedResource() } }
+            let catalog = try ensureWorkspaceCatalog()
+            self.catalog = catalog
             let summary = try await Task.detached(priority: .userInitiated) {
-                try Importer.importFolder(root, libraryName: root.lastPathComponent) { progress in
+                try Importer.importFolder(root,
+                                          databaseURL: WorkspacePaths.databaseURL,
+                                          cacheDirectory: WorkspacePaths.thumbnailRoot,
+                                          libraryName: root.lastPathComponent) { progress in
                     Task { @MainActor in
                         self.importHint = "已处理 \(progress.processed)/\(progress.total)：\(progress.currentFileName)"
                     }
@@ -206,6 +251,8 @@ final class MobileLibraryModel: ObservableObject {
         let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
         guard let docs else { return nil }
         let candidate = docs.appendingPathComponent("DemoLibrary", isDirectory: true)
-        return FileManager.default.fileExists(atPath: candidate.appendingPathComponent("catalog.db").path) ? candidate : nil
+        var isDirectory: ObjCBool = false
+        let exists = FileManager.default.fileExists(atPath: candidate.path, isDirectory: &isDirectory)
+        return (exists && isDirectory.boolValue) ? candidate : nil
     }
 }

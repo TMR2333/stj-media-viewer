@@ -57,6 +57,62 @@ final class LibraryModel: ObservableObject {
     @Published var availableUpdate: UpdateInfo?
     @Published var isCheckingUpdate = false
     @Published var updateCheckMessage: String?
+    // MARK: - 目录标签页（不再要求目录里存在 catalog.db）
+
+    /// 一个「目录标签页」：直接把某个图片目录作为一个库打开，素材文件保持原地不动。
+    struct FolderTab: Identifiable, Hashable {
+        let directory: URL
+        var id: String { WorkspacePaths.libraryID(for: directory) }
+        var name: String { directory.lastPathComponent }
+        var path: String { directory.path }
+    }
+
+    @Published var folderTabs: [FolderTab] = []
+    @Published var activeFolderTabID: String?
+
+    private static let folderTabsKey = "folderTabs"
+    private static let activeFolderTabKey = "activeFolderTab"
+    private var workspaceCatalog: Catalog?
+
+    var activeFolderTab: FolderTab? {
+        guard let activeFolderTabID else { return nil }
+        return folderTabs.first { $0.id == activeFolderTabID }
+    }
+
+    /// 应用支持目录里的工作区数据库（所有目录共用一个，素材目录不生成任何文件）。
+    private func ensureWorkspaceCatalog() throws -> Catalog {
+        if let workspaceCatalog, FileManager.default.fileExists(atPath: workspaceCatalog.databaseURL.path) {
+            return workspaceCatalog
+        }
+        let url = WorkspacePaths.databaseURL
+        if !FileManager.default.fileExists(atPath: url.path) {
+            let db = try Database(path: url.path, readOnly: false)
+            try CatalogSchema.create(in: db)
+        }
+        let catalog = try Catalog(databaseURL: url)
+        workspaceCatalog = catalog
+        return catalog
+    }
+
+    private func persistFolderTabs() {
+        UserDefaults.standard.set(folderTabs.map(\.path), forKey: Self.folderTabsKey)
+        UserDefaults.standard.set(activeFolderTabID, forKey: Self.activeFolderTabKey)
+    }
+
+    private func restoreFolderTabsIfNeeded() {
+        guard folderTabs.isEmpty else { return }
+        let defaults = UserDefaults.standard
+        let paths = defaults.stringArray(forKey: Self.folderTabsKey) ?? []
+        let existing = paths
+            .map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
+            .filter { FileManager.default.fileExists(atPath: $0.path) }
+        folderTabs = existing.map { FolderTab(directory: $0) }
+        if let active = defaults.string(forKey: Self.activeFolderTabKey),
+           folderTabs.contains(where: { $0.id == active }) {
+            activeFolderTabID = active
+        }
+    }
+
     @Published var presentedError: String?
     @Published var isBatchEditorPresented = false
     @Published var searchFocused = false
@@ -252,10 +308,19 @@ final class LibraryModel: ObservableObject {
         let defaults = UserDefaults.standard
         if let path = defaults.string(forKey: "dataDirectory"), !path.isEmpty {
             await open(directory: URL(fileURLWithPath: (path as NSString).expandingTildeInPath), quiet: true)
-        } else if let last = LastLibraryStore.lastDirectoryPath {
-            await open(directory: URL(fileURLWithPath: last), quiet: true)
         } else {
-            AppLog.breadcrumb("启动：未指定素材库，等待用户选择")
+            restoreFolderTabsIfNeeded()
+            if let active = activeFolderTab {
+                await switchFolderTab(active.id)
+                AppLog.breadcrumb("启动：恢复目录标签 \(active.name)")
+            } else if let last = defaults.string(forKey: "lastFolderDirectory"), !last.isEmpty,
+                      FileManager.default.fileExists(atPath: last) {
+                await openFolder(URL(fileURLWithPath: last), quiet: true)
+            } else if let last = LastLibraryStore.lastDirectoryPath {
+                await open(directory: URL(fileURLWithPath: last), quiet: true)
+            } else {
+                AppLog.breadcrumb("启动：未指定目录，等待用户选择")
+            }
         }
         if let preselect = defaults.string(forKey: "preselectAssetID"), !preselect.isEmpty {
             selection = [preselect]
@@ -393,8 +458,114 @@ final class LibraryModel: ObservableObject {
         #endif
     }
 
-    func open(directory: URL, quiet: Bool = false) async {
+    /// 打开一个目录（默认走「直接识别图片」的工作区模式，不需要 catalog.db）。
+    func openFolder(_ folder: URL, quiet: Bool = false) async {
+        let dir = folder.resolvingSymlinksInPath().standardizedFileURL
+        let tab = FolderTab(directory: dir)
+        if !folderTabs.contains(where: { $0.id == tab.id }) {
+            folderTabs.append(tab)
+        }
+        activeFolderTabID = tab.id
+        persistFolderTabs()
+        UserDefaults.standard.set(dir.path, forKey: "lastFolderDirectory")
+        await activate(tab, quiet: quiet)
+    }
+
+    /// 切换到已打开的目录标签页。
+    func switchFolderTab(_ id: String) async {
+        guard let tab = folderTabs.first(where: { $0.id == id }) else { return }
+        guard id != activeFolderTabID || catalog == nil else { return }
+        activeFolderTabID = id
+        persistFolderTabs()
+        await activate(tab, quiet: true)
+    }
+
+    /// 激活某个目录标签：打开工作区库 → 首次访问时索引 → 按目录过滤并刷新。
+    private func activate(_ tab: FolderTab, quiet: Bool) async {
         do {
+            let catalog = try ensureWorkspaceCatalog()
+            self.catalog = catalog
+            self.dataDirectory = WorkspacePaths.directory
+            ThumbnailStore.shared.configure(cacheDirectory: WorkspacePaths.thumbnailRoot)
+            cachedThumbnailCount = ThumbnailStore.shared.cachedThumbnailCount()
+
+            var libraryID = (try? catalog.libraryID(forDirectory: tab.directory)) ?? tab.id
+            var scoped = filter
+            scoped.libraryIDs = [libraryID]
+            let known = (try? catalog.count(filter: scoped)) ?? 0
+            if known == 0 {
+                if !quiet { showStatus("正在索引 \(tab.name)…") }
+                let summary = try await Task.detached(priority: .userInitiated) {
+                    try Importer.importFolder(tab.directory,
+                                              databaseURL: WorkspacePaths.databaseURL,
+                                              cacheDirectory: WorkspacePaths.thumbnailRoot,
+                                              libraryName: tab.name)
+                }.value
+                AppLog.breadcrumb("索引目录：\(tab.directory.path) → 新增 \(summary.added)、跳过 \(summary.skipped)、缩略图 \(summary.thumbnails)")
+                libraryID = (try? catalog.libraryID(forDirectory: tab.directory)) ?? libraryID
+            }
+            filter.libraryIDs = [libraryID]
+            selection = []
+            await reloadNow(reason: "切换目录 \(tab.name)")
+            if !quiet {
+                showStatus("已索引 \(tab.name)：\(totalCount) 张")
+            }
+        } catch {
+            AppLog.error("打开目录失败：\(tab.directory.path) — \(error.localizedDescription)")
+            presentedError = error.localizedDescription
+        }
+    }
+
+    /// 关闭标签页（只从标签栏移除，不删除磁盘上的任何东西）。
+    func closeFolderTab(_ id: String) {
+        guard let index = folderTabs.firstIndex(where: { $0.id == id }) else { return }
+        folderTabs.remove(at: index)
+        if activeFolderTabID == id {
+            let next = folderTabs.indices.contains(index) ? folderTabs[index] : folderTabs.last
+            if let next {
+                Task { await switchFolderTab(next.id) }
+            } else {
+                activeFolderTabID = nil
+                filter.libraryIDs = []
+                selection = []
+                catalog = nil
+                assets = []
+                totalCount = 0
+            }
+        }
+        persistFolderTabs()
+    }
+
+    /// 选择一个（或多个）图片目录，作为新标签页打开并索引。
+    func openFolderFromPanel(multiple: Bool = true) async {
+        let panel = NSOpenPanel()
+        panel.title = "打开图片文件夹"
+        panel.message = "选择一个图片目录，直接索引其中的图片与视频（不会在目录里写任何素材库文件）"
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = multiple
+        panel.prompt = "打开"
+        if let activeFolderTab { panel.directoryURL = activeFolderTab.directory.deletingLastPathComponent() }
+        guard panel.runModal() == .OK else { return }
+        for url in panel.urls {
+            await openFolder(url)
+        }
+    }
+
+    /// 兼容入口：若目录里有 catalog.db 则按旧「共享素材库文件」方式打开；否则按目录索引。
+    func open(directory: URL, quiet: Bool = false) async {
+        let standardized = directory.standardizedFileURL
+        if FileManager.default.fileExists(atPath: standardized.appendingPathComponent("catalog.db").path) {
+            await openLegacyCatalog(directory: standardized, quiet: quiet)
+        } else {
+            await openFolder(standardized, quiet: quiet)
+        }
+    }
+
+    private func openLegacyCatalog(directory: URL, quiet: Bool = false) async {
+        do {
+            activeFolderTabID = nil
+            filter.libraryIDs = []
             let catalog = try Catalog(directory: directory)
             self.catalog = catalog
             self.dataDirectory = directory
@@ -415,18 +586,7 @@ final class LibraryModel: ObservableObject {
     }
 
     func openFromPanel() async {
-        let panel = NSOpenPanel()
-        panel.title = "选择素材库目录"
-        panel.message = "请选择包含 catalog.db 的素材库目录"
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.allowsMultipleSelection = false
-        panel.prompt = "打开"
-        if let dataDirectory {
-            panel.directoryURL = dataDirectory
-        }
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        await open(directory: url)
+        await openFolderFromPanel()
     }
 
     // MARK: 导入 / 扫描（P2）
