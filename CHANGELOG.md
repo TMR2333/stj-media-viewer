@@ -7,6 +7,38 @@
 > <https://gitcode.com/TMR2333/stj-media-viewer-macos>。
 > 本文件中涉及 macOS 的条目均为历史记录，不再随本仓库更新。
 
+## v1.28.0 — 2026-11-23
+
+### 新增：三端「云相册」（云端浏览 / 预览 / 导入导出 + 原云同步合并）
+
+原来的「云同步」页面升级为「云相册」：一个页面同时提供**云端浏览/预览/导入导出**和原有同步能力，
+三端共用 [`docs/CLOUD-ALBUM-SPEC.md`](docs/CLOUD-ALBUM-SPEC.md) 的语义。
+
+**Windows（1.28.0）**
+- 核心新增 `CloudAlbumService`：按目录列一层、Range 缩略图（≤12MB 整下载；大 RAW 走 TIFF IFD 定向取内嵌预览；失败才整下载 ≤48MB）、
+  导入到本地素材库（保持相对路径 + 自动扫描）、导出素材 + XMP 边车。
+- 存储层新增 `ListFolderAsync` / `ReadRangeAsync`（WebDAV + 本地挂载目录；不支持的适配器返回 null 自动降级）。
+- 云相册页新增浏览卡片：面包屑、上一级/刷新/全选、网格缩略图、双击进目录或看大图、下载到素材库、上传所选素材；
+  原云同步全部功能（目标/差异预览/立即同步/按分类上传/暂停取消/报告/诊断）保留在同一页。
+- 自检 **474 项 / 0 失败**（新增云相册 9 项：列目录、子目录、Range 一致性、JPG/RAW 缩略图、导入、导出+XMP、Range 降级）。
+
+**Android（0.2.0）**
+- 新增 `WebDavClient`（PROPFIND / 手动 302 重发 Range / PUT + Expect 重试）与 `CloudAlbumRepository`（Range + EXIF 内嵌缩略图 + RAW 内嵌预览）。
+- 新增「云相册」页面：账号配置、目录浏览、缩略图网格、预览、勾选下载到本机并入库、上传素材库选中素材（含 XMP）。
+- 素材库右上角新增云相册入口；账号仅存本机。
+
+**macOS**
+- 本仓库提供实现规范与可直接使用的提示词：[`docs/MACOS-CLOUD-ALBUM-PROMPT.md`](docs/MACOS-CLOUD-ALBUM-PROMPT.md)，
+  在 `stj-media-viewer-macos` 仓库按同一规范实现（SwiftUI 原生）。
+
+### 说明
+
+- 云相册导出只写 XMP 边车，不动云端原图；不做服务端缩略图/转码。
+- 123pan 实测：`GET Range` 先 302 到 CDN，跟随重定向后 206；客户端每次请求都重新走 302 并重发 Range。
+- 交换文件（`stj-media-viewer/exchange` v1）与云相册互相独立。
+
+下载：Windows 安装包 / 便携版 + **STJMediaViewer-Android-0.2.0.apk**。
+
 ## v1.27.0 — 2026-11-23
 
 ### 新增：Android 移动伴生版（0.1.0，Material 3 Expressive）

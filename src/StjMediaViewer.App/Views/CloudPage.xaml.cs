@@ -23,6 +23,7 @@ public sealed partial class CloudPage : Page
     {
         PageLayout.Fit(PageScroll, PageContent);
         await ViewModel.InitializeAsync();
+        _ = ViewModel.LoadAlbumAsync();
         SyncEditorSelections();
         if (Environment.GetEnvironmentVariable("STJ_DEMO_CLOUD_FILTER") == "1") DemoCloudFilterAsync();
         if (Environment.GetEnvironmentVariable("STJ_DEMO_CLOUD_UPLOAD") == "1") DemoCloudUploadAsync();
@@ -140,6 +141,52 @@ public sealed partial class CloudPage : Page
         ViewModel.LayoutSecondaryIndex = Math.Max(0, LayoutSecondaryBox.SelectedIndex);
         ViewModel.LayoutTertiaryIndex = Math.Max(0, LayoutTertiaryBox.SelectedIndex);
     }
+
+    // ---------------- 云相册 ----------------
+
+    private async void AlbumRefresh_Click(object sender, RoutedEventArgs e)
+        => await ViewModel.LoadAlbumAsync(ViewModel.AlbumPath);
+
+    private async void AlbumUp_Click(object sender, RoutedEventArgs e)
+        => await ViewModel.AlbumUpAsync();
+
+    private void AlbumSelectAll_Click(object sender, RoutedEventArgs e)
+        => AlbumGrid.SelectAll();
+
+    private void AlbumGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        => ViewModel.SetAlbumSelection(AlbumGrid.SelectedItems.OfType<StjMediaViewer.App.ViewModels.CloudAlbumRow>());
+
+    private async void AlbumGrid_DoubleTapped(object sender, Microsoft.UI.Xaml.Input.DoubleTappedRoutedEventArgs e)
+    {
+        if (AlbumGrid.SelectedItem is not StjMediaViewer.App.ViewModels.CloudAlbumRow row) return;
+        if (!row.IsDirectory)
+        {
+            var path = await ViewModel.DownloadPreviewAsync(row);
+            if (string.IsNullOrEmpty(path) || !File.Exists(path)) return;
+            var image = new Microsoft.UI.Xaml.Controls.Image
+            {
+                Source = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri(path)),
+                MaxHeight = 560,
+                Stretch = Microsoft.UI.Xaml.Media.Stretch.Uniform,
+            };
+            var dialog = new ContentDialog
+            {
+                Title = row.Name,
+                Content = new ScrollViewer { Content = image, MaxHeight = 600, MaxWidth = 900 },
+                CloseButtonText = "关闭",
+                XamlRoot = XamlRoot,
+            };
+            await dialog.ShowAsync();
+            return;
+        }
+        await ViewModel.OpenAlbumRowAsync(row);
+    }
+
+    private async void AlbumDownload_Click(object sender, RoutedEventArgs e)
+        => await ViewModel.ImportAlbumSelectionAsync();
+
+    private async void AlbumUpload_Click(object sender, RoutedEventArgs e)
+        => await ViewModel.ExportLibrarySelectionAsync();
 
     private async void UploadFiltered_Click(object sender, RoutedEventArgs e)
     {

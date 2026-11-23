@@ -407,6 +407,20 @@ public interface ICloudStorage : IAsyncDisposable
     /// <summary>递归列出同步根下的所有文件（相对路径统一 '/'）。</summary>
     Task<IReadOnlyList<CloudEntry>> ListAllAsync(IProgress<string>? progress = null, CancellationToken ct = default);
 
+    /// <summary>
+    /// 只列一层目录（云相册浏览用）；<paramref name="relativeDir"/> 为空 = 同步根。
+    /// 返回条目里的 RelativePath 仍相对于同步根，目录条目 IsDirectory = true。
+    /// </summary>
+    Task<IReadOnlyList<CloudEntry>> ListFolderAsync(string relativeDir, CancellationToken ct = default)
+        => throw new NotSupportedException("当前云存储适配器不支持按目录浏览");
+
+    /// <summary>
+    /// 读取云端文件的一段字节（云相册缩略图/预览用）。
+    /// 不支持 Range 的服务器实现可以返回 null，调用方会退化为整文件下载。
+    /// </summary>
+    Task<byte[]?> ReadRangeAsync(string relativePath, long offset, int length, CancellationToken ct = default)
+        => Task.FromResult<byte[]?>(null);
+
     Task DownloadAsync(string relativePath, string localPath, CancellationToken ct = default);
 
     Task UploadAsync(string localPath, string relativePath, CancellationToken ct = default);

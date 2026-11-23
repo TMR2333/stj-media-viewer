@@ -30,6 +30,7 @@ import java.time.format.DateTimeFormatter
 
 class MainActivity : ComponentActivity() {
     private val vm: LibraryViewModel by viewModels()
+    private val cloudVm: com.stjarna.mediaviewer.cloud.CloudAlbumViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -37,7 +38,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             StjTheme(themeMode = vm.state.themeMode, dynamicColor = vm.state.dynamicColor) {
                 Surface(Modifier.fillMaxSize()) {
-                    AppRoot(vm)
+                    AppRoot(vm, cloudVm)
                 }
             }
         }
@@ -45,8 +46,9 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun AppRoot(vm: LibraryViewModel) {
+private fun AppRoot(vm: LibraryViewModel, cloudVm: com.stjarna.mediaviewer.cloud.CloudAlbumViewModel) {
     var showSettings by rememberSaveable { mutableStateOf(false) }
+    var showCloud by rememberSaveable { mutableStateOf(false) }
     val app = LocalContext.current.applicationContext
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -84,7 +86,13 @@ private fun AppRoot(vm: LibraryViewModel) {
         if (uri != null) vm.prepareImport(uri)
     }
 
-    if (showSettings) {
+    if (showCloud) {
+        com.stjarna.mediaviewer.cloud.CloudAlbumScreen(
+            vm = cloudVm,
+            libraryVm = vm,
+            onBack = { showCloud = false },
+        )
+    } else if (showSettings) {
         SettingsScreen(
             vm = vm,
             onBack = { showSettings = false },
@@ -98,6 +106,6 @@ private fun AppRoot(vm: LibraryViewModel) {
             onImportExchange = { importLauncher.launch(arrayOf("application/json", "text/plain", "*/*")) },
         )
     } else {
-        LibraryScreen(vm = vm, onOpenSettings = { showSettings = true })
+        LibraryScreen(vm = vm, onOpenSettings = { showSettings = true }, onOpenCloud = { showCloud = true })
     }
 }

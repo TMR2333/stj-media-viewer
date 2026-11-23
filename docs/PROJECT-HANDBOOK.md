@@ -229,6 +229,17 @@ UI 只通过 ViewModel 访问服务；所有长任务都吃 `CancellationToken`�
   退回 compose 1.11.4 + material3 1.4.0 + compileSdk 36 才编得过）。
 - 验收清单：[ANDROID-ACCEPTANCE.md](ANDROID-ACCEPTANCE.md)。
 
+### 5.14.3 云相册（Cloud Album）
+
+- 云同步升级为云相册：浏览 / 预览 / 导入 / 导出 + 原同步合并一页；三端同一规范
+  （[CLOUD-ALBUM-SPEC.md](CLOUD-ALBUM-SPEC.md)）。
+- 缩略图策略：≤12MB 整下载；大文件先 Range 读 2MB 头解析 TIFF IFD（513/514）定向取内嵌预览，
+  才考虑整下载（≤48MB）；按 `路径|大小|mtime|px` 做磁盘缓存，并发 3。
+- **经验**：WebDAV 的 Range 常被 302 到 CDN 打断——必须手动跟随重定向并**每次重发 Range 头**；
+  123pan 还要求 PUT 带 `Expect: 100-continue`（失败自动重试）。
+- 导入导出都要防目录穿越、保持相对路径、只写 XMP 边车不动原图；密码只进 Keychain/SharedPreferences/DPAPI 本机存储。
+- 自检：Windows 474 项（云相册 9 项）；Android `WebDavClient` + `CloudAlbumScreen`。
+
 ### 5.15 关于 / 设置
 
 - 关于：作者卡（TMR、一个货成、一只马子、大肥鱼），可点进 B 站/抖音，项目地址。

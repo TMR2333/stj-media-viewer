@@ -28,8 +28,8 @@
                     </Grid.ColumnDefinitions>
 
                     <StackPanel Spacing="4">
-                        <TextBlock Text="云同步" Style="{ThemeResource AppDisplayTextStyle}" />
-                        <TextBlock Text="三步：① 添加一个同步目标（云盘 / NAS / 挂载目录）→ ② 先「预览差异」确认要传哪些 → ③ 「立即同步」。只想传某一类素材，用下面的「只上传某一类素材」。"
+                        <TextBlock Text="云相册" Style="{ThemeResource AppDisplayTextStyle}" />
+                        <TextBlock Text="云相册 = 云端浏览 / 预览 / 导入导出 + 原来的云同步（差异预览、双向同步、按分类上传），都合并在这一页。"
                                    Style="{ThemeResource AppCaptionTextStyle}"
                                    Foreground="{ThemeResource TextSecondaryBrush}"
                                    TextWrapping="Wrap" />
@@ -71,6 +71,80 @@
                                    Style="{ThemeResource AppCaptionTextStyle}"
                                    Foreground="{ThemeResource TextSecondaryBrush}"
                                    TextTrimming="CharacterEllipsis" />
+                    </StackPanel>
+                </Border>
+
+                <!-- ============ 云相册浏览 ============ -->
+                <Border Background="{ThemeResource AppSurfaceBrush}"
+                        BorderBrush="{ThemeResource AppCardStrokeBrush}"
+                        BorderThickness="{ThemeResource AppCardStrokeThickness}"
+                        CornerRadius="{ThemeResource AppRadiusMedium}"
+                        Padding="14,12">
+                    <StackPanel Spacing="10">
+                        <Grid>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="云相册浏览" Style="{ThemeResource AppSubtitleTextStyle}" />
+                                <TextBlock Text="{x:Bind ViewModel.AlbumBreadcrumb, Mode=OneWay}"
+                                           Style="{ThemeResource AppMicroTextStyle}"
+                                           Foreground="{ThemeResource TextSecondaryBrush}" />
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" VerticalAlignment="Top">
+                                <Button Content="上一级" Style="{ThemeResource AppSubtleButtonStyle}" Click="AlbumUp_Click" />
+                                <Button Content="刷新" Style="{ThemeResource AppSubtleButtonStyle}" Click="AlbumRefresh_Click"
+                                        IsEnabled="{x:Bind ViewModel.IsNotBusy, Mode=OneWay}" />
+                                <Button Content="全选" Style="{ThemeResource AppSubtleButtonStyle}" Click="AlbumSelectAll_Click" />
+                                <Button Content="下载到素材库" Style="{ThemeResource AppSubtleButtonStyle}" Click="AlbumDownload_Click"
+                                        IsEnabled="{x:Bind ViewModel.IsNotBusy, Mode=OneWay}" />
+                                <Button Content="上传所选素材" Style="{ThemeResource AppSubtleButtonStyle}" Click="AlbumUpload_Click"
+                                        IsEnabled="{x:Bind ViewModel.IsNotBusy, Mode=OneWay}" />
+                            </StackPanel>
+                        </Grid>
+
+                        <ProgressBar IsIndeterminate="True"
+                                     Visibility="{x:Bind ViewModel.AlbumBusyVisibility, Mode=OneWay}" />
+
+                        <GridView x:Name="AlbumGrid"
+                                  Height="360"
+                                  ItemsSource="{x:Bind ViewModel.AlbumRows, Mode=OneWay}"
+                                  SelectionMode="Multiple"
+                                  SelectionChanged="AlbumGrid_SelectionChanged"
+                                  DoubleTapped="AlbumGrid_DoubleTapped"
+                                  IsItemClickEnabled="False"
+                                  Padding="2">
+                            <GridView.ItemTemplate>
+                                <DataTemplate x:DataType="vm:CloudAlbumRow">
+                                    <Grid Width="128" Height="150" Margin="2" CornerRadius="{ThemeResource AppRadiusSmall}">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <Grid Background="{ThemeResource AppSurfaceAltBrush}"
+                                              CornerRadius="{ThemeResource AppRadiusSmall}">
+                                            <FontIcon Glyph="{x:Bind IconGlyph}" FontSize="28"
+                                                      Foreground="{ThemeResource TextTertiaryBrush}"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            <Image Source="{x:Bind Thumbnail, Mode=OneWay}" Stretch="UniformToFill" />
+                                        </Grid>
+                                        <StackPanel Grid.Row="1" Spacing="1">
+                                            <TextBlock Text="{x:Bind Name}" Style="{ThemeResource AppMicroTextStyle}"
+                                                       TextTrimming="CharacterEllipsis" MaxLines="2" />
+                                            <TextBlock Text="{x:Bind SizeText}" Style="{ThemeResource AppMicroTextStyle}"
+                                                       Foreground="{ThemeResource TextTertiaryBrush}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </GridView.ItemTemplate>
+                            <GridView.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <ItemsWrapGrid Orientation="Horizontal" MaximumRowsOrColumns="4" />
+                                </ItemsPanelTemplate>
+                            </GridView.ItemsPanel>
+                        </GridView>
+
+                        <TextBlock Text="{x:Bind ViewModel.AlbumStatus, Mode=OneWay}"
+                                   Style="{ThemeResource AppMicroTextStyle}"
+                                   Foreground="{ThemeResource TextSecondaryBrush}"
+                                   TextWrapping="Wrap" IsTextSelectionEnabled="True" />
                     </StackPanel>
                 </Border>
 

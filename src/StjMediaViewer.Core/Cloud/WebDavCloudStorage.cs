@@ -199,6 +199,75 @@ public sealed class WebDavCloudStorage : ICloudStorage
         catch (Exception ex) { throw Wrap("列出云端文件", null, ex); }
     }
 
+    /// <summary>只列一层目录（云相册浏览用）。</summary>
+    public async Task<IReadOnlyList<CloudEntry>> ListFolderAsync(string relativeDir, CancellationToken ct = default)
+    {
+        EnsureConfigured();
+        try
+        {
+            var dirRel = (relativeDir ?? "").Replace('\\', '/').Trim('/');
+            var dirUri = CombineUri(_rootAbsoluteUri, dirRel, isDirectory: true);
+            using var request = CreateRequest(PropFindMethod, dirUri, depth: "1");
+            request.Content = new StringContent(PropFindBody, Encoding.UTF8, "application/xml");
+            using var response = await SendLoggedAsync(request, ct).ConfigureAwait(false);
+            if ((int)response.StatusCode != HttpMultiStatus)
+                throw await BuildHttpErrorAsync(response, "列出云端目录", dirRel, ct).ConfigureAwait(false);
+
+            var xml = await response.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+            var result = new List<CloudEntry>();
+            foreach (var item in ParseMultiStatus(xml))
+            {
+                var rel = ToRelativePath(item.DecodedPath);
+                if (rel is null || rel.Length == 0) continue;
+                var parent = rel.Contains('/') ? rel[..rel.LastIndexOf('/')] : "";
+                if (!string.Equals(parent, dirRel, StringComparison.OrdinalIgnoreCase)) continue; // 只保留直接子项
+                result.Add(new CloudEntry
+                {
+                    RelativePath = rel,
+                    IsDirectory = item.IsCollection,
+                    SizeBytes = item.Size,
+                    ModifiedUtc = item.Modified,
+                });
+            }
+            result.Sort((a, b) =>
+            {
+                if (a.IsDirectory != b.IsDirectory) return a.IsDirectory ? -1 : 1;
+                return string.Compare(a.FileName, b.FileName, StringComparison.CurrentCultureIgnoreCase);
+            });
+            return result;
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (IOException) { throw; }
+        catch (Exception ex) { throw Wrap("列出云端目录", relativeDir, ex); }
+    }
+
+    /// <summary>读取一段字节；服务器不支持 Range（返回 200）时在本地切出请求区间。</summary>
+    public async Task<byte[]?> ReadRangeAsync(string relativePath, long offset, int length, CancellationToken ct = default)
+    {
+        EnsureConfigured();
+        if (offset < 0 || length <= 0) return null;
+        try
+        {
+            var uri = BuildFileUri(relativePath);
+            using var request = CreateRequest(HttpMethod.Get, uri);
+            request.Headers.TryAddWithoutValidation("Range", $"bytes={offset}-{offset + length - 1}");
+            using var response = await SendLoggedAsync(request, ct).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode) return null;
+
+            var bytes = await response.Content.ReadAsByteArrayAsync(ct).ConfigureAwait(false);
+            if (response.StatusCode == System.Net.HttpStatusCode.PartialContent) return bytes;
+            if (offset >= bytes.Length) return Array.Empty<byte>();
+            var count = (int)Math.Min(length, bytes.Length - offset);
+            return bytes.AsSpan((int)offset, count).ToArray();
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (Exception ex)
+        {
+            Log.Warn($"[webdav] Range 读取失败 {relativePath} @{offset}+{length}：{ex.Message}");
+            return null;
+        }
+    }
+
     private async Task<IReadOnlyList<CloudEntry>> ListAllCoreAsync(IProgress<string>? progress, CancellationToken ct)
     {
         var entries = new List<CloudEntry>();

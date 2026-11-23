@@ -205,6 +205,16 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** 当前选中的素材（云相册上传等批量操作用）。 */
+    fun selectedAssets(): List<MediaAsset> = allAssets.filter { it.id in state.selection }
+
+    /** 已有同路径媒体库就返回，否则新建（云相册下载目录自动入库）。 */
+    fun ensurePathRoot(path: String, name: String): LibraryRoot? {
+        graph.settings.libraries().firstOrNull { it.path == path }?.let { return it }
+        addPathRoot(path, name)
+        return graph.settings.libraries().lastOrNull()
+    }
+
     // ------------------------------------------------------------------ 扫描
 
     fun addPathRoot(path: String, name: String? = null) {

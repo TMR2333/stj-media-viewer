@@ -37,6 +37,27 @@ class SettingsStore(context: Context) {
         get() = prefs.getString("lastViewedAssetId", null)
         set(value) = prefs.edit().putString("lastViewedAssetId", value).apply()
 
+    // ---------------- 云相册（WebDAV） ----------------
+
+    var cloudUrl: String
+        get() = prefs.getString("cloudUrl", "") ?: ""
+        set(value) = prefs.edit().putString("cloudUrl", value.trim()).apply()
+
+    var cloudUser: String
+        get() = prefs.getString("cloudUser", "") ?: ""
+        set(value) = prefs.edit().putString("cloudUser", value.trim()).apply()
+
+    var cloudPassword: String
+        get() = prefs.getString("cloudPassword", "") ?: ""
+        set(value) = prefs.edit().putString("cloudPassword", value).apply()
+
+    var cloudRoot: String
+        get() = prefs.getString("cloudRoot", "") ?: ""
+        set(value) = prefs.edit().putString("cloudRoot", value.trim().trim('/')).apply()
+
+    val cloudConfigured: Boolean
+        get() = cloudUrl.isNotBlank() && cloudUser.isNotBlank()
+
     fun libraries(): List<LibraryRoot> {
         val raw = prefs.getString("libraries", null) ?: return emptyList()
         return try {

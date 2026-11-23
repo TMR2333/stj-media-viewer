@@ -208,7 +208,7 @@
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
                 <NavigationViewItem Content="地图" Tag="map" Icon="Map" />
-                <NavigationViewItem Content="云同步" Tag="cloud">
+                <NavigationViewItem Content="云相册" Tag="cloud">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE753;" />
                     </NavigationViewItem.Icon>

@@ -100,6 +100,25 @@ keyPassword=<pass>
 EOF
 ```
 
+## 云相册（0.2.0 新增，与 Windows / macOS 同一套语义）
+
+入口：素材库右上角 **云图标**。一个页面包含：云端浏览 / 预览 / 导入本机 / 上传所选素材。
+
+- **账号**：WebDAV 地址（如 `https://webdav.123pan.cn/webdav/`）+ 账号 + 密码（只存本机 SharedPreferences，不进交换文件、不进日志）。
+- **浏览**：PROPFIND `Depth:1` 列一层，面包屑 + 上一级；中文/空格路径逐段编码；服务器 302 到 CDN 时手动重发 `Range`。
+- **缩略图**（Range 按需）：
+  - ≤12MB 整文件下载 → 采样解码；
+  - JPEG 优先取 `ExifInterface` 内嵌缩略图（只读前 1MB）；
+  - RAW 用核心模块 `TiffPreview` + `RemoteByteSource`（Range）取内嵌预览，不下载整张；
+  - 视频暂用占位（不做首帧）；
+  - 磁盘缓存 `cacheDir/cloud-album`，键含路径/大小/修改时间。
+- **预览**：点击图片下载到缓存并弹出大图；其他格式提示不支持。
+- **导入**：勾选 → 「下载」→ 存到 `Android/data/com.stjarna.mediaviewer/files/Pictures/STJ云相册/`，自动加入媒体库并扫描（MediaScanner 通知系统相册）。
+- **上传**：在素材库长按选中素材 → 进云相册 → 「上传」→ 上传原文件 + 同名/同 stem 的 `.xmp` 边车到当前云端目录（`PUT`，失败自动带 `Expect: 100-continue` 重试，123pan 必需）。
+- **同步**：Windows 侧的差异计划/双向同步不在 Android 上重复实现，移动端定位是「看 + 取 + 传」；交换文件仍可迁移编辑成果。
+
+验收见 `docs/ANDROID-ACCEPTANCE.md` §云相册。
+
 ## 5. 权限与 root
 
 | 权限 | 用途 |

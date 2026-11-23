@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -59,6 +60,7 @@ import com.stjarna.mediaviewer.vm.LibraryViewModel
 fun LibraryScreen(
     vm: LibraryViewModel,
     onOpenSettings: () -> Unit,
+    onOpenCloud: () -> Unit = {},
 ) {
     val state = vm.state
     val app = StjApp.instance
@@ -123,6 +125,7 @@ fun LibraryScreen(
                         }) {
                             IconButton(onClick = { filterOpen = true }) { Icon(Icons.Filled.FilterList, "筛选") }
                         }
+                        IconButton(onClick = onOpenCloud) { Icon(Icons.Outlined.Cloud, "云相册") }
                         IconButton(onClick = onOpenSettings) { Icon(Icons.Filled.Settings, "设置") }
                     },
                     scrollBehavior = scrollBehavior,

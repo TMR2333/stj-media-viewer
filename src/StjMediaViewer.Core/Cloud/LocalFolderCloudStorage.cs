@@ -104,6 +104,52 @@ public sealed class LocalFolderCloudStorage : ICloudStorage
         }, ct);
     }
 
+    public Task<IReadOnlyList<CloudEntry>> ListFolderAsync(string relativeDir, CancellationToken ct = default)
+    {
+        var dir = Path.Combine(_root, Normalize(relativeDir));
+        if (!Directory.Exists(dir)) return Task.FromResult<IReadOnlyList<CloudEntry>>(Array.Empty<CloudEntry>());
+        var prefix = Normalize(relativeDir);
+        var result = new List<CloudEntry>();
+        foreach (var path in Directory.EnumerateFileSystemEntries(dir))
+        {
+            var info = new FileInfo(path);
+            var isDir = Directory.Exists(path);
+            var relative = prefix.Length == 0 ? info.Name : prefix + "/" + info.Name;
+            result.Add(new CloudEntry
+            {
+                RelativePath = relative.Replace('\\', '/'),
+                IsDirectory = isDir,
+                SizeBytes = isDir ? 0 : info.Length,
+                ModifiedUtc = info.LastWriteTimeUtc,
+            });
+        }
+        result.Sort((a, b) =>
+        {
+            if (a.IsDirectory != b.IsDirectory) return a.IsDirectory ? -1 : 1;
+            return string.Compare(a.FileName, b.FileName, StringComparison.CurrentCultureIgnoreCase);
+        });
+        return Task.FromResult<IReadOnlyList<CloudEntry>>(result);
+    }
+
+    public Task<byte[]?> ReadRangeAsync(string relativePath, long offset, int length, CancellationToken ct = default)
+    {
+        var full = Path.Combine(_root, Normalize(relativePath));
+        if (!File.Exists(full) || offset < 0 || length <= 0) return Task.FromResult<byte[]?>(null);
+        using var fs = new FileStream(full, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+        if (offset >= fs.Length) return Task.FromResult<byte[]?>(Array.Empty<byte>());
+        var count = (int)Math.Min(length, fs.Length - offset);
+        var buffer = new byte[count];
+        fs.Seek(offset, SeekOrigin.Begin);
+        var read = 0;
+        while (read < count)
+        {
+            var n = fs.Read(buffer, read, count - read);
+            if (n <= 0) break;
+            read += n;
+        }
+        return Task.FromResult<byte[]?>(read == count ? buffer : buffer[..read]);
+    }
+
     public Task DownloadAsync(string relativePath, string localPath, CancellationToken ct = default)
     {
         var src = ToAbsolute(relativePath);
