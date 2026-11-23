@@ -53,7 +53,6 @@ fun FilterSheet(vm: LibraryViewModel, onDismiss: () -> Unit) {
         LazyColumn(
             Modifier
                 .fillMaxWidth()
-                .heightIn(max = 560.dp)
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -284,12 +283,22 @@ fun DetailSheet(asset: MediaAsset, vm: LibraryViewModel, onDismiss: () -> Unit) 
     var themes by remember { mutableStateOf(asset.themes.joinToString(",")) }
     var tone by remember { mutableStateOf(asset.tone ?: "") }
     var keywords by remember { mutableStateOf(asset.keywords.joinToString(",")) }
+    var deviceKey by remember { mutableStateOf(asset.deviceKey ?: "") }
+    var cameraModel by remember { mutableStateOf(asset.cameraModel ?: "") }
+    var capturedText by remember {
+        mutableStateOf(
+            asset.capturedAt?.let {
+                java.text.SimpleDateFormat("yyyy-MM-dd HH:mm", java.util.Locale.getDefault()).format(java.util.Date(it))
+            } ?: ""
+        )
+    }
+    var latitude by remember { mutableStateOf(asset.latitude?.toString() ?: "") }
+    var longitude by remember { mutableStateOf(asset.longitude?.toString() ?: "") }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheet) {
         LazyColumn(
             Modifier
                 .fillMaxWidth()
-                .heightIn(max = 640.dp)
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -369,6 +378,51 @@ fun DetailSheet(asset: MediaAsset, vm: LibraryViewModel, onDismiss: () -> Unit) 
             }
             item {
                 TextField(
+                    value = deviceKey,
+                    onValueChange = { deviceKey = it },
+                    label = { Text("设备标识（如 ILCE-7M4 / X-T5，会参与设备筛选）") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+            }
+            item {
+                TextField(
+                    value = cameraModel,
+                    onValueChange = { cameraModel = it },
+                    label = { Text("相机型号（EXIF Model，可修正）") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+            }
+            item {
+                TextField(
+                    value = capturedText,
+                    onValueChange = { capturedText = it },
+                    label = { Text("拍摄时间（yyyy-MM-dd HH:mm，留空=未知）") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                )
+            }
+            item {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextField(
+                        value = latitude,
+                        onValueChange = { latitude = it },
+                        label = { Text("纬度") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                    )
+                    TextField(
+                        value = longitude,
+                        onValueChange = { longitude = it },
+                        label = { Text("经度") },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                    )
+                }
+            }
+            item {
+                TextField(
                     value = city,
                     onValueChange = { city = it },
                     label = { Text("拍摄地点（自由输入，如 平遥 / 上海·外滩）") },
@@ -425,6 +479,11 @@ fun DetailSheet(asset: MediaAsset, vm: LibraryViewModel, onDismiss: () -> Unit) 
                             asset.themes = themes.split(',', '，').map { it.trim() }.filter { it.isNotEmpty() }.toMutableList()
                             asset.tone = tone.trim().ifEmpty { null }
                             asset.keywords = keywords.split(',', '，').map { it.trim() }.filter { it.isNotEmpty() }.toMutableList()
+                            asset.deviceKey = deviceKey.trim().ifEmpty { null }
+                            asset.cameraModel = cameraModel.trim().ifEmpty { null }
+                            asset.capturedAt = parseDateTime(capturedText) ?: asset.capturedAt
+                            asset.latitude = latitude.trim().toDoubleOrNull()?.takeIf { it in -90.0..90.0 }
+                            asset.longitude = longitude.trim().toDoubleOrNull()?.takeIf { it in -180.0..180.0 }
                             vm.saveAsset(asset)
                             onDismiss()
                         },
@@ -486,4 +545,18 @@ fun BatchSheet(vm: LibraryViewModel, onDismiss: () -> Unit) {
             Spacer(Modifier.height(12.dp))
         }
     }
+}
+
+private fun parseDateTime(text: String): Long? {
+    val trimmed = text.trim()
+    if (trimmed.isEmpty()) return null
+    val patterns = listOf("yyyy-MM-dd HH:mm", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd")
+    for (pattern in patterns) {
+        runCatching {
+            val fmt = java.text.SimpleDateFormat(pattern, java.util.Locale.getDefault())
+            fmt.isLenient = false
+            return fmt.parse(trimmed)?.time
+        }
+    }
+    return null
 }

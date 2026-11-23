@@ -13,21 +13,25 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Badge
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -45,6 +49,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -69,7 +74,7 @@ fun LibraryScreen(
     var filterOpen by remember { mutableStateOf(false) }
     var detailAsset by remember { mutableStateOf<MediaAsset?>(null) }
     var batchOpen by remember { mutableStateOf(false) }
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    var sortOpen by remember { mutableStateOf(false) }
 
     LaunchedEffect(state.message) {
         state.message?.let {
@@ -79,7 +84,6 @@ fun LibraryScreen(
     }
 
     Scaffold(
-        modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
             if (searchOpen) {
                 Row(
@@ -105,7 +109,7 @@ fun LibraryScreen(
                     }) { Icon(Icons.Filled.Close, "关闭搜索") }
                 }
             } else {
-                LargeTopAppBar(
+                TopAppBar(
                     title = {
                         Text(
                             if (state.selection.isEmpty()) {
@@ -116,9 +120,33 @@ fun LibraryScreen(
                         )
                     },
                     actions = {
-                        IconButton(onClick = {
-                            vm.setSort(state.filter.sort)
-                        }) { Icon(Icons.Filled.Refresh, "切换排序") }
+                        Box {
+                            IconButton(onClick = { sortOpen = true }) { Icon(Icons.Filled.Sort, "排序") }
+                            DropdownMenu(expanded = sortOpen, onDismissRequest = { sortOpen = false }) {
+                                com.stjarna.mediaviewer.core.SortKey.entries.forEach { key ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                key.label + if (state.filter.sort == key) {
+                                                    if (state.filter.descending) " ↓" else " ↑"
+                                                } else ""
+                                            )
+                                        },
+                                        onClick = {
+                                            vm.setSort(key)
+                                            sortOpen = false
+                                        },
+                                    )
+                                }
+                                DropdownMenuItem(
+                                    text = { Text(if (state.filter.descending) "切换为升序" else "切换为降序") },
+                                    onClick = {
+                                        vm.setSort(state.filter.sort)
+                                        sortOpen = false
+                                    },
+                                )
+                            }
+                        }
                         IconButton(onClick = { searchOpen = true }) { Icon(Icons.Filled.Search, "搜索") }
                         BadgedBox(badge = {
                             if (state.filter.hasAnyFacet) Badge { Text("${filterCount(state)}") }
@@ -128,7 +156,6 @@ fun LibraryScreen(
                         IconButton(onClick = onOpenCloud) { Icon(Icons.Outlined.Cloud, "云相册") }
                         IconButton(onClick = onOpenSettings) { Icon(Icons.Filled.Settings, "设置") }
                     },
-                    scrollBehavior = scrollBehavior,
                 )
             }
         },
@@ -152,6 +179,7 @@ fun LibraryScreen(
                 contentPadding = PaddingValues(6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
+                state = rememberLazyGridState(),
                 modifier = Modifier.fillMaxSize(),
             ) {
                 item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {

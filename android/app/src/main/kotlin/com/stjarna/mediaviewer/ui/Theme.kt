@@ -68,8 +68,14 @@ fun StjTheme(
     }
     MaterialTheme(
         colorScheme = scheme,
-        content = content,
-    )
+    ) {
+        // Android 列表的拉伸回弹在快速滑动时观感很差；统一关掉 overscroll 效果。
+        androidx.compose.runtime.CompositionLocalProvider(
+            androidx.compose.foundation.LocalOverscrollFactory provides null,
+        ) {
+            content()
+        }
+    }
 }
 
 /** 强调色常量（用于自绘的小元素，如评分星、色标点）。 */

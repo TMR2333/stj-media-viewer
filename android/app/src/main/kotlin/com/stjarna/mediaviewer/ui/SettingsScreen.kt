@@ -164,12 +164,13 @@ fun SettingsScreen(
                 Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("明暗模式", style = MaterialTheme.typography.labelLarge)
                     SingleChoiceSegmentedButtonRow {
-                        listOf("system" to "跟随系统", "light" to "浅色", "dark" to "深色").forEachIndexed { i, (mode, label) ->
+                        listOf("system" to "系统", "light" to "浅色", "dark" to "深色").forEachIndexed { i, (mode, label) ->
                             SegmentedButton(
                                 selected = state.themeMode == mode,
                                 onClick = { vm.setTheme(mode) },
                                 shape = SegmentedButtonDefaults.itemShape(i, 3),
-                            ) { Text(label) }
+                                modifier = Modifier.weight(1f),
+                            ) { Text(label, maxLines = 1) }
                         }
                     }
                     ListItem(
@@ -186,7 +187,8 @@ fun SettingsScreen(
                                 selected = state.density == d,
                                 onClick = { vm.setDensity(d) },
                                 shape = SegmentedButtonDefaults.itemShape(i, 3),
-                            ) { Text(label) }
+                                modifier = Modifier.weight(1f),
+                            ) { Text(label, maxLines = 1) }
                         }
                     }
                 }
