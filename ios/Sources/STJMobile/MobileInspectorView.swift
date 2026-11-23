@@ -101,7 +101,7 @@ struct MobileInspectorView: View {
                 ForEach(ColorLabelOption.allCases) { option in
                     Circle()
                         .fill(option.color)
-                        .frame(width: 18, height: 18)
+                        .frame(width: 16, height: 16)
                         .overlay {
                             if asset.colorLabel?.lowercased() == option.rawValue {
                                 Circle().strokeBorder(Color.primary, lineWidth: 2)
@@ -139,8 +139,17 @@ struct MobileInspectorView: View {
 
     private func metaRow(_ title: String, _ value: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
-            Text(title).foregroundStyle(.secondary).frame(width: 64, alignment: .leading)
-            Text(value).textSelection(.enabled)
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(width: 56, alignment: .leading)
+                .lineLimit(1)
+            Text(value)
+                .font(.callout)
+                .textSelection(.enabled)
+                .lineLimit(value.count > 40 ? 3 : 2)
+                .truncationMode(.middle)
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 }

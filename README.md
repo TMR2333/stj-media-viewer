@@ -51,7 +51,13 @@
 | --- |
 | ![设置与图片数据迁移](shots/settings-exchange.png) |
 
-> 截图来自 1.39.0 发布包实机运行（主窗口 1800×1053，设置窗口 1120×1576，Retina 2x 缩小）。Liquid Glass 只在 macOS 26 上呈现，旧系统自动回退半透明材质。
+**iPadOS / iOS 预览（1.40.1 起，模拟器截图）**
+
+| iPad 网格（侧栏计数 + 图片/视频分库） | iPad 检视面板（评分/色标/元数据） |
+| --- | --- |
+| ![iPad 网格](shots/ipad-main.png) | ![iPad 检视](shots/ipad-inspector.png) |
+
+> macOS 截图来自 1.40.1 发布包实机运行（主窗口 1800×1053，设置窗口 1120×1576，Retina 2x 缩小）。iPad 截图来自 iOS 26.5 模拟器（iPad Pro 13" M4，2064×2752 缩至 1600 宽）。Liquid Glass 只在 macOS 26 上呈现，旧系统自动回退半透明材质。
 
 ## 快捷键
 

@@ -1,5 +1,6 @@
-import CoreGraphics
+import AVFoundation
 import Combine
+import CoreGraphics
 import Foundation
 import ImageIO
 import QuickLookThumbnailing
@@ -423,6 +424,10 @@ public final class ThumbnailStore: @unchecked Sendable {
             cache.setObject(ImageBox(image), forKey: key as NSString)
             return ThumbnailResult(image: image, source: .quickLook)
         }
+        if asset.isVideo, let image = Self.videoFrameImage(at: asset.fileURL) {
+            cache.setObject(ImageBox(image), forKey: key as NSString)
+            return ThumbnailResult(image: image, source: .quickLook)
+        }
         if let image = await loadImage(at: asset.fileURL, asset: asset) {
             cache.setObject(ImageBox(image), forKey: key as NSString)
             return ThumbnailResult(image: image, source: .fileSystem)
@@ -471,6 +476,21 @@ public final class ThumbnailStore: @unchecked Sendable {
                 continuation.resume(returning: image)
             }
         }
+    }
+
+    /// 视频帧兜底：模拟器/无 QuickLook 插件时用 AVFoundation 抽首帧。
+    /// （macOS 与 iOS 都可用，失败时返回 nil 并只在 debug 日志里留痕。）
+    static func videoFrameImage(at url: URL, maxPixel: Int = 640) -> CGImage? {
+        let asset = AVURLAsset(url: url)
+        let generator = AVAssetImageGenerator(asset: asset)
+        generator.appliesPreferredTrackTransform = true
+        generator.maximumSize = CGSize(width: maxPixel, height: maxPixel)
+        let time = CMTime(seconds: 0.1, preferredTimescale: 600)
+        guard let cgImage = try? generator.copyCGImage(at: time, actualTime: nil) else {
+            ThumbnailStore.logFailure("视频抽帧失败：\(url.lastPathComponent)")
+            return nil
+        }
+        return cgImage
     }
 
     public func quickLookImage(for asset: Asset, maxPixel: Int = 1024) async -> CGImage? {

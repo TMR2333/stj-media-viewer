@@ -22,7 +22,7 @@ struct MobileRootView: View {
                 .toolbar { toolbarContent }
                 .inspector(isPresented: $model.showsInspector) {
                     MobileInspectorView(model: model)
-                        .inspectorColumnWidth(min: 280, ideal: 320, max: 420)
+                        .inspectorColumnWidth(min: 260, ideal: 300, max: 360)
                 }
         }
         .task { await model.restoreLastLibrary() }
@@ -109,6 +109,7 @@ struct MobileRootView: View {
                 }
             }
         }
+        .navigationSplitViewColumnWidth(min: 240, ideal: 268, max: 300)
         .navigationTitle("STJ Media Viewer")
         .onChange(of: section) { _, newValue in applySection(newValue) }
     }

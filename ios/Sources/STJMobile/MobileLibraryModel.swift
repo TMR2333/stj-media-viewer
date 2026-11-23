@@ -134,6 +134,12 @@ final class MobileLibraryModel: ObservableObject {
             collections = snapshot.3
             let visible = Set(assets.map(\.id))
             selection = selection.filter { visible.contains($0) }
+            // 验收截图用：-preselectAssetID <uuid> 预设选中（模拟器里无法合成点击）
+            if selection.isEmpty,
+               let preset = UserDefaults.standard.string(forKey: "preselectAssetID"),
+               visible.contains(preset) {
+                selection = [preset]
+            }
         } catch {
             errorMessage = "读取素材库失败：\(error.localizedDescription)"
         }
