@@ -746,11 +746,14 @@ public sealed partial class LibraryPage : Page
             if (assets.Count == 0) assets = ViewModel.SelectedItems.Select(i => i.Asset).ToList();
             if (assets.Count == 0) { e.Cancel = true; return; }
 
+            // 拖拽内容由设置决定：全部（RAW+JPEG）/ 仅 RAW / 仅 JPEG / 仅主文件
+            var dragMode = AppServices.Settings.Current.DragFileMode ?? "all";
             var files = new List<Windows.Storage.StorageFile>();
             foreach (var asset in assets)
             {
                 foreach (var path in new[] { asset.FullPath }.Concat(asset.CompanionPaths))
                 {
+                    if (!IncludeForDrag(path, asset.FullPath, dragMode)) continue;
                     var file = DragFileCache.Take(path);
                     if (file is not null) files.Add(file);
                 }
@@ -2017,6 +2020,35 @@ public sealed partial class LibraryPage : Page
         };
         flyout.Items.Add(deleteItem);
 
+        var deleteJpegItem = new MenuFlyoutItem { Text = "仅删除 JPEG（保留 RAW）" };
+        deleteJpegItem.Click += async (_, _) =>
+        {
+            try
+            {
+                var targets = await ExpandTargetsAsync(TargetAssets(item));
+                var jpegs = targets.Where(IsJpegMember).ToList();
+                if (jpegs.Count == 0)
+                {
+                    AppEvents.SetStatus("所选里没有可删除的 JPEG（RAW 会保留）");
+                    return;
+                }
+                var kept = targets.Count - jpegs.Count;
+                var ok = await AppServices.Dialogs.ConfirmAsync(
+                    "仅删除 JPEG",
+                    $"把 {jpegs.Count} 个 JPEG 移入系统回收站，保留其余 {kept} 个文件（RAW 不动）。\n\n" +
+                    "适合「删废片只删预览、留底片」的场景；回收站里可以还原。",
+                    "仅删除 JPEG", "取消");
+                if (!ok) return;
+                await DeleteAssetsToRecycleBinAsync(jpegs, "JPEG");
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("仅删除 JPEG 失败", ex);
+                AppEvents.SetError($"仅删除 JPEG 失败：{ex.Message}");
+            }
+        };
+        flyout.Items.Add(deleteJpegItem);
+
         var collectionItem = new MenuFlyoutItem { Text = "加入影像合集…" };
         collectionItem.Click += async (_, _) => await ShowCollectionsDialogAsync(TargetAssets(item));
         flyout.Items.Add(collectionItem);
@@ -2036,6 +2068,51 @@ public sealed partial class LibraryPage : Page
         flyout.Items.Add(copyItem);
 
         flyout.ShowAt(AssetList, position);
+    }
+
+    private static readonly string[] DragRawExtensions =
+    {
+        ".arw", ".srf", ".sr2", ".cr2", ".cr3", ".nef", ".nrw", ".raf", ".orf",
+        ".rw2", ".pef", ".srw", ".x3f", ".dng", ".iiq", ".mos", ".gpr", ".3fr",
+    };
+
+    /// <summary>拖拽时某个路径是否要放进 DataPackage。</summary>
+    private static bool IncludeForDrag(string path, string primaryPath, string mode)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        var isPrimary = string.Equals(path, primaryPath, StringComparison.OrdinalIgnoreCase);
+        var ext = Path.GetExtension(path).ToLowerInvariant();
+        return mode switch
+        {
+            "raw" => DragRawExtensions.Contains(ext),
+            "jpeg" => ext is ".jpg" or ".jpeg",
+            "main" => isPrimary,
+            _ => true, // all：保持原有行为（RAW+JPEG 配对/边车一起）
+        };
+    }
+
+    /// <summary>把合并组封面展开成组内成员（删除/批量操作前用）。</summary>
+    private async Task<IReadOnlyList<MediaAsset>> ExpandTargetsAsync(IReadOnlyList<MediaAsset> assets)
+    {
+        try
+        {
+            return await SelectionExpander.ExpandMergeGroupsAsync(AppServices.Store, assets);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("展开合并组失败", ex);
+            return assets;
+        }
+    }
+
+    /// <summary>是否是 JPEG 成员（非 RAW，格式 JPEG/JPG 或扩展名 .jpg/.jpeg）。</summary>
+    private static bool IsJpegMember(MediaAsset asset)
+    {
+        if (asset.IsRaw) return false;
+        if (asset.FormatCode.Equals("JPEG", StringComparison.OrdinalIgnoreCase) ||
+            asset.FormatCode.Equals("JPG", StringComparison.OrdinalIgnoreCase)) return true;
+        var ext = Path.GetExtension(asset.FullPath).ToLowerInvariant();
+        return ext is ".jpg" or ".jpeg";
     }
 
     private IReadOnlyList<MediaAsset> TargetAssets(AssetCardItem fallback)

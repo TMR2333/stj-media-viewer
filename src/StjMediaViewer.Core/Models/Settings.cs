@@ -79,6 +79,9 @@ public sealed class AppSettings
     public bool UseFfmpegWhenAvailable { get; set; } = true;
     public bool UseOnlineGeocoding { get; set; }
     public bool WriteXmpOnSave { get; set; } = true;
+
+    /// <summary>拖到外部软件时带哪些文件：all=RAW+JPEG（默认）/ raw / jpeg / main（只主文件）。</summary>
+    public string DragFileMode { get; set; } = "all";
     public bool AutoClassifyOnImport { get; set; }
     public int ThumbnailCacheMb { get; set; } = 512;
 

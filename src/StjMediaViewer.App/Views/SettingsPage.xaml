@@ -360,6 +360,19 @@
                                           VerticalAlignment="Center" />
                         </Grid>
                     </Border>
+                    <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                        <TextBlock Text="拖拽到外部软件时" Style="{StaticResource FieldLabelStyle}" MinWidth="140" />
+                        <ComboBox x:Name="DragModeBox" MinWidth="260" SelectionChanged="DragMode_SelectionChanged">
+                            <ComboBoxItem Content="RAW + JPEG（默认，配对一起拖）" Tag="all" />
+                            <ComboBoxItem Content="仅 RAW" Tag="raw" />
+                            <ComboBoxItem Content="仅 JPEG" Tag="jpeg" />
+                            <ComboBoxItem Content="仅主文件（不拖配对/边车）" Tag="main" />
+                        </ComboBox>
+                    </StackPanel>
+                    <TextBlock Text="拖到 Photoshop / Lightroom 等外部软件时，决定 DataPackage 里放哪些文件；只影响拖拽，不改磁盘。"
+                               Style="{ThemeResource AppMicroTextStyle}"
+                               Foreground="{ThemeResource TextTertiaryBrush}"
+                               TextWrapping="Wrap" />
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto" />

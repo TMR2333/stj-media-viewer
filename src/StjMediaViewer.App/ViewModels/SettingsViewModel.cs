@@ -369,6 +369,7 @@ public sealed partial class SettingsViewModel : ObservableObject
         {
             var settings = AppServices.Settings.Current;
             var ai = settings.Ai;
+            LoadDragFileMode();
 
             ProviderId = NormalizeProvider(ai.ProviderId);
             BaseUrl = ai.BaseUrl;
@@ -793,6 +794,28 @@ public sealed partial class SettingsViewModel : ObservableObject
     // ==================================================================================
     //  照片 / 视频分库
     // ==================================================================================
+    // ------------------------------------------------------------------
+    //  拖拽到外部软件时包含哪些文件
+    // ------------------------------------------------------------------
+    [ObservableProperty] private string _dragFileMode = "all";
+
+    public void LoadDragFileMode()
+    {
+        DragFileMode = string.IsNullOrWhiteSpace(AppServices.Settings.Current.DragFileMode)
+            ? "all"
+            : AppServices.Settings.Current.DragFileMode;
+    }
+
+    partial void OnDragFileModeChanged(string value)
+    {
+        try
+        {
+            AppServices.Settings.Current.DragFileMode = value;
+            _ = AppServices.Settings.SaveAsync();
+        }
+        catch (Exception ex) { Log.Warn("保存拖拽模式失败", ex); }
+    }
+
     [ObservableProperty] private bool _splitMediaKindLibraries;
 
     [ObservableProperty] private string _splitLibraryStatus = "";

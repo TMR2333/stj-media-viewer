@@ -44,6 +44,13 @@ public sealed partial class SettingsPage : Page
                 "dark" => 2,
                 _ => 0,
             };
+            DragModeBox.SelectedIndex = ViewModel.DragFileMode switch
+            {
+                "raw" => 1,
+                "jpeg" => 2,
+                "main" => 3,
+                _ => 0,
+            };
         }
         finally
         {
@@ -92,6 +99,20 @@ public sealed partial class SettingsPage : Page
     // ==================================================================================
     //  外观（明暗；设计语言已收敛为单一 Fluent）
     // ==================================================================================
+    private void DragMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressUiEvents) return;
+        if (DragModeBox.SelectedItem is not ComboBoxItem { Tag: string mode }) return;
+        ViewModel.DragFileMode = mode;
+        AppEvents.SetStatus(mode switch
+        {
+            "raw" => "拖拽：只带 RAW",
+            "jpeg" => "拖拽：只带 JPEG",
+            "main" => "拖拽：只带主文件",
+            _ => "拖拽：RAW + JPEG 一起",
+        });
+    }
+
     private async void ThemeMode_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (_suppressUiEvents) return;
