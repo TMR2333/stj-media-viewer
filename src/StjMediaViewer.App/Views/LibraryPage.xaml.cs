@@ -7,6 +7,7 @@ using Microsoft.UI.Xaml.Media;
 using StjMediaViewer.App.Services;
 using StjMediaViewer.App.ViewModels;
 using StjMediaViewer.Core.Models;
+using StjMediaViewer.Core.Scanning;
 using StjMediaViewer.Core.Util;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Storage.Pickers;
@@ -1034,14 +1035,76 @@ public sealed partial class LibraryPage : Page
             Log.Warn("清理已删除素材的索引失败", ex);
         }
 
+        // 删掉 JPG 后，原本只作为"配对伴随文件"存在的 RAW 需要重新独立入库，
+        // 否则索引里没有它 → 界面只剩删不掉的空目录视图。
+        var restored = await RestoreOrphanCompanionsAsync(assets);
+
         AppEvents.RaiseLibraryContentChanged();
         ViewModel.RequestRefresh(immediate: true);
         await ViewModel.RefreshCollectionsAsync();
         await ViewModel.RefreshMergeGroupsAsync();
 
+        var suffix = restored > 0 ? $"，并把 {restored} 个 RAW/配对文件独立入库" : "";
         AppEvents.SetStatus(deleted >= assets.Count
-            ? $"已把 {deleted} 个{label}移入回收站"
-            : $"已移入回收站 {deleted} / {assets.Count} 个{label}（其余可能已被占用或已删除）");
+            ? $"已把 {deleted} 个{label}移入回收站{suffix}"
+            : $"已移入回收站 {deleted} / {assets.Count} 个{label}（其余可能已被占用或已删除）{suffix}");
+    }
+
+    /// <summary>
+    /// 删除 JPG 后，把仍然存在的配对文件（RAW / 其它副本）重新建成独立素材。
+    /// 扫描器原本把它们放在 CompanionPaths 里不单独入库，删掉封面后就"消失"了。
+    /// </summary>
+    private async Task<int> RestoreOrphanCompanionsAsync(IReadOnlyList<MediaAsset> deleted)
+    {
+        var added = 0;
+        var libraries = AppServices.Settings.Current.Libraries;
+        foreach (var asset in deleted)
+        {
+            if (asset.CompanionPaths.Count == 0) continue;
+            foreach (var companion in asset.CompanionPaths)
+            {
+                try
+                {
+                    if (string.IsNullOrWhiteSpace(companion) || !File.Exists(companion)) continue;
+                    if (await AppServices.Store.GetByPathAsync(companion) is not null) continue;
+
+                    var info = new FileInfo(companion);
+                    var meta = AppServices.Metadata.Read(companion);
+                    var root = libraries
+                        .Where(r => !string.IsNullOrWhiteSpace(r.Path) &&
+                                    companion.StartsWith(r.Path, StringComparison.OrdinalIgnoreCase))
+                        .OrderByDescending(r => r.Path.Length)
+                        .FirstOrDefault();
+
+                    var promoted = new MediaAsset
+                    {
+                        Id = LibraryScanner.MakeId(companion),
+                        LibraryId = root?.Id ?? asset.LibraryId,
+                        FullPath = companion,
+                        FileName = info.Name,
+                        RelativePath = root is null ? info.Name : Path.GetRelativePath(root.Path, companion),
+                        SizeBytes = info.Length,
+                        FileModified = info.LastWriteTimeUtc,
+                        FileCreated = info.CreationTimeUtc,
+                        Kind = meta.Kind,
+                        FormatCode = meta.FormatCode,
+                        MimeType = meta.MimeType,
+                        ImageFlavor = meta.ImageFlavor,
+                        RawFormat = meta.RawFormat,
+                        IndexedAt = DateTimeOffset.Now,
+                    };
+                    meta.ApplyTo(promoted);
+                    await AppServices.Store.UpsertAsync(promoted);
+                    added++;
+                    Log.Info($"[delete] 配对文件重新入库：{info.Name}");
+                }
+                catch (Exception ex)
+                {
+                    Log.Warn($"重新入库配对文件失败：{companion}", ex);
+                }
+            }
+        }
+        return added;
     }
 
     private async void BatchEdit_Click(object sender, RoutedEventArgs e)

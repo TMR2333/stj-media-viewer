@@ -30,7 +30,7 @@ internal static class Program
 {
     private const string AppName = "STJ Media Viewer";
     private const string AppId = "StjMediaViewer";
-    private const string Version = "1.29.0";
+    private const string Version = "1.29.1";
     private const string Publisher = "Stjarna Perspective";
     private const string ExeName = "StjMediaViewer.exe";
     private const string UninstallSubKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\" + AppId;
