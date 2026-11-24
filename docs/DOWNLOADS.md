@@ -1,56 +1,50 @@
-# 全平台下载（统一入口）
+# 全平台下载（统一仓库，按平台分发行版）
 
-**一个发行版装下所有平台**：最新版本 Release 即全平台下载页。
+所有平台的源码和安装包都在 **同一个仓库** `TMR2333/stj-media-viewer`：
 
-- 统一入口（当前 = v1.28.3）：<https://gitcode.com/TMR2333/stj-media-viewer/releases/tag/v1.28.3>
-- 历史版本：各 `vX.Y.Z` Release（回滚用）
-- 旧聚合页 `latest` 已改为跳转提示，仅保留旧附件。
+- 主分支 `master`：Windows + Android 源码；
+- 分支 `macos`：macOS + iPadOS 源码（原独立 macOS 仓库内容迁入）；
+- 发行版按平台划分：主发行版只放 Windows/Android，macOS 发行版只放 macOS/iPadOS，互不混放。
 
-## 直接下载（v1.28.3）
+## 1. 主发行版（Windows + Android）
 
-| 平台 | 文件 | 说明 |
-| --- | --- | --- |
-| Windows 10/11 x64 | [`STJMediaViewer-1.28.3-Setup.exe`](https://gitcode.com/TMR2333/stj-media-viewer/releases/download/v1.28.3/STJMediaViewer-1.28.3-Setup.exe) | 安装版（自包含） |
-| Windows 10/11 x64 | [`STJMediaViewer-1.28.3-portable.exe`](https://gitcode.com/TMR2333/stj-media-viewer/releases/download/v1.28.3/STJMediaViewer-1.28.3-portable.exe) | 便携版（免安装） |
-| Android 8.0+ | [`STJMediaViewer-Android-0.4.0.apk`](https://gitcode.com/TMR2333/stj-media-viewer/releases/download/v1.28.3/STJMediaViewer-Android-0.4.0.apk) | release 签名 |
-| macOS 12+（arm64/x86_64） | [`STJMediaViewer-1.36.0-macos-arm64-x86_64.dmg`](https://gitcode.com/TMR2333/stj-media-viewer/releases/download/v1.28.3/STJMediaViewer-1.36.0-macos-arm64-x86_64.dmg) | 通用二进制 |
-| 校验 | [`downloads.json`](https://gitcode.com/TMR2333/stj-media-viewer/releases/download/v1.28.3/downloads.json) | 大小 + SHA-256 + 直链 |
+👉 <https://gitcode.com/TMR2333/stj-media-viewer/releases/tag/v1.29.0>
 
-## SHA-256
+| 平台 | 文件 |
+| --- | --- |
+| Windows 10/11 x64 | [`STJMediaViewer-1.29.0-Setup.exe`](https://gitcode.com/TMR2333/stj-media-viewer/releases/download/v1.29.0/STJMediaViewer-1.29.0-Setup.exe) |
+| Windows 10/11 x64 | [`STJMediaViewer-1.29.0-portable.exe`](https://gitcode.com/TMR2333/stj-media-viewer/releases/download/v1.29.0/STJMediaViewer-1.29.0-portable.exe) |
+| Android 8.0+ | [`STJMediaViewer-Android-0.4.0.apk`](https://gitcode.com/TMR2333/stj-media-viewer/releases/download/v1.29.0/STJMediaViewer-Android-0.4.0.apk) |
 
-| 文件 | 大小 | SHA-256 |
-| --- | --- | --- |
-| STJMediaViewer-1.28.3-Setup.exe | 155,444,193 B | `2ab6d294465f450f850587989bb604789e5d2a0724da00501ab748191ac7686a` |
-| STJMediaViewer-1.28.3-portable.exe | 155,444,193 B | `2ab6d294465f450f850587989bb604789e5d2a0724da00501ab748191ac7686a` |
-| STJMediaViewer-Android-0.4.0.apk | 14,096,922 B | `91414e7e855d74744c47e1d8d47be8bf8d70eb4e32ea35e721e59cbaea8d6f14` |
-| STJMediaViewer-1.36.0-macos-arm64-x86_64.dmg | 5,104,417 B | `027969cbdc5113fe2988ba43df30eb58363b19370168d54f3944474ff793ae90` |
+## 2. macOS 发行版（只放 macOS）
 
-> Windows 的 Setup 与 portable 是同一份自包含产物，哈希相同（安装器负责释放/建快捷方式）。
+👉 <https://gitcode.com/TMR2333/stj-media-viewer/releases/tag/v1.42.1-macos>
 
-## 各平台版本对照
+| 平台 | 文件 |
+| --- | --- |
+| macOS 12+（arm64/x86_64） | [`STJMediaViewer-1.42.1-macos-arm64-x86_64.dmg`](https://gitcode.com/TMR2333/stj-media-viewer/releases/download/v1.42.1-macos/STJMediaViewer-1.42.1-macos-arm64-x86_64.dmg) |
+
+## 3. iPadOS 发行版（只放 iPadOS）
+
+👉 <https://gitcode.com/TMR2333/stj-media-viewer/releases/tag/v0.3.1-ios>
+
+| 平台 | 文件 |
+| --- | --- |
+| iPadOS | [`STJMobile-0.3.1-unsigned.ipa`](https://gitcode.com/TMR2333/stj-media-viewer/releases/download/v0.3.1-ios/STJMobile-0.3.1-unsigned.ipa)（未签名，需自签安装） |
+
+## 版本对照
 
 | 平台 | 版本 | 源码位置 |
 | --- | --- | --- |
-| Windows | 1.28.3 | 本仓库 `src/` |
-| Android | 0.4.0 | 本仓库 `android/` |
-| macOS | 1.36.0 | 独立仓库 `stj-media-viewer-macos` |
+| Windows | 1.29.0 | `master` 分支 `src/` |
+| Android | 0.4.0 | `master` 分支 `android/` |
+| macOS | 1.42.1 | `macos` 分支 |
+| iPadOS | 0.3.1 | `macos` 分支 `ios/` |
 
-## 发版时怎么保持"一个发行版"
+> 历史 Release 里 1.28.3 及更早的附件包含过 macOS dmg / 全平台校验文件，属旧结构，不再作为入口；新发版一律按上面三类分开发行。
 
-1. 正常构建 Windows 安装包/便携版、Android APK；
-2. 创建该版本的 Release（`vX.Y.Z`）；
-3. 把 **Windows Setup / portable / Android APK / macOS dmg / downloads.json** 全部上传到这一个 Release；
-4. 更新本文件与 README 的统一入口指向新版本；
-5. 旧版本 Release 保留作回滚，不再上传新附件。
+## 发版规则
 
-## 自动化脚本
-
-- `tools/gc-upload-cfg.py <tag> <文件名> <字节数> <输出cfg>`：向 GitCode 申请上传地址并生成 curl 配置；
-- `tools/gc-release.py <upload-url|patch|list|delete-all|asset-ids> ...`：申请上传地址 / 改发行说明 / 查看附件 / 尽力删除附件。
-
-示例（上传一个附件）：
-
-```bash
-python tools/gc-upload-cfg.py v1.28.3 STJMediaViewer-Android-0.4.0.apk 14096922 /tmp/up.cfg
-curl -sS --fail -T dist/STJMediaViewer-Android-0.4.0.apk -K /tmp/up.cfg -w ' -> %{http_code}\n'
-```
+1. Windows/Android 改动：升版本 → 构建 Setup/portable/APK → 打 `vX.Y.Z` → 只把这三类附件传到该 Release；
+2. macOS/iPadOS 改动：在 `macos` 分支开发 → 打 `vX.Y.Z-macos` / `vX.Y.Z-ios` → 只把 dmg / ipa 传到对应 Release；
+3. 不再把 macOS dmg 放进主发行版，也不把 Windows/Android 放进 macOS/iPadOS 发行版。

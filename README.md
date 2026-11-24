@@ -677,20 +677,18 @@ macOS 版是独立的 SwiftUI 原生应用（NavigationSplitView 三栏、Liquid
 本仓库（Windows / WinUI 3 主版本）不再包含 macOS 源码、构建脚本与相关文档；
 历史上发布过的 macOS 版本（`v1.25.0-macos` … `v1.35.0-macos`）仍可从原发行版页面下载。
 
-## 3.5 下载：全平台统一入口
+## 3.5 下载（统一仓库，按平台分发行版）
 
-Windows / Android / macOS 的安装包统一放在**最新版本的那个发行版**里（一个 Release 包含全部平台）：
+所有平台源码/安装包都在本仓库；发行版按平台分开，不混放：
 
-👉 **<https://gitcode.com/TMR2333/stj-media-viewer/releases/tag/v1.28.3>**（最新版本 Release = 全平台下载页）
+| 平台 | 发行版 | 文件 |
+| --- | --- | --- |
+| Windows 10/11 x64 | [v1.29.0](https://gitcode.com/TMR2333/stj-media-viewer/releases/tag/v1.29.0) | `STJMediaViewer-1.29.0-Setup.exe` / `-portable.exe` |
+| Android 8.0+ | [v1.29.0](https://gitcode.com/TMR2333/stj-media-viewer/releases/tag/v1.29.0) | `STJMediaViewer-Android-0.4.0.apk` |
+| macOS 12+ | [v1.42.1-macos](https://gitcode.com/TMR2333/stj-media-viewer/releases/tag/v1.42.1-macos) | `STJMediaViewer-1.42.1-macos-arm64-x86_64.dmg` |
+| iPadOS | [v0.3.1-ios](https://gitcode.com/TMR2333/stj-media-viewer/releases/tag/v0.3.1-ios) | `STJMobile-0.3.1-unsigned.ipa` |
 
-| 平台 | 文件 |
-| --- | --- |
-| Windows 10/11 x64 | `STJMediaViewer-1.28.2-Setup.exe` / `STJMediaViewer-1.29.0-portable.exe` |
-| Android 8.0+ | `STJMediaViewer-Android-0.4.0.apk` |
-| macOS 12+ | `STJMediaViewer-1.36.0-macos-arm64-x86_64.dmg`（源码在独立仓库） |
-
-校验值与各平台版本对照见 [`docs/DOWNLOADS.md`](docs/DOWNLOADS.md)。
-历史版本仍保留在各 `vX.Y.Z` Release，便于回滚；`latest` 旧聚合页只作跳转提示。
+macOS/iPadOS 源码在主仓库 `macos` 分支；详细说明与校验见 [`docs/DOWNLOADS.md`](docs/DOWNLOADS.md)。
 
 ## 3.6 Android 移动伴生版（Material 3 Expressive）
 
