@@ -475,6 +475,54 @@ public sealed partial class ShellPage : Page
     // ==================================================================================
     private async void ScanButton_Click(object sender, RoutedEventArgs e) => await PickAndScanLibraryAsync();
 
+    /// <summary>刷新：对所有已添加的媒体库做一次增量扫描（不弹目录选择）。</summary>
+    private async void RefreshButton_Click(object sender, RoutedEventArgs e)
+    {
+        var libraries = AppServices.Settings.Current.Libraries;
+        if (libraries.Count == 0)
+        {
+            AppEvents.SetStatus("还没有媒体库，先点「扫描」选择一个文件夹");
+            return;
+        }
+        try
+        {
+            int added = 0, found = 0;
+            foreach (var library in libraries)
+            {
+                AppEvents.ReportScan(new ScanStatus
+                {
+                    IsActive = true,
+                    IsIndeterminate = true,
+                    Text = $"正在刷新 {library.Name} …",
+                });
+                var progress = new Progress<ScanProgress>(p => AppEvents.ReportScan(new ScanStatus
+                {
+                    IsActive = true,
+                    IsIndeterminate = p.Total <= 0,
+                    Percent = p.Percent,
+                    Text = $"{library.Name} · {p.Phase} · {p.Processed}/{p.Total}",
+                }));
+                var result = await AppServices.Library.ScanLibraryAsync(library, new ScanOptions(), progress);
+                added += result.Added;
+                found += result.MediaFound;
+            }
+            AppEvents.ReportScan(new ScanStatus
+            {
+                IsActive = false,
+                Text = $"刷新完成：{found} 个媒体文件（新增 {added}）",
+            });
+            AppEvents.RaiseLibraryContentChanged();
+            _ = ViewModel.RefreshCacheSizeAsync();
+            if (added == 0) AppEvents.SetStatus("没有发现新文件（已是最新索引）");
+        }
+        catch (Exception ex)
+        {
+            Log.Warn("刷新媒体库失败", ex);
+            AppEvents.ReportScan(new ScanStatus { IsActive = false });
+            AppEvents.SetError($"刷新失败：{ex.Message}");
+        }
+    }
+
     private async Task PickAndScanLibraryAsync()
     {
         try

@@ -137,6 +137,16 @@
                               IsActive="{x:Bind ViewModel.IsScanning, Mode=OneWay}"
                               Visibility="{x:Bind ViewModel.ScanRingVisibility, Mode=OneWay}" />
 
+                <Button x:Name="RefreshButton"
+                        Style="{StaticResource TopBarCompactButtonStyle}"
+                        Click="RefreshButton_Click"
+                        ToolTipService.ToolTip="重新扫描已添加的媒体库（增量；新修的 JPG / 新的 RAW 会入库并重新配对）">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon Glyph="&#xE72C;" FontSize="{ThemeResource AppFontCaptionSize}" />
+                        <TextBlock Text="刷新" Style="{ThemeResource AppCaptionTextStyle}" />
+                    </StackPanel>
+                </Button>
+
                 <Button x:Name="ScanButton"
                         Style="{StaticResource TopBarCompactButtonStyle}"
                         Click="ScanButton_Click"
