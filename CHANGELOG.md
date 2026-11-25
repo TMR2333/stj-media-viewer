@@ -7,6 +7,16 @@
 > <https://gitcode.com/TMR2333/stj-media-viewer-macos>。
 > 本文件中涉及 macOS 的条目均为历史记录，不再随本仓库更新。
 
+## v1.29.3 — 2026-11-25
+
+### 新增：地点数据恢复工具 GeoRestore
+
+- 从旧索引备份（`catalog.db.bak-*`）按完整路径恢复 `city/province/country`，匹配不到的再按
+  `G:\媒体\图片\<地点>\<日期>` 的目录名推断；
+- 同时写回 XMP 边车（`photoshop:City`），之后重扫/重装不会再丢；
+- 默认只填空值，`--dry-run` 预览，`--overwrite` 覆盖，`--no-xmp` 只写索引；
+- 说明：[`docs/GEO-RESTORE.md`](docs/GEO-RESTORE.md)。
+
 ## v1.29.2 — 2026-11-25
 
 ### 新增：顶栏「刷新」
