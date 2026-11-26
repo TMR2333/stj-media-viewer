@@ -137,9 +137,18 @@ fun CloudAlbumScreen(
             Text(
                 state.status,
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (state.error != null) MaterialTheme.colorScheme.error
+                else MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                 modifier = Modifier.padding(horizontal = 12.dp),
             )
+            state.error?.let { err ->
+                TextButton(
+                    onClick = { vm.connect() },
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                ) { Text("重试（$err）") }
+            }
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(104.dp),
                 contentPadding = PaddingValues(6.dp),

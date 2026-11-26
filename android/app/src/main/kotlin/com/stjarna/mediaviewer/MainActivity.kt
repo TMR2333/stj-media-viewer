@@ -11,6 +11,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -51,9 +53,10 @@ private fun AppRoot(vm: LibraryViewModel, cloudVm: com.stjarna.mediaviewer.cloud
     var showCloud by rememberSaveable { mutableStateOf(false) }
     val app = LocalContext.current.applicationContext
 
+    var permissionDenied by remember { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
-    ) { }
+    ) { granted -> permissionDenied = granted.values.any { !it } }
     LaunchedEffect(Unit) {
         val permissions = if (Build.VERSION.SDK_INT >= 33) {
             arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
@@ -84,6 +87,29 @@ private fun AppRoot(vm: LibraryViewModel, cloudVm: com.stjarna.mediaviewer.cloud
         ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri != null) vm.prepareImport(uri)
+    }
+
+    if (permissionDenied) {
+        androidx.compose.material3.AlertDialog(
+            onDismissRequest = { permissionDenied = false },
+            title = { Text("需要媒体权限才能扫描素材") },
+            text = { Text("请在系统设置里允许「照片和视频」权限，然后回到应用点「扫描」。") },
+            confirmButton = {
+                androidx.compose.material3.TextButton(onClick = {
+                    permissionDenied = false
+                    runCatching {
+                        val intent = Intent(
+                            android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            android.net.Uri.fromParts("package", app.packageName, null),
+                        )
+                        app.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    }
+                }) { Text("去设置授权") }
+            },
+            dismissButton = {
+                androidx.compose.material3.TextButton(onClick = { permissionDenied = false }) { Text("稍后") }
+            },
+        )
     }
 
     if (showCloud) {

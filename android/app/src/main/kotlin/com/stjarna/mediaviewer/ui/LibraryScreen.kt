@@ -208,12 +208,21 @@ fun LibraryScreen(
                 }
                 if (state.filtered.isEmpty() && !state.loading) {
                     item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                        val noAssets = state.assets.isEmpty()
                         EmptyState(
-                            title = if (state.assets.isEmpty()) "还没有素材" else "没有符合筛选的素材",
-                            description = if (state.assets.isEmpty()) {
+                            title = if (noAssets) "还没有素材" else "没有符合筛选的素材",
+                            description = if (noAssets) {
                                 "点右下角「扫描」索引系统相册，或到设置里添加相机/素材文件夹。"
                             } else {
-                                "试试右侧筛选里的「重置」，或换个关键词。"
+                                "当前筛选/搜索没有命中，可以清空后重新筛。"
+                            },
+                            actionText = if (noAssets) "去添加素材" else "清空筛选",
+                            onAction = {
+                                if (noAssets) onOpenSettings()
+                                else {
+                                    searchOpen = false
+                                    vm.resetFilter()
+                                }
                             },
                         )
                     }

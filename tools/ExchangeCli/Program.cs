@@ -96,7 +96,7 @@ internal static class Program
     }
 
     private const string AssetSortKeysCaptured = "capturedAt";
-    private const string Version = "1.29.3";
+    private const string Version = "1.30.0";
 
     private static string DefaultDataDir() => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "StjMediaViewer");

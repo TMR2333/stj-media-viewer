@@ -7,6 +7,33 @@
 > <https://gitcode.com/TMR2333/stj-media-viewer-macos>。
 > 本文件中涉及 macOS 的条目均为历史记录，不再随本仓库更新。
 
+## v1.30.0 — 2026-11-26
+
+### 用 BadGoods 技能做的一轮 UI/UX 优化（Windows 1.30.0 / Android 0.5.0）
+
+按 [BadGoods](https://github.com/BadbotAI/BadGoods) 的四个技能（review-frontend-production / ux-writer /
+ui-walkthrough / frontend-to-ue）做快速体检与文案审查，产物在 [`docs/skills/`](docs/skills/README.md)：
+
+- `README.md`：技能用法 + 文案策略卡（定位/用户三问/语气表/对象动作词表）
+- `quick-review-windows.md` / `quick-review-android.md`：quick review 报告（证据、优先级、修复、复验）
+- `walkthrough-cases.md`：页面五态/0-1-多/中断/边界用例
+- `page-map.md`：原生应用的页面—入口—交互地图
+- 以及给 macOS 的 [`docs/MACOS-SKILLS-PROMPT.md`](docs/MACOS-SKILLS-PROMPT.md)
+
+**Windows 修复**
+- 云相册加载失败：错误条（原因 + 重试），成功后消失；重试保留当前目录；
+- 「下载到素材库」未勾选即禁用；「上传所选素材」tooltip 说明前置条件与 XMP；
+- 云相册状态行最多 2 行省略，长异常不撑破布局；
+- 顶栏「刷新」支持 **F5**。
+
+**Android 0.5.0 修复**
+- 空态可行动：「去添加素材」/「清空筛选」；
+- 权限被拒：说明原因 + 「去设置授权」，不再静默；
+- 云相册失败：错误色状态 + 「重试」；
+- 详情保存失败：snackbar 报错不崩溃；状态文案限 2 行。
+
+**未完成/未验证**：键盘与读屏全量走查、200% 缩放、真机性能；已在报告中标为未验证。
+
 ## v1.29.3 — 2026-11-25
 
 ### 新增：地点数据恢复工具 GeoRestore

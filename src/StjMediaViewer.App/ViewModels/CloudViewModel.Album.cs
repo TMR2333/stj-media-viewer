@@ -33,6 +33,23 @@ public sealed partial class CloudViewModel
 
     public int AlbumSelectedCount => _albumSelection.Count;
 
+    /// <summary>有勾选才能"下载到素材库"。</summary>
+    public bool AlbumHasSelection => _albumSelection.Count > 0;
+
+    /// <summary>最近一次列目录/连接的错误（失败时页面显示重试条）。</summary>
+    [ObservableProperty] private string? _albumError;
+
+    public Visibility AlbumErrorVisibility =>
+        string.IsNullOrWhiteSpace(AlbumError) ? Visibility.Collapsed : Visibility.Visible;
+
+    public bool AlbumHasError => !string.IsNullOrWhiteSpace(AlbumError);
+
+    partial void OnAlbumErrorChanged(string? value)
+    {
+        OnPropertyChanged(nameof(AlbumErrorVisibility));
+        OnPropertyChanged(nameof(AlbumHasError));
+    }
+
     public async Task LoadAlbumAsync(string? path = null)
     {
         var target = SelectedTarget?.Target ?? Targets.FirstOrDefault()?.Target;
@@ -55,6 +72,7 @@ public sealed partial class CloudViewModel
             AlbumRows.Clear();
             _albumSelection.Clear();
             OnPropertyChanged(nameof(AlbumSelectedCount));
+            OnPropertyChanged(nameof(AlbumHasSelection));
             foreach (var entry in visible) AlbumRows.Add(new CloudAlbumRow(entry));
             var summary = visible.Count == 0
                 ? "这个目录是空的"
@@ -64,6 +82,7 @@ public sealed partial class CloudViewModel
         }
         catch (Exception ex)
         {
+            AlbumError = ex.Message;
             AlbumStatus = "列出云端目录失败：" + ex.Message;
             Log.Warn("[cloud-album] 列目录失败", ex);
         }
@@ -107,6 +126,7 @@ public sealed partial class CloudViewModel
         _albumSelection.Clear();
         foreach (var row in rows) _albumSelection.Add(row.Entry.RelativePath);
         OnPropertyChanged(nameof(AlbumSelectedCount));
+        OnPropertyChanged(nameof(AlbumHasSelection));
     }
 
     public void SelectAllAlbum()
@@ -114,6 +134,7 @@ public sealed partial class CloudViewModel
         _albumSelection.Clear();
         foreach (var row in AlbumRows) _albumSelection.Add(row.Entry.RelativePath);
         OnPropertyChanged(nameof(AlbumSelectedCount));
+        OnPropertyChanged(nameof(AlbumHasSelection));
     }
 
     public Task AlbumUpAsync()

@@ -140,7 +140,10 @@
                 <Button x:Name="RefreshButton"
                         Style="{StaticResource TopBarCompactButtonStyle}"
                         Click="RefreshButton_Click"
-                        ToolTipService.ToolTip="重新扫描已添加的媒体库（增量；新修的 JPG / 新的 RAW 会入库并重新配对）">
+                        ToolTipService.ToolTip="重新扫描已添加的媒体库（增量）；快捷键 F5">
+                    <Button.KeyboardAccelerators>
+                        <KeyboardAccelerator Key="F5" />
+                    </Button.KeyboardAccelerators>
                     <StackPanel Orientation="Horizontal" Spacing="6">
                         <FontIcon Glyph="&#xE72C;" FontSize="{ThemeResource AppFontCaptionSize}" />
                         <TextBlock Text="刷新" Style="{ThemeResource AppCaptionTextStyle}" />

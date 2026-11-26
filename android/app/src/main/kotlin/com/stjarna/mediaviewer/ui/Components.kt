@@ -33,6 +33,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -264,7 +265,13 @@ fun ColorDotRow(
 }
 
 @Composable
-fun EmptyState(title: String, description: String, modifier: Modifier = Modifier) {
+fun EmptyState(
+    title: String,
+    description: String,
+    modifier: Modifier = Modifier,
+    actionText: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
     Column(
         modifier = modifier
             .fillMaxWidth()
@@ -285,5 +292,9 @@ fun EmptyState(title: String, description: String, modifier: Modifier = Modifier
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (actionText != null && onAction != null) {
+            androidx.compose.foundation.layout.Spacer(Modifier.height(10.dp))
+            androidx.compose.material3.TextButton(onClick = onAction) { Text(actionText) }
+        }
     }
 }

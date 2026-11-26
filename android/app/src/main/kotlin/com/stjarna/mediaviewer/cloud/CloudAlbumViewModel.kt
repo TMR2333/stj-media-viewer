@@ -30,6 +30,7 @@ data class CloudAlbumUiState(
     val status: String = "填入 WebDAV 地址与账号后点「连接」。",
     val preview: File? = null,
     val previewName: String = "",
+    val error: String? = null,
 )
 
 /**
@@ -88,6 +89,7 @@ class CloudAlbumViewModel(app: Application) : AndroidViewModel(app) {
             val error = c.test()
             _state.value = _state.value.copy(
                 busy = false,
+                error = error,
                 status = if (error == null) "连接成功" else "连接失败：$error",
             )
             if (error == null) refresh(settings.cloudRoot)
@@ -103,6 +105,7 @@ class CloudAlbumViewModel(app: Application) : AndroidViewModel(app) {
                     _state.value = _state.value.copy(
                         busy = false,
                         entries = entries,
+                        error = null,
                         selection = emptySet(),
                         status = if (entries.isEmpty()) "这个目录是空的"
                         else "共 ${entries.size} 项（${entries.count { it.isDirectory }} 个文件夹 / ${entries.count { !it.isDirectory }} 个文件）",
@@ -110,7 +113,12 @@ class CloudAlbumViewModel(app: Application) : AndroidViewModel(app) {
                     loadThumbs(c, entries)
                 }
                 .onFailure { err ->
-                    _state.value = _state.value.copy(busy = false, status = "列目录失败：${err.message}")
+                    _state.value = _state.value.copy(
+                        busy = false,
+                        entries = emptyList(),
+                        error = err.message ?: "未知错误",
+                        status = "列目录失败：${err.message}",
+                    )
                 }
         }
     }

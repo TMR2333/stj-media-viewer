@@ -143,13 +143,18 @@ class LibraryViewModel(app: Application) : AndroidViewModel(app) {
     /** 更新单个素材（含写 XMP 边车；写失败只提示，不影响索引库）。 */
     fun saveAsset(asset: MediaAsset) {
         viewModelScope.launch {
-            withContext(Dispatchers.IO) {
-                graph.db.updateAsset(asset)
-                writeSidecar(asset)
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    graph.db.updateAsset(asset)
+                    writeSidecar(asset)
+                }
+                allAssets = allAssets.map { if (it.id == asset.id) asset else it }
+                recompute()
+            }.onSuccess {
+                state = state.copy(message = "已保存")
+            }.onFailure { err ->
+                state = state.copy(message = "保存失败：${err.message ?: "未知错误"}")
             }
-            allAssets = allAssets.map { if (it.id == asset.id) asset else it }
-            recompute()
-            state = state.copy(message = "已保存")
         }
     }
 

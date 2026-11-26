@@ -94,9 +94,11 @@
                                         IsEnabled="{x:Bind ViewModel.IsNotBusy, Mode=OneWay}" />
                                 <Button Content="全选" Style="{ThemeResource AppSubtleButtonStyle}" Click="AlbumSelectAll_Click" />
                                 <Button Content="下载到素材库" Style="{ThemeResource AppSubtleButtonStyle}" Click="AlbumDownload_Click"
-                                        IsEnabled="{x:Bind ViewModel.IsNotBusy, Mode=OneWay}" />
+                                        IsEnabled="{x:Bind ViewModel.AlbumHasSelection, Mode=OneWay}"
+                                        ToolTipService.ToolTip="先勾选云端文件，再下载到本地素材库" />
                                 <Button Content="上传所选素材" Style="{ThemeResource AppSubtleButtonStyle}" Click="AlbumUpload_Click"
-                                        IsEnabled="{x:Bind ViewModel.IsNotBusy, Mode=OneWay}" />
+                                        IsEnabled="{x:Bind ViewModel.IsNotBusy, Mode=OneWay}"
+                                        ToolTipService.ToolTip="先在素材库选中素材（会连同 XMP 边车一起上传）" />
                             </StackPanel>
                         </Grid>
 
@@ -144,10 +146,19 @@
                             </GridView.ItemsPanel>
                         </GridView>
 
+                        <InfoBar Severity="Error"
+                                 IsOpen="{x:Bind ViewModel.AlbumHasError, Mode=OneWay}"
+                                 Title="云相册加载失败"
+                                 Message="{x:Bind ViewModel.AlbumError, Mode=OneWay}">
+                            <InfoBar.ActionButton>
+                                <Button Content="重试" Click="AlbumRefresh_Click" />
+                            </InfoBar.ActionButton>
+                        </InfoBar>
+
                         <TextBlock Text="{x:Bind ViewModel.AlbumStatus, Mode=OneWay}"
                                    Style="{ThemeResource AppMicroTextStyle}"
                                    Foreground="{ThemeResource TextSecondaryBrush}"
-                                   TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                                   MaxLines="2" TextTrimming="CharacterEllipsis" IsTextSelectionEnabled="True" />
                     </StackPanel>
                 </Border>
 
